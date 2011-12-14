@@ -1,5 +1,7 @@
-
 (define all-tests '())
+
+(define (compile-program x)
+  (error 'compile-program "implement me!"))
 
 (define-syntax add-tests-with-string-output
   (syntax-rules (=>)
@@ -8,11 +10,6 @@
         (cons 
            '(test-name [expr string  output-string] ...)
             all-tests))]))
-
-(define (run-compile expr)
-  (let ([p (open-output-file "stst.s" 'replace)])
-    (compile-program expr p)
-    (close-output-port p)))
 
 (define (build)
   (unless (zero? (system "gcc -o stst startup.c stst.s"))
