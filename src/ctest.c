@@ -1,3 +1,3 @@
 int scheme_entry(){
-  return 7; /* should print 7 */
+  return 7 << 2; /* should print 7 */
 }
