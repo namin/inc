@@ -1,7 +1,7 @@
 (define all-tests '())
 
 (define (compile-program x)
-  (error 'compile-program "implement me!"))
+  (emit-program x)) ;; implemented by compiler.scm
 
 (define-syntax add-tests-with-string-output
   (syntax-rules (=>)

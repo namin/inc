@@ -1,7 +1,7 @@
 (load "tests-driver.scm")
 (load "tests-1.1-req.scm")
 
-(define (compile-program x)
+(define (emit-program x)
   (unless (integer? x) (error 'compile-program "not an integer"))
   (emit "  .text")
   (emit "  .globl scheme_entry")
