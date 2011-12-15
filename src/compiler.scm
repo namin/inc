@@ -5,9 +5,11 @@
 
 (define fxshift        2)
 (define fxmask      #x03)
-(define bool_f      #x2F)
-(define bool_t      #x6F)
-(define list_nil    #x3F)
+(define fxtag       #x00)
+(define bool-f      #x2F)
+(define bool-t      #x6F)
+(define bool-bit       6)
+(define list-nil    #x3F)
 (define charshift      8)
 (define charmask    #x0F)
 (define chartag     #x0F)
@@ -28,8 +30,8 @@
 (define (immediate-rep x)
   (cond
    [(fixnum? x) (ash x fxshift)]
-   [(boolean? x) (if x bool_t bool_f)]
-   [(null? x) list_nil]
+   [(boolean? x) (if x bool-t bool-f)]
+   [(null? x) list-nil]
    [(char? x) (bitwise-ior (ash (char->integer x) charshift) chartag)]
    [else #f]))
 
@@ -66,6 +68,24 @@
 (define-primitive ($fxadd1 arg)
   (emit-expr arg)
   (emit "  addl $~s, %eax" (immediate-rep 1)))
+
+(define-primitive ($fixnum->char arg)
+  (emit-expr arg)
+  (emit "  shll $~s, %eax" (- charshift fxshift))
+  (emit "  orl $~s, %eax" chartag))
+
+(define-primitive ($char->fixnum arg)
+  (emit-expr arg)
+  (emit "  shrl $~s, %eax" (- charshift fxshift)))
+
+(define-primitive (fixnum? arg)
+  (emit-expr arg)
+  (emit "  and $~s, %al" fxmask)
+  (emit "  cmp $~s, %al" fxtag)
+  (emit "  sete %al")
+  (emit "  movzbl %al, %eax")
+  (emit "  sal $~s, %al" bool-bit)
+  (emit "  or $~s, %al" bool-f))
 
 (define (emit-expr expr)
   (cond
