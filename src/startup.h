@@ -6,7 +6,7 @@
 #define bool_t               0x6F
 #define bool_bit                6
 #define list_nil             0x3F
-#define char_mask            0x0F
+#define char_mask            0x3F
 #define char_tag             0x0F
 #define char_shift              8
 

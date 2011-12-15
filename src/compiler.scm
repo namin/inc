@@ -9,9 +9,10 @@
 (define bool-f      #x2F)
 (define bool-t      #x6F)
 (define bool-bit       6)
+(define boolmask   #xBF)
 (define list-nil    #x3F)
 (define charshift      8)
-(define charmask    #x0F)
+(define charmask    #x3F)
 (define chartag     #x0F)
 (define wordsize       4) ; bytes
 
@@ -82,10 +83,40 @@
   (emit-expr arg)
   (emit "  and $~s, %al" fxmask)
   (emit "  cmp $~s, %al" fxtag)
+  (emit-cmp-bool))
+
+(define (emit-cmp-bool)
   (emit "  sete %al")
   (emit "  movzbl %al, %eax")
   (emit "  sal $~s, %al" bool-bit)
   (emit "  or $~s, %al" bool-f))
+
+(define-primitive ($fxzero? arg)
+  (emit-expr arg)
+  (emit "  cmp $~s, %al" fxtag)
+  (emit-cmp-bool))
+
+(define-primitive (null? arg)
+  (emit-expr arg)
+  (emit "  cmp $~s, %al" list-nil)
+  (emit-cmp-bool))
+
+(define-primitive (boolean? arg)
+  (emit-expr arg)
+  (emit "  and $~s, %al" boolmask)
+  (emit "  cmp $~s, %al" bool-f)
+  (emit-cmp-bool))
+
+(define-primitive (char? arg)
+  (emit-expr arg)
+  (emit "  and $~s, %al" charmask)
+  (emit "  cmp $~s, %al" chartag)
+  (emit-cmp-bool))
+
+(define-primitive (not arg)
+  (emit-expr arg)
+  (emit "  cmp $~s, %al" bool-f)
+  (emit-cmp-bool))
 
 (define (emit-expr expr)
   (cond
