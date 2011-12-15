@@ -1,5 +1,5 @@
 (load "tests-driver.scm")
-;;--- (load "tests-1.3-req.scm")
+(load "tests-1.3-req.scm")
 (load "tests-1.2-req.scm")
 (load "tests-1.1-req.scm")
 
@@ -117,6 +117,12 @@
   (emit-expr arg)
   (emit "  cmp $~s, %al" bool-f)
   (emit-cmp-bool))
+
+(define-primitive ($fxlognot arg)
+  (emit-expr arg)
+  (emit "  shr $~s, %eax" fxshift)
+  (emit "  not %eax")
+  (emit "  shl $~s, %eax" fxshift))
 
 (define (emit-expr expr)
   (cond
