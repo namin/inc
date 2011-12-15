@@ -9,7 +9,7 @@
 (define bool-f      #x2F)
 (define bool-t      #x6F)
 (define bool-bit       6)
-(define boolmask   #xBF)
+(define boolmask    #xBF)
 (define list-nil    #x3F)
 (define charshift      8)
 (define charmask    #x3F)
