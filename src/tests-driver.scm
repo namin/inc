@@ -123,8 +123,8 @@
    (build)
    (execute)
    (unless (string=? expected-output (get-string))
-     (error 'test "output mismatch for test ~s, expected ~s, got ~s"
-        test-id expected-output (get-string))))
+     (error 'test (format "output mismatch for test ~s, expected ~s, got ~s"
+        test-id expected-output (get-string)))))
 
 (define (emit . args)
   (apply fprintf (compile-port) args)
