@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-1.4-req.scm")
 (load "tests-1.3-req.scm")
 (load "tests-1.2-req.scm")
 (load "tests-1.1-req.scm")
@@ -128,10 +129,36 @@
   (emit "  not %eax")
   (emit "  shl $~s, %eax" fxshift))
 
+(define unique-label
+  (let ([count 0])
+    (lambda ()
+      (let ([L (format "L_~s" count)])
+        (set! count (add1 count))
+        L))))
+
+(define (if? expr)
+  (and (list? expr) (eq? (car expr) 'if) (= 3 (length (cdr expr)))))
+(define if-test cadr)
+(define if-conseq caddr)
+(define if-altern cadddr)
+
+(define (emit-if expr)
+  (let ([alt-label (unique-label)]
+        [end-label (unique-label)])
+    (emit-expr (if-test expr))
+    (emit "  cmp $~s, %al" bool-f)
+    (emit "  je ~a" alt-label)
+    (emit-expr (if-conseq expr))
+    (emit "  jmp ~a" end-label)
+    (emit "~a:" alt-label)
+    (emit-expr (if-altern expr))
+    (emit "~a:" end-label)))
+
 (define (emit-expr expr)
   (cond
    [(immediate? expr) (emit-immediate expr)]
    [(primcall? expr) (emit-primcall expr)]
+   [(if? expr) (emit-if expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
 
 (define (emit-function-header f)
