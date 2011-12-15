@@ -70,6 +70,10 @@
   (emit-expr arg)
   (emit "  addl $~s, %eax" (immediate-rep 1)))
 
+(define-primitive ($fxsub1 arg)
+  (emit-expr arg)
+  (emit "  subl $~s, %eax" (immediate-rep 1)))
+
 (define-primitive ($fixnum->char arg)
   (emit-expr arg)
   (emit "  shll $~s, %eax" (- charshift fxshift))

@@ -1,6 +1,3 @@
-
-
-
 (add-tests-with-string-output "fxadd1"
   [($fxadd1 0) => "1\n"]
   [($fxadd1 -1) => "0\n"]
@@ -12,6 +9,20 @@
   [($fxadd1 ($fxadd1 0)) => "2\n"]
   [($fxadd1 ($fxadd1 ($fxadd1 ($fxadd1 ($fxadd1 ($fxadd1 12)))))) => "18\n"]
   )
+
+(add-tests-with-string-output "fxsub1"
+  [($fxsub1 0) => "-1\n"]
+  [($fxsub1 -1) => "-2\n"]
+  [($fxsub1 1) => "0\n"]
+  [($fxsub1 -100) => "-101\n"]
+  [($fxsub1 1000) => "999\n"]
+  [($fxsub1 536870911) => "536870910\n"]
+  [($fxsub1 -536870911) => "-536870912\n"]
+  [($fxsub1 ($fxsub1 0)) => "-2\n"]
+  [($fxsub1 ($fxsub1 ($fxsub1 ($fxsub1 ($fxsub1 ($fxsub1 12)))))) => "6\n"]
+  [($fxsub1 ($fxadd1 0)) => "0\n"]
+  )
+
 
 (add-tests-with-string-output "fixnum->char and char->fixnum"
    [($fixnum->char 65) => "#\\A\n"]
