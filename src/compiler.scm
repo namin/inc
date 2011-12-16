@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-1.6-opt.scm")
 (load "tests-1.6-req.scm")
 (load "tests-1.5-req.scm")
 (load "tests-1.4-req.scm")
@@ -215,6 +216,8 @@
 (define variable? symbol?)
 (define (let? expr)
   (and (list? expr) (eq? (car expr) 'let)))
+(define (let*? expr)
+  (and (list? expr) (eq? (car expr) 'let*)))
 (define let-bindings cadr)
 (define let-body caddr)
 (define empty? null?)
@@ -241,7 +244,7 @@
       (emit-expr si new-env (let-body expr))]
      [else
       (let ([b (first bindings)])
-        (emit-expr si env (rhs b))
+        (emit-expr si (if (let*? expr) new-env env) (rhs b))
         (emit-stack-save si)
         (process-let (rest bindings)
            (next-stack-index si)
@@ -258,7 +261,7 @@
    [(immediate? expr) (emit-immediate expr)]
    [(variable? expr) (emit-variable-ref env expr)]
    [(if? expr) (emit-if si env expr)]
-   [(let? expr) (emit-let si env expr)]
+   [(or (let? expr) (let*? expr)) (emit-let si env expr)]
    [(primcall? expr) (emit-primcall si env expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
 
