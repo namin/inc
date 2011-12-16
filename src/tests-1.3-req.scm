@@ -117,12 +117,12 @@
 )
 
 (add-tests-with-string-output "fxlognot"
- [($fxlognot 0) => "-1\n"]
- [($fxlognot -1) => "0\n"]
- [($fxlognot 1) => "-2\n"]
- [($fxlognot -2) => "1\n"]
- [($fxlognot 536870911) => "-536870912\n"]
- [($fxlognot -536870912) => "536870911\n"]
- [($fxlognot ($fxlognot 237463)) => "237463\n"]
+ [(fxlognot 0) => "-1\n"]
+ [(fxlognot -1) => "0\n"]
+ [(fxlognot 1) => "-2\n"]
+ [(fxlognot -2) => "1\n"]
+ [(fxlognot 536870911) => "-536870912\n"]
+ [(fxlognot -536870912) => "536870911\n"]
+ [(fxlognot (fxlognot 237463)) => "237463\n"]
 )
 

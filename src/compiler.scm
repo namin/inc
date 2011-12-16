@@ -1,5 +1,5 @@
 (load "tests-driver.scm")
-;(load "tests-1.5-req.scm")
+(load "tests-1.5-req.scm")
 (load "tests-1.4-req.scm")
 (load "tests-1.3-req.scm")
 (load "tests-1.2-req.scm")
@@ -91,8 +91,8 @@
   (emit "  cmp $~s, %al" fxtag)
   (emit-cmp-bool))
 
-(define (emit-cmp-bool)
-  (emit "  sete %al")
+(define (emit-cmp-bool . args)
+  (emit "  ~s %al" (if (null? args) 'sete (car args)))
   (emit "  movzbl %al, %eax")
   (emit "  sal $~s, %al" bool-bit)
   (emit "  or $~s, %al" bool-f))
@@ -124,17 +124,58 @@
   (emit "  cmp $~s, %al" bool-f)
   (emit-cmp-bool))
 
-(define-primitive ($fxlognot si arg)
+(define-primitive (fxlognot si arg)
   (emit-expr si arg)
   (emit "  shr $~s, %eax" fxshift)
   (emit "  not %eax")
   (emit "  shl $~s, %eax" fxshift))
 
 (define-primitive (fx+ si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  addl ~s(%rsp), %eax" si))
+
+(define (emit-binop si arg1 arg2)
   (emit-expr si arg1)
   (emit "  movl %eax, ~s(%rsp)" si)
-  (emit-expr (- si wordsize) arg2)
-  (emit "  addl ~s(%rsp), %eax" si))
+  (emit-expr (- si wordsize) arg2))
+  
+(define-primitive (fx- si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  subl %eax, ~s(%rsp)" si)
+  (emit "  movl ~s(%rsp), %eax" si))
+
+(define-primitive (fx* si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  shrl $~s, %eax" fxshift)
+  (emit "  mull ~s(%rsp)" si))
+
+(define-primitive (fxlogor si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  orl ~s(%rsp), %eax" si))
+
+(define-primitive (fxlogand si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  andl ~s(%rsp), %eax" si))
+
+(define-primitive (fx= si arg1 arg2)
+  (emit-cmp-binop 'sete si arg1 arg2))
+
+(define (emit-cmp-binop setx si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  cmpl %eax, ~s(%rsp)" si)
+  (emit-cmp-bool setx))
+
+(define-primitive (fx< si arg1 arg2)
+  (emit-cmp-binop 'setl si arg1 arg2))
+
+(define-primitive (fx<= si arg1 arg2)
+  (emit-cmp-binop 'setle si arg1 arg2))
+
+(define-primitive (fx> si arg1 arg2)
+  (emit-cmp-binop 'setg si arg1 arg2))
+
+(define-primitive (fx>= si arg1 arg2)
+  (emit-cmp-binop 'setge si arg1 arg2))
 
 (define unique-label
   (let ([count 0])
