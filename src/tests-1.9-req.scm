@@ -13,10 +13,14 @@
   [(if (cons 12 43) 32 43) => "32\n"]
   [(car (cons 1 23)) => "1\n"]
   [(cdr (cons 43 123)) => "123\n"]
+  [(let ((x (cons 1 2)) (y (cons 3 4))) (pair? x)) => "#t\n"]
+  [(pair? (cons (cons 12 3) #f)) => "#t\n"]
+  [(pair? (cons (cons 12 3) (cons #t #f))) => "#t\n"]
   [(car (car (cons (cons 12 3) (cons #t #f)))) => "12\n"]
   [(cdr (car (cons (cons 12 3) (cons #t #f)))) => "3\n"]
   [(car (cdr (cons (cons 12 3) (cons #t #f)))) => "#t\n"]
   [(cdr (cdr (cons (cons 12 3) (cons #t #f)))) => "#f\n"]
+  [(pair? (cons (fx* 1 1) 1)) => "#t\n"]
   [(let ([x (let ([y (fx+ 1 2)]) (fx* y y))])
      (cons x (fx+ x x)))
    => "(9 . 18)\n"]

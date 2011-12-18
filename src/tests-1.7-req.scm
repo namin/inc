@@ -30,4 +30,9 @@
                      acc
                      (f (fxsub1 x) (fx* acc x))))])
       (f 5 1)) => "120\n"]
+  [(letrec ([f (lambda (x) 
+                 (if (fxzero? x)
+                     0
+                     (fx+ 1 (f (fxsub1 x)))))])
+      (f 200)) => "200\n"]
 )

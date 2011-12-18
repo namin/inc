@@ -9,6 +9,11 @@
 #define char_mask            0x3F
 #define char_tag             0x0F
 #define char_shift              8
+#define obj_mask             0x3F
+#define obj_shift               3
+#define pair_tag             0x0F
+#define pair_size               8
+
 
 /* all scheme values are of type ptrs */
 typedef unsigned int ptr;

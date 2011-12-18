@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+;(load "tests-1.9-req.scm")
 (load "tests-1.8-req.scm")
 (load "tests-1.7-req.scm")
 (load "tests-1.6-opt.scm")
@@ -20,6 +21,12 @@
 (define charshift      8)
 (define charmask    #x3F)
 (define chartag     #x0F)
+(define objshift       3)
+(define objmask     #x07)
+(define pairtag     #x01)
+(define pairsize       8)
+(define paircar        0)
+(define paircdr        4)
 (define wordsize       4) ; bytes
 
 (define registers
@@ -35,23 +42,29 @@
 (define x64 (make-parameter #t))
 (define address-size (make-parameter (* 2 wordsize)))
 (define sp (make-parameter 'rsp))
+(define ax (make-parameter 'rax))
 (define cx (make-parameter 'rcx))
-(define reg-prefix (make-parameter 'r))
-(define instr-suffix (make-parameter 'q))
+(define rsi (make-parameter 'rsi))
+(define bp (make-parameter 'rbp))
+(define reg-pref (make-parameter 'r))
+(define instr-suf (make-parameter 'q))
 (define (run-compile-32 expr)
   (parameterize
    ([x64 #f]
     [address-size wordsize]
     [sp 'esp]
+    [ax 'eax]
     [cx 'ecx]
-    [reg-prefix 'e]
-    [instr-suffix 'l])
+    [rsi 'esi]
+    [bp 'ebp]
+    [reg-pref 'e]
+    [instr-suf 'l])
    (run-compile expr)))
 
 (define (sv si)
   (format "~s(%~a)" si (sp)))
 
-(define (reg-name reg) (format "~a~a" (reg-prefix) (car reg)))
+(define (reg-name reg) (format "~a~a" (reg-pref) (car reg)))
 (define (reg-preserve? reg) (eq? 'preserve (cadr reg)))
 
 (define fixnum-bits (- (* wordsize 8) fxshift))
@@ -370,6 +383,39 @@
     (move-arguments si (- (+ si wordsize)) (call-args expr))
     (emit-jmp (lookup (call-target expr) env))]))
 
+(define heap-cell-size (ash 1 objshift))
+(define (emit-heap-alloc size)
+  (let ([alloc-size (* (div size heap-cell-size) heap-cell-size)])
+    (emit "  mov~a %~a, %~a" (instr-suf) (bp) (ax))
+    (emit "  sub~a %~a, %~a" (instr-suf) (rsi) (ax))
+    (emit "  add~a $~a, %~a" (instr-suf) (* alloc-size 8) (bp))))
+(define (emit-stack-to-heap si offset)
+  (emit "  add~a %~a, %~a" (instr-suf) (rsi) (ax))
+  (emit "  movl ~a, %edx" (sv si))
+  (emit "  movl %edx, ~a(%~a)" offset (ax))
+  (emit "  sub~a %~a, %~a" (instr-suf) (rsi) (ax)))
+(define (emit-heap-load offset)
+  (emit "  add~a %~a, %~a" (instr-suf) (rsi) (ax))
+  (emit "  movl ~a(%~a), %eax" offset (ax)))
+(define-primitive (cons si env arg1 arg2)
+  (emit-binop si env arg1 arg2)
+  (emit-stack-save (next-stack-index si))
+  (emit-heap-alloc pairsize)
+  (emit "  orl $~s, %eax" pairtag)
+  (emit-stack-to-heap si (- paircar pairtag))
+  (emit-stack-to-heap (next-stack-index si) (- paircdr pairtag)))
+(define-primitive (pair? si env arg)
+  (emit-expr si env arg)
+  (emit "  and $~s, %al" objmask)
+  (emit "  cmp $~s, %al" pairtag)
+  (emit-cmp-bool))
+(define-primitive (car si env arg)
+  (emit-expr si env arg)
+  (emit-heap-load (- paircar pairtag)))
+(define-primitive (cdr si env arg)
+  (emit-expr si env arg)
+  (emit-heap-load (- paircdr pairtag)))
+
 (define (emit-label label)
   (emit "~a:" label))
 
@@ -384,7 +430,7 @@
   (emit-tail-expr (- wordsize) env expr))
 
 (define (emit-adjust-base si)
-  (unless (= si 0) (emit "  add~a $~s, %~a" (instr-suffix) si (sp))))
+  (unless (= si 0) (emit "  add~a $~s, %~a" (instr-suf) si (sp))))
 
 (define (emit-call label)
   (emit "  call ~a" label))
@@ -402,16 +448,18 @@
 
 (define (backup-registers)
   (preserve-registers (lambda (name num)
-    (emit "  mov~a %~a, ~s(%~a)" (instr-suffix) name num (cx)))))
+    (emit "  mov~a %~a, ~s(%~a)" (instr-suf) name num (cx)))))
 
 (define (restore-registers)
   (preserve-registers (lambda (name num)
-    (emit "  mov~a ~s(%~a), %~a" (instr-suffix) num (cx) name))))
+    (emit "  mov~a ~s(%~a), %~a" (instr-suf) num (cx) name))))
     
 (define (emit-program program)
   (emit-function-header "scheme_entry")
-  (emit "  mov~a ~a, %~a" (instr-suffix) (sv (address-size)) (cx))
+  (emit "  mov~a ~a, %~a" (instr-suf) (sv (address-size)) (cx))
   (backup-registers)
+  (emit "  mov~a ~a, %~a" (instr-suf) (sv (- (address-size))) (bp))
+  (emit "  mov~a %~a, %~a" (instr-suf) (bp) (rsi))
   (emit-call "L_scheme_entry")
   (restore-registers)
   (emit "  ret")
