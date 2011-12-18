@@ -28,6 +28,7 @@
 (define paircar        0)
 (define paircdr        8)
 (define wordsize       8) ; bytes
+(define bytes          4)
 
 (define registers
   '((rax scratch)
@@ -356,9 +357,9 @@
 
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
-  (let ([alloc-size (* (div size heap-cell-size) heap-cell-size)])
+  (let ([alloc-size (* (add1 (div (sub1 size) heap-cell-size)) heap-cell-size)])
     (emit "  mov %rbp, %rax")
-    (emit "  add $~s, %rbp" (* alloc-size heap-cell-size))))
+    (emit "  add $~s, %rbp" (* alloc-size bytes))))
 (define (emit-stack-to-heap si offset)
   (emit "  mov ~s(%rsp), %rdx" si)
   (emit "  mov %rdx, ~s(%rax)" offset))
