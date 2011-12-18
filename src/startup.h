@@ -15,7 +15,7 @@
 #define pair_size              16
 #define pair_car                0
 #define pair_cdr                8
-
+#define vector_tag            0x05
 
 /* all scheme values are of type ptrs */
 typedef unsigned long ptr;
@@ -35,3 +35,8 @@ typedef struct {
   ptr car;
   ptr cdr;
 } cell;
+
+typedef struct {
+  ptr length;
+  ptr buf[1];
+} vector;

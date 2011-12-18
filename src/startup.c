@@ -40,6 +40,18 @@ static void print_ptr_rec(ptr x, int state) {
       }
     }
     if (state != IN_LIST) printf(")");
+  } else if ((x & obj_mask) == vector_tag) {
+    printf("#(");
+
+    vector* p = (vector*)(x-vector_tag);
+    unsigned long n = p->length >> fx_shift;
+    unsigned long i;
+    for (i = 0; i < n; i++) {
+      if (i > 0) printf(" ");
+      print_ptr_rec(p->buf[i], OUT_LIST);
+    }
+
+    printf(")");
   } else {
     printf("#<unknown 0x%08lx>", x);
   }
