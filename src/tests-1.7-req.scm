@@ -25,7 +25,9 @@
                      1
                      (fx* x (f (fxsub1 x)))))])
       (f 5)) => "120\n"]
-  [(letrec ([e (lambda (x) (if (fxzero? x) #t (o (fxsub1 x))))]
-            [o (lambda (x) (if (fxzero? x) #f (e (fxsub1 x))))])
-     (e 5)) => "#f\n"]
+  [(letrec ([f (lambda (x acc) 
+                 (if (fxzero? x)
+                     acc
+                     (f (fxsub1 x) (fx* acc x))))])
+      (f 5 1)) => "120\n"]
 )

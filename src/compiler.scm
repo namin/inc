@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-1.8-req.scm")
 (load "tests-1.7-req.scm")
 (load "tests-1.6-opt.scm")
 (load "tests-1.6-req.scm")
@@ -196,14 +197,8 @@
         (set! count (add1 count))
         L))))
 
-(define unique-labels
-  (let ([count 0])
-    (lambda (lvars)
-      (map (lambda (lvar)
-             (let ([L (format "L_~s_~s" lvar count)])
-               (set! count (add1 count))
-               L))
-           lvars))))
+(define (unique-labels lvars)
+  (map (lambda (lvar) (format "L_proc_~s" lvar)) lvars))
 
 (define (if? expr)
   (and (list? expr) (eq? (car expr) 'if) (= 3 (length (cdr expr)))))
@@ -211,16 +206,16 @@
 (define if-conseq caddr)
 (define if-altern cadddr)
 
-(define (emit-if si env expr)
+(define (emit-if si env tail expr)
   (let ([alt-label (unique-label)]
         [end-label (unique-label)])
     (emit-expr si env (if-test expr))
     (emit "  cmp $~s, %al" bool-f)
     (emit "  je ~a" alt-label)
-    (emit-expr si env (if-conseq expr))
-    (emit "  jmp ~a" end-label)
+    (emit-any-expr si env tail (if-conseq expr))
+    (if (not tail) (emit "  jmp ~a" end-label))
     (emit-label alt-label)
-    (emit-expr si env (if-altern expr))
+    (emit-any-expr si env tail (if-altern expr))
     (emit-label end-label)))
 
 (define variable? symbol?)
@@ -253,11 +248,11 @@
    [(assv var env) => cadr]
    [else #f]))
 
-(define (emit-let si env expr)
+(define (emit-let si env tail expr)
   (define (process-let bindings si new-env)
     (cond
      [(empty? bindings)
-      (emit-expr si new-env (let-body expr))]
+      (emit-any-expr si new-env tail (let-body expr))]
      [else
       (let ([b (first bindings)])
         (emit-expr si (if (let*? expr) new-env env) (rhs b))
@@ -272,14 +267,23 @@
    [(lookup var env) => emit-stack-load]
    (else (error 'emit-variable-ref (format "undefined variable ~s" var)))))
 
+(define (emit-ret-if tail)
+  (if tail (emit "  ret")))
+
 (define (emit-expr si env expr)
+  (emit-any-expr si env #f expr))
+
+(define (emit-tail-expr si env expr)
+  (emit-any-expr si env #t expr))
+
+(define (emit-any-expr si env tail expr)
   (cond
-   [(immediate? expr) (emit-immediate expr)]
-   [(variable? expr) (emit-variable-ref env expr)]
-   [(if? expr) (emit-if si env expr)]
-   [(or (let? expr) (let*? expr)) (emit-let si env expr)]
-   [(primcall? expr) (emit-primcall si env expr)]
-   [(app? expr env) (emit-app si env expr)]
+   [(immediate? expr) (emit-immediate expr) (emit-ret-if tail)]
+   [(variable? expr) (emit-variable-ref env expr) (emit-ret-if tail)]
+   [(if? expr) (emit-if si env tail expr)]
+   [(or (let? expr) (let*? expr)) (emit-let si env tail expr)]
+   [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
+   [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
 
 (define (emit-letrec expr)
@@ -302,8 +306,7 @@
       (let f ([fmls fmls] [si (- wordsize)] [env env])
         (cond
          [(empty? fmls)
-          (emit-expr si env body)
-          (emit "  ret")]
+          (emit-tail-expr si env body)]
          [else
           (f (rest fmls)
              (- si wordsize)
@@ -313,16 +316,27 @@
   (and (list? expr) (not (null? expr)) (lookup (call-target expr) env)))
 (define call-target car)
 (define call-args cdr)
-(define (emit-app si env expr)
+(define (emit-app si env tail expr)
   (define (emit-arguments si args)
     (unless (empty? args)
       (emit-expr si env (first args))
       (emit-stack-save si)
       (emit-arguments (- si wordsize) (rest args))))
-  (emit-arguments (- si (* 2 wordsize)) (call-args expr))
-  (emit-adjust-base (+ si wordsize))
-  (emit-call (lookup (call-target expr) env))
-  (emit-adjust-base (- (+ si wordsize))))
+  (define (move-arguments si delta args)
+    (unless (or (= delta 0) (empty? args))
+      (emit-stack-load si)
+      (emit-stack-save (+ si delta))
+      (move-arguments (- si wordsize) delta (rest args))))
+  (cond
+   [(not tail)
+    (emit-arguments (- si (* 2 wordsize)) (call-args expr))
+    (emit-adjust-base (+ si wordsize))
+    (emit-call (lookup (call-target expr) env))
+    (emit-adjust-base (- (+ si wordsize)))]
+   [else ; tail
+    (emit-arguments si (call-args expr))
+    (move-arguments si (- (+ si wordsize)) (call-args expr))
+    (emit-jmp (lookup (call-target expr) env))]))
 
 (define (emit-label label)
   (emit "~a:" label))
@@ -335,14 +349,16 @@
 
 (define (emit-scheme-entry expr env)
   (emit-function-header "L_scheme_entry")
-  (emit-expr (- wordsize) env expr)
-  (emit "  ret"))
+  (emit-tail-expr (- wordsize) env expr))
 
 (define (emit-adjust-base si)
   (unless (= si 0) (emit "  addq $~s, %rsp" si)))
 
 (define (emit-call label)
   (emit "  call ~a" label))
+
+(define (emit-jmp label)
+  (emit "  jmp ~a" label))
 
 (define (emit-program program)
   (emit-function-header "scheme_entry")
