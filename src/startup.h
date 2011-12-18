@@ -9,14 +9,16 @@
 #define char_mask            0x3F
 #define char_tag             0x0F
 #define char_shift              8
-#define obj_mask             0x3F
+#define obj_mask             0x07
 #define obj_shift               3
-#define pair_tag             0x0F
-#define pair_size               8
+#define pair_tag             0x01
+#define pair_size              16
+#define pair_car                0
+#define pair_cdr                8
 
 
 /* all scheme values are of type ptrs */
-typedef unsigned int ptr;
+typedef unsigned long ptr;
 
 typedef struct {
   void* eax; /* 0   scratch  */
@@ -29,3 +31,7 @@ typedef struct {
   void* esp; /* 28  preserve */
 } context;
 
+typedef struct {
+  ptr car;
+  ptr cdr;
+} cell;

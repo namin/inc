@@ -24,55 +24,26 @@
 (define objshift       3)
 (define objmask     #x07)
 (define pairtag     #x01)
-(define pairsize       8)
+(define pairsize      16)
 (define paircar        0)
-(define paircdr        4)
-(define wordsize       4) ; bytes
+(define paircdr        8)
+(define wordsize       8) ; bytes
 
 (define registers
-  '((ax scratch)
-    (bx preserve)
-    (cx scratch)
-    (dx scratch)
-    (si preserve)
-    (di preserve)
-    (bp preserve)
-    (sp preserve)))
-
-(define x64 (make-parameter #t))
-(define address-size (make-parameter (* 2 wordsize)))
-(define sp (make-parameter 'rsp))
-(define ax (make-parameter 'rax))
-(define cx (make-parameter 'rcx))
-(define rsi (make-parameter 'rsi))
-(define bp (make-parameter 'rbp))
-(define reg-pref (make-parameter 'r))
-(define instr-suf (make-parameter 'q))
-(define (run-compile-32 expr)
-  (parameterize
-   ([x64 #f]
-    [address-size wordsize]
-    [sp 'esp]
-    [ax 'eax]
-    [cx 'ecx]
-    [rsi 'esi]
-    [bp 'ebp]
-    [reg-pref 'e]
-    [instr-suf 'l])
-   (run-compile expr)))
-
-(define (sv si)
-  (format "~s(%~a)" si (sp)))
-
-(define (reg-name reg) (format "~a~a" (reg-pref) (car reg)))
+  '((rax scratch)
+    (rbx preserve)
+    (rcx scratch)
+    (rdx scratch)
+    (rsi preserve)
+    (rdi preserve)
+    (rbp preserve)
+    (rsp preserve)))
+(define (reg-name reg) (car reg))
 (define (reg-preserve? reg) (eq? 'preserve (cadr reg)))
 
 (define fixnum-bits (- (* wordsize 8) fxshift))
-
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
-
 (define fxupper (sub1 (expt 2 (- fixnum-bits 1))))
-
 (define (fixnum? x)
   (and (integer? x) (exact? x) (<= fxlower x fxupper)))
 
@@ -88,7 +59,7 @@
    [else #f]))
 
 (define (emit-immediate x)
-  (emit "  movl $~s, %eax" (immediate-rep x)))
+  (emit "  mov $~s, %rax" (immediate-rep x)))
 
 (define-syntax define-primitive
   (syntax-rules ()
@@ -119,20 +90,20 @@
 
 (define-primitive (fxadd1 si env arg)
   (emit-expr si env arg)
-  (emit "  addl $~s, %eax" (immediate-rep 1)))
+  (emit "  add $~s, %rax" (immediate-rep 1)))
 
 (define-primitive (fxsub1 si env arg)
   (emit-expr si env arg)
-  (emit "  subl $~s, %eax" (immediate-rep 1)))
+  (emit "  sub $~s, %rax" (immediate-rep 1)))
 
 (define-primitive (fixnum->char si env arg)
   (emit-expr si env arg)
-  (emit "  shll $~s, %eax" (- charshift fxshift))
-  (emit "  orl $~s, %eax" chartag))
+  (emit "  shl $~s, %rax" (- charshift fxshift))
+  (emit "  or $~s, %rax" chartag))
 
 (define-primitive (char->fixnum si env arg)
   (emit-expr si env arg)
-  (emit "  shrl $~s, %eax" (- charshift fxshift)))
+  (emit "  shr $~s, %rax" (- charshift fxshift)))
 
 (define-primitive (fixnum? si env arg)
   (emit-expr si env arg)
@@ -142,13 +113,13 @@
 
 (define (emit-cmp-bool . args)
   (emit "  ~s %al" (if (null? args) 'sete (car args)))
-  (emit "  movzbl %al, %eax")
+  (emit "  movzbq %al, %rax")
   (emit "  sal $~s, %al" bool-bit)
   (emit "  or $~s, %al" bool-f))
 
 (define-primitive (fxzero? si env arg)
   (emit-expr si env arg)
-  (emit "  cmpl $~s, %eax" fxtag)
+  (emit "  cmp $~s, %rax" fxtag)
   (emit-cmp-bool))
 
 (define-primitive (null? si env arg)
@@ -175,13 +146,13 @@
 
 (define-primitive (fxlognot si env arg)
   (emit-expr si env arg)
-  (emit "  shr $~s, %eax" fxshift)
-  (emit "  not %eax")
-  (emit "  shl $~s, %eax" fxshift))
+  (emit "  shr $~s, %rax" fxshift)
+  (emit "  not %rax")
+  (emit "  shl $~s, %rax" fxshift))
 
 (define-primitive (fx+ si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  addl ~a, %eax" (sv si)))
+  (emit "  add ~s(%rsp), %rax" si))
 
 (define (emit-binop si env arg1 arg2)
   (emit-expr si env arg1)
@@ -189,38 +160,38 @@
   (emit-expr (next-stack-index si) env arg2))
 
 (define (emit-stack-save si)
-  (emit "  movl %eax, ~a" (sv si)))
+  (emit "  mov %rax, ~s(%rsp)" si))
 
 (define (emit-stack-load si)
-  (emit "  movl ~a, %eax" (sv si)))
+  (emit "  mov ~s(%rsp), %rax" si))
 
 (define (next-stack-index si)
   (- si wordsize))
 
 (define-primitive (fx- si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  subl %eax, ~a" (sv si))
+  (emit "  sub %rax, ~s(%rsp)" si)
   (emit-stack-load si))
 
 (define-primitive (fx* si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  shrl $~s, %eax" fxshift)
-  (emit "  mull ~a" (sv si)))
+  (emit "  shr $~s, %rax" fxshift)
+  (emit "  mulq ~s(%rsp)" si))
 
 (define-primitive (fxlogor si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  orl ~a, %eax" (sv si)))
+  (emit "  or ~s(%rsp), %rax" si))
 
 (define-primitive (fxlogand si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  andl ~a, %eax" (sv si)))
+  (emit "  and ~s(%rsp), %rax" si))
 
 (define-primitive (fx= si env arg1 arg2)
   (emit-cmp-binop 'sete si env arg1 arg2))
 
 (define (emit-cmp-binop setx si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  cmpl %eax, ~a" (sv si))
+  (emit "  cmp %rax, ~s(%rsp)" si)
   (emit-cmp-bool setx))
 
 (define-primitive (fx< si env arg1 arg2)
@@ -374,7 +345,7 @@
       (move-arguments (- si wordsize) delta (rest args))))
   (cond
    [(not tail)
-    (emit-arguments (- si (address-size)) (call-args expr))
+    (emit-arguments (- si wordsize) (call-args expr))
     (emit-adjust-base (+ si wordsize))
     (emit-call (lookup (call-target expr) env))
     (emit-adjust-base (- (+ si wordsize)))]
@@ -386,22 +357,19 @@
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
   (let ([alloc-size (* (div size heap-cell-size) heap-cell-size)])
-    (emit "  mov~a %~a, %~a" (instr-suf) (bp) (ax))
-    (emit "  sub~a %~a, %~a" (instr-suf) (rsi) (ax))
-    (emit "  add~a $~a, %~a" (instr-suf) (* alloc-size 8) (bp))))
+    (emit "  mov %rbp, %rax")
+    (emit "  add $~s, %rbp" (* alloc-size heap-cell-size))))
 (define (emit-stack-to-heap si offset)
-  (emit "  add~a %~a, %~a" (instr-suf) (rsi) (ax))
-  (emit "  movl ~a, %edx" (sv si))
-  (emit "  movl %edx, ~a(%~a)" offset (ax))
-  (emit "  sub~a %~a, %~a" (instr-suf) (rsi) (ax)))
+  (emit "  mov ~s(%rsp), %rdx" si)
+  (emit "  mov %rdx, ~s(%rax)" offset))
 (define (emit-heap-load offset)
-  (emit "  add~a %~a, %~a" (instr-suf) (rsi) (ax))
-  (emit "  movl ~a(%~a), %eax" offset (ax)))
+  (emit "  mov ~s(%rax), %rax" offset))
+
 (define-primitive (cons si env arg1 arg2)
   (emit-binop si env arg1 arg2)
   (emit-stack-save (next-stack-index si))
   (emit-heap-alloc pairsize)
-  (emit "  orl $~s, %eax" pairtag)
+  (emit "  or $~s, %rax" pairtag)
   (emit-stack-to-heap si (- paircar pairtag))
   (emit-stack-to-heap (next-stack-index si) (- paircdr pairtag)))
 (define-primitive (pair? si env arg)
@@ -430,7 +398,7 @@
   (emit-tail-expr (- wordsize) env expr))
 
 (define (emit-adjust-base si)
-  (unless (= si 0) (emit "  add~a $~s, %~a" (instr-suf) si (sp))))
+  (unless (= si 0) (emit "  add $~s, %rsp" si)))
 
 (define (emit-call label)
   (emit "  call ~a" label))
@@ -443,23 +411,22 @@
     (unless (null? regs)
       (let ([reg (first regs)])
         (if (reg-preserve? reg)
-          (cmd (reg-name reg) (* count (address-size))))
+          (cmd (reg-name reg) (* count wordsize)))
         (loop (rest regs) (+ count 1))))))
 
 (define (backup-registers)
   (preserve-registers (lambda (name num)
-    (emit "  mov~a %~a, ~s(%~a)" (instr-suf) name num (cx)))))
+    (emit "  mov %~a, ~s(%rcx)" name num))))
 
 (define (restore-registers)
   (preserve-registers (lambda (name num)
-    (emit "  mov~a ~s(%~a), %~a" (instr-suf) num (cx) name))))
+    (emit "  mov ~s(%rcx), %~a" num name))))
     
 (define (emit-program program)
   (emit-function-header "scheme_entry")
-  (emit "  mov~a ~a, %~a" (instr-suf) (sv (address-size)) (cx))
+  (emit "  mov ~s(%rsp), %rcx" wordsize)
   (backup-registers)
-  (emit "  mov~a ~a, %~a" (instr-suf) (sv (- (address-size))) (bp))
-  (emit "  mov~a %~a, %~a" (instr-suf) (bp) (rsi))
+  (emit "  mov ~s(%rsp), %rbp" (* 3 wordsize))
   (emit-call "L_scheme_entry")
   (restore-registers)
   (emit "  ret")
