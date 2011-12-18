@@ -14,5 +14,5 @@
   [(not (if (not (if (if (not 1) (not 2) (not 3)) 4 5)) 6 7)) => "#f\n"] 
   [(if (char? 12) 13 14) => "14\n"]
   [(if (char? #\a) 13 14) => "13\n"]
-  [($fxadd1 (if ($fxsub1 1) ($fxsub1 13) 14)) => "13\n"]
+  [(fxadd1 (if (fxsub1 1) (fxsub1 13) 14)) => "13\n"]
 )
