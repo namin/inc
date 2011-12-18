@@ -1,1 +1,1 @@
-extern ptr scheme_entry(char* stack_base);
+extern ptr scheme_entry(context* ctxt, char* stack_base, char* heap);

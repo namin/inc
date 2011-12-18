@@ -22,18 +22,37 @@
 (define chartag     #x0F)
 (define wordsize       4) ; bytes
 
-(define x64 #t)
-(define address-size (* 2 wordsize))
-(define sp "rsp")
-(define sp-backup "rcx")
-(define sp-suffix "q")
-(define (set-for-32-bit!)
-  (set! address-size wordsize)
-  (set! sp "esp")
-  (set! sp-backup "ecx")
-  (set! sp-suffix "l"))
+(define registers
+  '((ax scratch)
+    (bx preserve)
+    (cx scratch)
+    (dx scratch)
+    (si preserve)
+    (di preserve)
+    (bp preserve)
+    (sp preserve)))
+
+(define x64 (make-parameter #t))
+(define address-size (make-parameter (* 2 wordsize)))
+(define sp (make-parameter 'rsp))
+(define cx (make-parameter 'rcx))
+(define reg-prefix (make-parameter 'r))
+(define instr-suffix (make-parameter 'q))
+(define (run-compile-32 expr)
+  (parameterize
+   ([x64 #f]
+    [address-size wordsize]
+    [sp 'esp]
+    [cx 'ecx]
+    [reg-prefix 'e]
+    [instr-suffix 'l])
+   (run-compile expr)))
+
 (define (sv si)
-  (format "~s(%~a)" si sp))
+  (format "~s(%~a)" si (sp)))
+
+(define (reg-name reg) (format "~a~a" (reg-prefix) (car reg)))
+(define (reg-preserve? reg) (eq? 'preserve (cadr reg)))
 
 (define fixnum-bits (- (* wordsize 8) fxshift))
 
@@ -342,7 +361,7 @@
       (move-arguments (- si wordsize) delta (rest args))))
   (cond
    [(not tail)
-    (emit-arguments (- si address-size) (call-args expr))
+    (emit-arguments (- si (address-size)) (call-args expr))
     (emit-adjust-base (+ si wordsize))
     (emit-call (lookup (call-target expr) env))
     (emit-adjust-base (- (+ si wordsize)))]
@@ -365,7 +384,7 @@
   (emit-tail-expr (- wordsize) env expr))
 
 (define (emit-adjust-base si)
-  (unless (= si 0) (emit "  add~a $~s, %~a" sp-suffix si sp)))
+  (unless (= si 0) (emit "  add~a $~s, %~a" (instr-suffix) si (sp))))
 
 (define (emit-call label)
   (emit "  call ~a" label))
@@ -373,12 +392,28 @@
 (define (emit-jmp label)
   (emit "  jmp ~a" label))
 
+(define (preserve-registers cmd)
+  (let loop ([regs registers] [count 0])
+    (unless (null? regs)
+      (let ([reg (first regs)])
+        (if (reg-preserve? reg)
+          (cmd (reg-name reg) (* count (address-size))))
+        (loop (rest regs) (+ count 1))))))
+
+(define (backup-registers)
+  (preserve-registers (lambda (name num)
+    (emit "  mov~a %~a, ~s(%~a)" (instr-suffix) name num (cx)))))
+
+(define (restore-registers)
+  (preserve-registers (lambda (name num)
+    (emit "  mov~a ~s(%~a), %~a" (instr-suffix) num (cx) name))))
+    
 (define (emit-program program)
   (emit-function-header "scheme_entry")
-  (emit "  mov~a %~a, %~a" sp-suffix sp sp-backup)
-  (emit "  mov~a ~a, %~a" sp-suffix (sv address-size) sp)
+  (emit "  mov~a ~a, %~a" (instr-suffix) (sv (address-size)) (cx))
+  (backup-registers)
   (emit-call "L_scheme_entry")
-  (emit "  mov~a %~a, %~a" sp-suffix sp-backup sp)
+  (restore-registers)
   (emit "  ret")
   (cond 
    [(letrec? program) (emit-letrec program)]

@@ -54,9 +54,17 @@ static void deallocate_protected_space(char* p, int size) {
 
 int main(int argc, char** argv) {
   int stack_size = (16 * 4096); /* holds 16K cells */
+  int heap_size = (16 * 4096); /* holds 16K cells */
+
   char* stack_top = allocate_protected_space(stack_size);
   char* stack_base = stack_top + stack_size;
-  print_ptr(scheme_entry(stack_base));
+
+  char* heap = allocate_protected_space(heap_size);
+
+  context ctxt;
+  print_ptr(scheme_entry(&ctxt, stack_base, heap));
+
   deallocate_protected_space(stack_top, stack_size);
+  deallocate_protected_space(heap, stack_size);
   return 0;
 }

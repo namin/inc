@@ -10,6 +10,17 @@
 #define char_tag             0x0F
 #define char_shift              8
 
-
 /* all scheme values are of type ptrs */
 typedef unsigned int ptr;
+
+typedef struct {
+  void* eax; /* 0   scratch  */
+  void* ebx; /* 4   preserve */
+  void* ecx; /* 8   scratch  */
+  void* edx; /* 12  scratch  */
+  void* esi; /* 16  preserve */
+  void* edi; /* 20  preserve */
+  void* ebp; /* 24  preserve */
+  void* esp; /* 28  preserve */
+} context;
+
