@@ -22,6 +22,19 @@
 (define chartag     #x0F)
 (define wordsize       4) ; bytes
 
+(define x64 #t)
+(define address-size (* 2 wordsize))
+(define sp "rsp")
+(define sp-backup "rcx")
+(define sp-suffix "q")
+(define (set-for-32-bit!)
+  (set! address-size wordsize)
+  (set! sp "esp")
+  (set! sp-backup "ecx")
+  (set! sp-suffix "l"))
+(define (sv si)
+  (format "~s(%~a)" si sp))
+
 (define fixnum-bits (- (* wordsize 8) fxshift))
 
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
@@ -136,7 +149,7 @@
 
 (define-primitive (fx+ si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  addl ~s(%rsp), %eax" si))
+  (emit "  addl ~a, %eax" (sv si)))
 
 (define (emit-binop si env arg1 arg2)
   (emit-expr si env arg1)
@@ -144,38 +157,38 @@
   (emit-expr (next-stack-index si) env arg2))
 
 (define (emit-stack-save si)
-  (emit "  movl %eax, ~s(%rsp)" si))
+  (emit "  movl %eax, ~a" (sv si)))
 
 (define (emit-stack-load si)
-  (emit "  movl ~s(%rsp), %eax" si))
+  (emit "  movl ~a, %eax" (sv si)))
 
 (define (next-stack-index si)
   (- si wordsize))
 
 (define-primitive (fx- si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  subl %eax, ~s(%rsp)" si)
-  (emit "  movl ~s(%rsp), %eax" si))
+  (emit "  subl %eax, ~a" (sv si))
+  (emit-stack-load si))
 
 (define-primitive (fx* si env arg1 arg2)
   (emit-binop si env arg1 arg2)
   (emit "  shrl $~s, %eax" fxshift)
-  (emit "  mull ~s(%rsp)" si))
+  (emit "  mull ~a" (sv si)))
 
 (define-primitive (fxlogor si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  orl ~s(%rsp), %eax" si))
+  (emit "  orl ~a, %eax" (sv si)))
 
 (define-primitive (fxlogand si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  andl ~s(%rsp), %eax" si))
+  (emit "  andl ~a, %eax" (sv si)))
 
 (define-primitive (fx= si env arg1 arg2)
   (emit-cmp-binop 'sete si env arg1 arg2))
 
 (define (emit-cmp-binop setx si env arg1 arg2)
   (emit-binop si env arg1 arg2)
-  (emit "  cmpl %eax, ~s(%rsp)" si)
+  (emit "  cmpl %eax, ~a" (sv si))
   (emit-cmp-bool setx))
 
 (define-primitive (fx< si env arg1 arg2)
@@ -329,7 +342,7 @@
       (move-arguments (- si wordsize) delta (rest args))))
   (cond
    [(not tail)
-    (emit-arguments (- si (* 2 wordsize)) (call-args expr))
+    (emit-arguments (- si address-size) (call-args expr))
     (emit-adjust-base (+ si wordsize))
     (emit-call (lookup (call-target expr) env))
     (emit-adjust-base (- (+ si wordsize)))]
@@ -352,7 +365,7 @@
   (emit-tail-expr (- wordsize) env expr))
 
 (define (emit-adjust-base si)
-  (unless (= si 0) (emit "  addq $~s, %rsp" si)))
+  (unless (= si 0) (emit "  add~a $~s, %~a" sp-suffix si sp)))
 
 (define (emit-call label)
   (emit "  call ~a" label))
@@ -362,10 +375,10 @@
 
 (define (emit-program program)
   (emit-function-header "scheme_entry")
-  (emit "  movq %rsp, %rcx")
-  (emit "  movq 8(%rsp), %rsp")
+  (emit "  mov~a %~a, %~a" sp-suffix sp sp-backup)
+  (emit "  mov~a ~a, %~a" sp-suffix (sv address-size) sp)
   (emit-call "L_scheme_entry")
-  (emit "  movq %rcx, %rsp")
+  (emit "  mov~a %~a, %~a" sp-suffix sp-backup sp)
   (emit "  ret")
   (cond 
    [(letrec? program) (emit-letrec program)]
