@@ -65,6 +65,8 @@
    [(fxzero? 0) => "#t\n"]
    [(fxzero? 1) => "#f\n"]
    [(fxzero? -1) => "#f\n"]
+   [(fxzero? 64) => "#f\n"]
+   [(fxzero? 960) => "#f\n"]
 )
 
 (add-tests-with-string-output "null?"

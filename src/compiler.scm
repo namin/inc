@@ -103,7 +103,7 @@
 
 (define-primitive (fxzero? si env arg)
   (emit-expr si env arg)
-  (emit "  cmp $~s, %al" fxtag)
+  (emit "  cmpl $~s, %eax" fxtag)
   (emit-cmp-bool))
 
 (define-primitive (null? si env arg)
