@@ -239,13 +239,32 @@
 (define (tagged-list tag expr)
   (and (list? expr) (not (null? expr)) (eq? (car expr) tag)))
 
-(define (let? expr) (tagged-list 'let expr))
-(define (let*? expr) (tagged-list 'let* expr))
-(define (letrec? expr) (tagged-list 'letrec expr))
+(define (make-begin seq) (cons 'begin seq))
+(define (begin? expr) (and (tagged-list 'begin expr) (not (null? (begin-seq expr)))))
+(define begin-seq cdr)
+(define (emit-begin si env tail expr)
+  (emit-seq si env tail (begin-seq expr)))
+(define (emit-seq si env tail seq)
+  (cond
+   [(null? seq) (error 'emit-seq "empty seq")]
+   [(null? (rest seq)) (emit-any-expr si env tail (first seq))]
+   [else
+    (emit-expr si env (first seq))
+    (emit-seq si env tail (rest seq))]))
+
+(define (let-form? let-kind expr)
+  (and (tagged-list let-kind expr)
+       (not (null? (cddr expr)))))
+(define (let? expr) (let-form? 'let expr))
+(define (let*? expr) (let-form? 'let* expr))
+(define (letrec? expr) (let-form? 'letrec expr))
 (define let-bindings cadr)
-(define letrec-bindings cadr)
-(define let-body caddr)
-(define letrec-body caddr)
+(define letrec-bindings let-bindings)
+(define (let-body expr)
+  (if (null? (cdddr expr))
+    (caddr expr)
+    (make-begin (cddr expr))))
+(define letrec-body let-body)
 (define empty? null?)
 (define first car)
 (define rest cdr)
@@ -299,6 +318,7 @@
    [(variable? expr) (emit-variable-ref env expr) (emit-ret-if tail)]
    [(if? expr) (emit-if si env tail expr)]
    [(or (let? expr) (let*? expr)) (emit-let si env tail expr)]
+   [(begin? expr) (emit-begin si env tail expr)]
    [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
    [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
