@@ -543,7 +543,7 @@
   (emit-function-header "scheme_entry")
   (emit "  mov ~s(%rsp), %rcx" wordsize)
   (backup-registers)
-  (emit "  mov ~s(%rsp), %rbp" (* 3 wordsize))
+  (emit "  mov %rdx, %rbp")
   (emit-call "L_scheme_entry")
   (restore-registers)
   (emit "  ret")
