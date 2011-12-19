@@ -515,7 +515,9 @@
   (emit-tail-expr (- wordsize) env expr))
 
 (define (emit-adjust-base si)
-  (unless (= si 0) (emit "  add $~s, %rsp" si)))
+  (cond
+   [(> si 0) (emit "  add $~s, %rsp" si)]
+   [(< si 0) (emit "  sub $~s, %rsp" (- si))]))
 
 (define (emit-call label)
   (emit "  call ~a" label))
@@ -541,9 +543,10 @@
     
 (define (emit-program program)
   (emit-function-header "scheme_entry")
-  (emit "  mov ~s(%rsp), %rcx" wordsize)
+  (emit "  mov %rdi, %rcx")
   (backup-registers)
   (emit "  mov %rdx, %rbp")
+  (emit "  mov %rsi, %rsp")
   (emit-call "L_scheme_entry")
   (restore-registers)
   (emit "  ret")

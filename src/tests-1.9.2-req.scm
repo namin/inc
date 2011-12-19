@@ -73,3 +73,12 @@
                       (fxsub1 (vector-length (if (vector? v0) v0 v1))))))
       (cons v0 v1))) => "(#(2) . #(13))\n"]
 )
+
+(add-tests-with-string-output "more vectors"
+  [(letrec ([f (lambda (v i)
+                 (if (fx>= i 0)
+                     (begin (vector-set! v i i) (f v (fxsub1 i)))
+                     v))])
+     (let ((v (make-vector 100)))
+       (vector-length (f v 100)))) => "100\n"])
+

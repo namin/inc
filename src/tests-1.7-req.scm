@@ -36,3 +36,10 @@
                      (fx+ 1 (f (fxsub1 x)))))])
       (f 200)) => "200\n"]
 )
+
+(add-tests-with-string-output "more stack"
+  [(letrec ([f (lambda (n)
+                 (if (fxzero? n)
+                     0
+                     (fx+ 1 (f (fxsub1 n)))))])
+     (f 500)) => "500\n"])
