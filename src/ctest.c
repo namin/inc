@@ -1,7 +1,8 @@
 #include "startup.h"
 
 ptr scheme_entry(context* ctxt, char* stack_base, char* heap){
-  ctxt->ecx = (void*) 2;
-  *(stack_base-8) = 7;
-  return *(stack_base-8) << (long) ctxt->ecx;
+  heap[0] = 'a';
+  heap[1] = heap[0];
+  ptr p = 0 | (heap[0] << char_shift) | char_tag;
+  return p;
 }

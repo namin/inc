@@ -7,7 +7,7 @@
 #include "scheme_entry.h"
 
 #define IN_LIST 1
-#define OUT_LIST 0
+#define OUT 0
 
 static void print_ptr_rec(ptr x, int state) {
   if ((x & fx_mask) == fx_tag) {
@@ -28,12 +28,12 @@ static void print_ptr_rec(ptr x, int state) {
   } else if ((x & obj_mask) == pair_tag) {
     if (state != IN_LIST) printf("(");
     ptr car = ((cell*)(x-pair_tag))->car;
-    print_ptr_rec(car, OUT_LIST);
+    print_ptr_rec(car, OUT);
     ptr cdr = ((cell*)(x-pair_tag))->cdr;
     if (cdr != list_nil) {
       if ((cdr & obj_mask) != pair_tag) {
         printf(" . ");
-        print_ptr_rec(cdr, OUT_LIST);
+        print_ptr_rec(cdr, OUT);
       } else {
         printf(" ");
         print_ptr_rec(cdr, IN_LIST);
@@ -48,17 +48,31 @@ static void print_ptr_rec(ptr x, int state) {
     unsigned long i;
     for (i = 0; i < n; i++) {
       if (i > 0) printf(" ");
-      print_ptr_rec(p->buf[i], OUT_LIST);
+      print_ptr_rec(p->buf[i], OUT);
     }
 
     printf(")");
+  } else if ((x & obj_mask) == string_tag) {
+    printf("\"");
+
+    string* p = (string*)(x-string_tag);
+    unsigned long n = p->length >> fx_shift;
+    unsigned long i;
+    for (i = 0; i < n; i++) {
+      int c = p->buf[i];
+      if      (c == '"' ) printf("\\\"");
+      else if (c == '\\') printf("\\\\");
+      else                putchar(c);
+    }
+
+    printf("\"");
   } else {
     printf("#<unknown 0x%08lx>", x);
   }
 }
 
 static void print_ptr(ptr x) {
-  print_ptr_rec(x, OUT_LIST);
+  print_ptr_rec(x, OUT);
   printf("\n");
 }
 
