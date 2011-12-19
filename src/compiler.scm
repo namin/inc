@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-2.1-req.scm")
 (load "tests-1.9-req.scm")
 (load "tests-1.8-req.scm")
 (load "tests-1.7-req.scm")
@@ -29,6 +30,7 @@
 (define paircdr        8)
 (define vectortag   #x05)
 (define stringtag   #x06)
+(define closuretag  #x02)
 (define wordsize       8) ; bytes
 (define wordshift      3)
 (define bytes          4)
@@ -213,15 +215,14 @@
 (define unique-label
   (let ([count 0])
     (lambda ()
-      (let ([L (format "L_~s" count)])
+      (let ([L (string->symbol (format "L_~s" count))])
         (set! count (add1 count))
         L))))
 
-(define (unique-labels lvars)
-  (map (lambda (lvar) (format "L_proc_~s" lvar)) lvars))
-
 (define (if? expr)
-  (and (list? expr) (eq? (car expr) 'if) (= 3 (length (cdr expr)))))
+  (and (tagged-list 'if expr)
+       (or (= 3 (length (cdr expr)))
+           (error 'if? "malformed if ~s" expr))))
 (define if-test cadr)
 (define if-conseq caddr)
 (define if-altern cadddr)
@@ -243,7 +244,10 @@
   (and (list? expr) (not (null? expr)) (eq? (car expr) tag)))
 
 (define (make-begin seq) (cons 'begin seq))
-(define (begin? expr) (and (tagged-list 'begin expr) (not (null? (begin-seq expr)))))
+(define (begin? expr)
+  (and (tagged-list 'begin expr)
+       (or (not (null? (begin-seq expr)))
+           (error 'begin? (format "empty begin")))))
 (define begin-seq cdr)
 (define (emit-begin si env tail expr)
   (emit-seq si env tail (begin-seq expr)))
@@ -255,33 +259,47 @@
     (emit-expr si env (first seq))
     (emit-seq si env tail (rest seq))]))
 
+(define make-let list)
 (define (let-form? let-kind expr)
   (and (tagged-list let-kind expr)
-       (not (null? (cddr expr)))))
+       (or (not (null? (cddr expr)))
+           (error 'let-form? (format "let without body ~s" expr)))))
+(define let-kind car)
+(define (any-let? expr)
+  (and (pair? expr)
+       (member (let-kind expr) '(let let* letrec))
+       (let-form? (let-kind expr) expr)))
 (define (let? expr) (let-form? 'let expr))
 (define (let*? expr) (let-form? 'let* expr))
 (define (letrec? expr) (let-form? 'letrec expr))
 (define let-bindings cadr)
 (define letrec-bindings let-bindings)
+(define labels-bindings let-bindings)
+(define (make-body lst)
+  (if (null? (cdr lst))
+      (car lst)
+      (make-begin lst)))
 (define (let-body expr)
-  (if (null? (cdddr expr))
-    (caddr expr)
-    (make-begin (cddr expr))))
+  (make-body (cddr expr)))
 (define letrec-body let-body)
+(define labels-body let-body)
 (define empty? null?)
+(define (bind lhs rhs)
+  (check-variable lhs)
+  (list lhs rhs))
 (define first car)
 (define rest cdr)
 (define rhs cadr)
 (define (lhs binding)
   (check-variable (car binding)))
 (define (check-variable var)
-  (if (variable? var)
+  (if (and (variable? var) (not (special? var)))
       var
       (error 'lhs (format "~s is not a variable" var))))
-(define (make-initial-env lvars labels)
-  (map list lvars labels))
-(define (extend-env var si new-env)
-  (cons (list var si) new-env))
+(define (make-initial-env bindings)
+  bindings)
+(define (extend-env var si env)
+  (cons (list var si) env))
 (define (lookup var env)
   (cond
    [(assv var env) => cadr]
@@ -301,10 +319,45 @@
            (extend-env (lhs b) si new-env)))]))
   (process-let (let-bindings expr) si env))
 
-(define (emit-variable-ref env var)
+(define (extend-env-with si env lvars k)
+  (if (null? lvars)
+      (k si env)
+      (extend-env-with
+       (next-stack-index si)
+       (extend-env (first lvars) si env)
+       (rest lvars)
+       k)))
+
+(define (free-var offset)
+  (list 'free (- offset closuretag)))
+(define (free-var? fv)
+  (tagged-list 'free fv))
+(define free-var-offset cadr)
+
+(define (close-env-with offset env lvars k)
+  (if (null? lvars)
+      (k env)
+      (close-env-with
+       (+ offset wordsize)
+       (extend-env (first lvars) (free-var offset) env)
+       (rest lvars)
+       k)))
+
+(define label? symbol?)
+
+(define (emit-variable-ref si env var)
   (cond
-   [(lookup var env) => emit-stack-load]
-   (else (error 'emit-variable-ref (format "undefined variable ~s" var)))))
+   [(lookup var env) =>
+    (lambda (v)
+      (cond 
+       [(free-var? v)
+        (emit "  mov ~s(%rdi), %rax" (free-var-offset v))]
+       [(number? v)
+        (emit-stack-load v)]
+       [(label? v)
+        (emit-closure si env (make-closure v '()))]
+       [else (error 'emit-variable-ref (format "looked up unknown value ~s for var ~s" v var))]))]
+   [else (error 'emit-variable-ref (format "undefined variable ~s" var))]))
 
 (define (emit-ret-if tail)
   (if tail (emit "  ret")))
@@ -318,7 +371,8 @@
 (define (emit-any-expr si env tail expr)
   (cond
    [(immediate? expr) (emit-immediate expr) (emit-ret-if tail)]
-   [(variable? expr) (emit-variable-ref env expr) (emit-ret-if tail)]
+   [(variable? expr) (emit-variable-ref si env expr) (emit-ret-if tail)]
+   [(closure? expr) (emit-closure si env expr) (emit-ret-if tail)]
    [(if? expr) (emit-if si env tail expr)]
    [(or (let? expr) (let*? expr)) (emit-let si env tail expr)]
    [(begin? expr) (emit-begin si env tail expr)]
@@ -326,34 +380,129 @@
    [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
 
-(define (emit-letrec expr)
-  (let* ([bindings (letrec-bindings expr)]
-         [lvars (map lhs bindings)]
-         [lambdas (map rhs bindings)]
-         [labels (unique-labels lvars)]
-         [env (make-initial-env lvars labels)])
-    (for-each (emit-lambda env) lambdas labels)
-    (emit-scheme-entry (letrec-body expr) env)))
+(define (closure-conversion expr)
+  (let ([labels '()]
+        [top-env '()]
+        [top-procs '()])
+    (define (transform-letrec expr)
+      (let ([top-bindings
+             (map (lambda (binding) (bind (lhs binding) (unique-label)))
+                  (letrec-bindings expr))])
+        (set! top-env (make-initial-env top-bindings))
+        (set! top-procs (map lhs top-bindings))
+        (for-each (lambda (lvar-lambda lvar-label)
+                    (transform (rhs lvar-lambda) (rhs lvar-label)))
+                  (letrec-bindings expr) top-bindings)
+        (transform (letrec-body expr))))
+    (define (transform expr . label)
+      (cond
+       [(lambda? expr)
+        (let ([label (or (and (not (null? label)) (car label)) (unique-label))]
+              [fvs (filter (lambda (v) (not (member v top-procs))) (free-vars expr))])
+          (set! labels
+                (cons (bind label
+                            (make-code (lambda-formals expr)
+                                       fvs
+                                       (transform (lambda-body expr))))
+                    labels))
+          (make-closure label fvs))]
+       [(any-let? expr)
+        (make-let (let-kind expr)
+                  (map (lambda (binding)
+                         (bind (lhs binding) (transform (rhs binding))))
+                       (let-bindings expr))
+                  (transform (let-body expr)))]
+       [(list? expr)
+        (map transform expr)]
+       [else
+        expr]))
+    (let* ([body (if (letrec? expr)
+                     (transform-letrec expr)
+                     (transform expr))])
+      (make-top top-env (make-let 'labels labels body)))))
 
+(define make-top list)
+(define top-env car)
+(define top-expr cadr)
+
+(define (special? symbol)
+  (or (member symbol '(if begin let let* letrec lambda closure))
+      (primitive? symbol)))
+
+(define (flatmap f . lst)
+  (apply append (apply map f lst)))
+
+(define (free-vars expr)
+  (cond
+   [(and (variable? expr) (not (special? expr))) (list expr)]
+   [(lambda? expr) (filter (lambda (v) (not (member v (lambda-formals expr))))
+                           (free-vars (lambda-body expr)))]
+   [(let? expr)
+    (append
+     (flatmap free-vars (map rhs (let-bindings expr)))
+     (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
+             (free-vars (let-body expr))))]
+   [(let*? expr)
+    (if (null? (let-bindings expr))
+        (free-vars (let-body expr))
+        (append
+         (free-vars (rhs (first (let-bindings expr))))
+         (filter (lambda (v) (not (eq? v (lhs (first (let-bindings expr))))))
+                 (free-vars (make-let 'let* (rest (let-bindings expr)) (let-body expr))))))]
+   [(list? expr) (flatmap free-vars expr)]
+   [else '()]))
+
+(define (emit-top top)
+  (emit-labels (top-expr top) (top-env top)))
+
+(define (emit-labels expr env)
+  (let* ([bindings (labels-bindings expr)]
+         [labels (map lhs bindings)]
+         [codes (map rhs bindings)])
+    (for-each (emit-code env) codes labels)
+    (emit-scheme-entry (labels-body expr) env)))
+
+(define (lambda? expr) (tagged-list 'lambda expr))
 (define lambda-formals cadr)
-(define lambda-body caddr)
+(define (lambda-body expr) (make-body (cddr expr)))
 
-(define (emit-lambda env)
+(define (make-closure label fvs)
+  (cons 'closure (cons label fvs)))
+(define (closure? expr) (tagged-list 'closure expr))
+(define closure-label cadr)
+(define closure-free-vars cddr)
+(define (emit-closure si env expr)
+  (let ([label (closure-label expr)]
+        [fvs (closure-free-vars expr)])
+    (emit-heap-alloc (* (add1 (length fvs)) wordsize))
+    (emit "  movq $~s, (%rax)" label)
+    (unless (null? fvs)
+      (emit "  mov %rax, %rdx")
+      (let loop ([fvs fvs] [count 1])
+        (unless (null? fvs)
+          (emit-variable-ref si env (first fvs))
+          (emit "  mov %rax, ~s(%rdx)" (* count wordsize))
+          (loop (rest fvs) (add1 count))))
+      (emit "  mov %rdx, %rax"))
+    (emit "  or $~s, %rax" closuretag)))
+
+(define (make-code formals free body)
+  (list 'code formals free body))
+(define code-formals cadr)
+(define code-free-variables caddr)
+(define code-body cadddr)
+(define (emit-code env)
   (lambda (expr label)
     (emit-function-header label)
-    (let ([fmls (lambda-formals expr)]
-          [body (lambda-body expr)])
-      (let f ([fmls fmls] [si (- wordsize)] [env env])
-        (cond
-         [(empty? fmls)
-          (emit-tail-expr si env body)]
-         [else
-          (f (rest fmls)
-             (- si wordsize)
-             (extend-env (first fmls) si env))])))))
+    (let ([fmls (code-formals expr)]
+          [fvs (code-free-variables expr)]
+          [body (code-body expr)])
+      (extend-env-with (- wordsize) env fmls (lambda (si env)
+        (close-env-with wordsize env fvs (lambda (env)
+          (emit-tail-expr si env body))))))))
 
 (define (app? expr env)
-  (and (list? expr) (not (null? expr)) (lookup (call-target expr) env)))
+  (and (list? expr) (not (null? expr))))
 (define call-target car)
 (define call-args cdr)
 (define (emit-app si env tail expr)
@@ -367,16 +516,42 @@
       (emit-stack-load si)
       (emit-stack-save (+ si delta))
       (move-arguments (- si wordsize) delta (rest args))))
-  (cond
-   [(not tail)
-    (emit-arguments (- si wordsize) (call-args expr))
-    (emit-adjust-base (+ si wordsize))
-    (emit-call (lookup (call-target expr) env))
-    (emit-adjust-base (- (+ si wordsize)))]
-   [else ; tail
-    (emit-arguments si (call-args expr))
-    (move-arguments si (- (+ si wordsize)) (call-args expr))
-    (emit-jmp (lookup (call-target expr) env))]))
+  (let ([target-proc (proc (call-target expr) env)])
+    (cond
+     [(not tail)
+      (emit-arguments (- si (* 2 wordsize)) (call-args expr))
+      (when (not target-proc)
+            (emit-expr si env (call-target expr))
+            (emit "  mov %rdi, ~s(%rsp)" si)
+            (emit "  mov %rax, %rdi")
+            (emit-heap-load (- closuretag)))
+      (emit-adjust-base si)
+      (cond
+       [target-proc => emit-call]
+       [else (emit-call "*%rax")])
+      (emit-adjust-base (- si))
+      (when (not target-proc)
+            (emit "  mov ~s(%rsp), %rdi" si))]
+     [else ; tail
+      (emit-arguments si (call-args expr))
+      (when (not target-proc)
+            (emit-expr si env (call-target expr))
+            (emit "  mov %rax, %rdi"))
+      (move-arguments si (- (+ si wordsize)) (call-args expr))
+      (when (not target-proc)
+            (emit "  mov %rdi, %rax")
+            (emit-heap-load (- closuretag)))
+      (cond
+       [target-proc => emit-jmp]
+       [else (emit-jmp "*%rax")])])))
+
+(define (proc expr env)
+  (cond 
+   [(and (variable? expr) (lookup expr env)) =>
+    (lambda (val) (and (label? val) val))]
+   [else #f]))
+    
+
 
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
@@ -471,6 +646,9 @@
   (emit "  add ~s(%rsp), %rax" si)
   (emit-heap-load (- vectortag)))
 
+(define-primitive (procedure? si env arg)
+  (emit-object? closuretag si env arg))
+
 (define (emit-expr-save si env arg)
   (emit-expr si env arg)
   (emit-stack-save si))
@@ -541,7 +719,7 @@
   (preserve-registers (lambda (name num)
     (emit "  mov ~s(%rcx), %~a" num name))))
     
-(define (emit-program program)
+(define (emit-program expr)
   (emit-function-header "scheme_entry")
   (emit "  mov %rdi, %rcx")
   (backup-registers)
@@ -550,6 +728,4 @@
   (emit-call "L_scheme_entry")
   (restore-registers)
   (emit "  ret")
-  (cond 
-   [(letrec? program) (emit-letrec program)]
-   [else (emit-scheme-entry program (make-initial-env '() '()))]))
+  (emit-top (closure-conversion expr)))

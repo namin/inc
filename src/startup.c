@@ -66,6 +66,8 @@ static void print_ptr_rec(ptr x, int state) {
     }
 
     printf("\"");
+  } else if ((x & obj_mask) == closure_tag) {
+    printf("#<procedure>");
   } else {
     printf("#<unknown 0x%08lx>", x);
   }

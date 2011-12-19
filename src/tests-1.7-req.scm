@@ -6,6 +6,7 @@
   [(letrec ([f (lambda () 5)]) (f)) => "5\n"]
   [(letrec ([f (lambda () 5)]) (let ([x (f)]) x)) => "5\n"]
   [(letrec ([f (lambda () 5)]) (fx+ (f) 6)) => "11\n"]
+  [(letrec ([f (lambda () 5)]) (fx+ 6 (f))) => "11\n"]
   [(letrec ([f (lambda () 5)]) (fx- 20 (f))) => "15\n"]
   [(letrec ([f (lambda () 5)]) (fx+ (f) (f))) => "10\n"]
   [(letrec ([f (lambda () (fx+ 5 7))]

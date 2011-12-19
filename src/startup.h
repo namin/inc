@@ -17,6 +17,7 @@
 #define pair_cdr                8
 #define vector_tag           0x05
 #define string_tag           0x06
+#define closure_tag          0x02
 
 /* all scheme values are of type ptrs */
 typedef unsigned long ptr;
