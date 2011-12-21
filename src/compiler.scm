@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-2.4.2-req.scm")
 (load "tests-2.4.1-req.scm")
 (load "tests-2.2-req.scm")
 (load "tests-2.1-req.scm")
@@ -224,7 +225,7 @@
 (define (if? expr)
   (and (tagged-list 'if expr)
        (or (= 3 (length (cdr expr)))
-           (error 'if? "malformed if ~s" expr))))
+           (error 'if? (format "malformed if ~s" expr)))))
 (define if-test cadr)
 (define if-conseq caddr)
 (define if-altern cadddr)
@@ -245,7 +246,10 @@
 (define (tagged-list tag expr)
   (and (list? expr) (not (null? expr)) (eq? (car expr) tag)))
 
-(define (make-begin seq) (cons 'begin seq))
+(define (make-begin lst) 
+  (if (null? (cdr lst))
+      (car lst)
+      (cons 'begin lst)))
 (define (begin? expr)
   (and (tagged-list 'begin expr)
        (or (not (null? (begin-seq expr)))
@@ -283,10 +287,7 @@
 (define let-bindings cadr)
 (define letrec-bindings let-bindings)
 (define labels-bindings let-bindings)
-(define (make-body lst)
-  (if (null? (cdr lst))
-      (car lst)
-      (make-begin lst)))
+(define make-body make-begin)
 (define let-body-seq cddr)
 (define (let-body expr)
   (make-body (let-body-seq expr)))
@@ -302,7 +303,7 @@
 (define (lhs binding)
   (check-variable (car binding)))
 (define (check-variable var)
-  (if (and (variable? var) (not (special? var)))
+  (if (variable? var)
       var
       (error 'lhs (format "~s is not a variable" var))))
 (define (make-initial-env bindings)
@@ -435,13 +436,41 @@
         (map (lambda (binding) (make-set! (lhs binding) (rhs binding)))
              (letrec-bindings expr))
         (let-body-seq expr)))))]
+   [(tagged-list 'and expr)
+    (cond
+     [(null? (cdr expr)) #t]
+     [(null? (cddr expr)) (macro-expand (cadr expr))]
+     [else
+      (macro-expand
+       `(if ,(cadr expr)
+            (and ,@(cddr expr))
+            #f))])]
+   [(tagged-list 'or expr)
+    (cond
+     [(null? (cdr expr)) #f]
+     [(null? (cddr expr)) (macro-expand (cadr expr))]
+     [else
+      (macro-expand
+       `(let ([one ,(cadr expr)]
+              [thunk (lambda () (or ,@(cddr expr)))])
+          (if one
+              one
+              (thunk))))])]
+   [(tagged-list 'when expr)
+    (macro-expand
+     `(if ,(cadr expr)
+          ,(make-begin (cddr expr))
+          #f))]
+   [(tagged-list 'unless expr)
+    (macro-expand
+     `(when (not ,(cadr expr)) ,@(cddr expr)))]
    [(list? expr) (map macro-expand expr)]
    [else expr]))
       
 (define (alpha-conversion expr)
   (define (transform expr env)
     (cond
-     [(and (variable? expr) (not (special? expr)))
+     [(variable? expr)
       (or (lookup expr env)
           (error 'alpha-conversion (format "undefined variable ~s" expr)))]
      [(lambda? expr)
@@ -465,6 +494,8 @@
                       (transform (rhs binding) env)))
               (let-bindings expr))
          (transform (let-body expr) new-env)))]
+     [(and (list? expr) (not (null? expr)) (special? (car expr)))
+      (cons (car expr) (map (lambda (e) (transform e env)) (cdr expr)))]
      [(list? expr) (map (lambda (e) (transform e env)) expr)]
      [else expr]))
   (transform expr (make-initial-env '())))
@@ -553,7 +584,7 @@
 
 (define (free-vars expr)
   (cond
-   [(and (variable? expr) (not (special? expr))) (list expr)]
+   [(variable? expr) (list expr)]
    [(lambda? expr) (filter (lambda (v) (not (member v (lambda-formals expr))))
                            (free-vars (lambda-body expr)))]
    [(let? expr)
@@ -561,14 +592,7 @@
      (flatmap free-vars (map rhs (let-bindings expr)))
      (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
              (free-vars (let-body expr))))]
-   [(let*? expr)
-    (if (null? (let-bindings expr))
-        (free-vars (let-body expr))
-        (append
-         (free-vars (rhs (first (let-bindings expr))))
-         (filter (lambda (v) (not (eq? v (lhs (first (let-bindings expr))))))
-                 (free-vars (make-let 'let* (rest (let-bindings expr)) (let-body expr))))))]
-   [(list? expr) (flatmap free-vars expr)]
+   [(list? expr) (flatmap free-vars (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
    [else '()]))
 
 (define (emit-labels expr)
