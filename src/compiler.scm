@@ -467,36 +467,36 @@
                 one
                 (thunk)))
          bound-vars)])]
-   [(tagged-list 'when expr)
-    (transform
-     `(if ,(cadr expr)
-          ,(make-begin (cddr expr))
-          #f)
-     bound-vars)]
-   [(tagged-list 'unless expr)
-    (transform
-     `(when (not ,(cadr expr)) ,@(cddr expr))
-     bound-vars)]
-   [(tagged-list 'cond expr)
-    (transform
-     (let* ([conditions (cdr expr)]
-            [first-condition (car conditions)]
-            [first-test (car first-condition)]
-            [first-body (cdr first-condition)]
-            [rest (if (null? (cdr conditions)) #f `(cond ,@(cdr conditions)))])
-       (cond
-        [(and (eq? first-test 'else) (not (member 'else bound-vars)))
-         (make-begin first-body)]
-        [(null? first-body)
-         `(or ,first-test ,rest)]
-        [(and (eq? '=> (car first-body)) (not (member '=> bound-vars)))
-         `(let ([one ,first-test])
-            (if one (,(cadr first-body) one) ,rest))]
-        [else
-         `(if ,first-test ,(make-begin first-body) ,rest)]))
-     bound-vars)]
-   [(list? expr) (map (lambda (e) (transform e bound-vars)) expr)]
-   [else expr]))
+     [(tagged-list 'when expr)
+      (transform
+       `(if ,(cadr expr)
+            ,(make-begin (cddr expr))
+            #f)
+       bound-vars)]
+     [(tagged-list 'unless expr)
+      (transform
+       `(when (not ,(cadr expr)) ,@(cddr expr))
+       bound-vars)]
+     [(tagged-list 'cond expr)
+      (transform
+       (let* ([conditions (cdr expr)]
+              [first-condition (car conditions)]
+              [first-test (car first-condition)]
+              [first-body (cdr first-condition)]
+              [rest (if (null? (cdr conditions)) #f `(cond ,@(cdr conditions)))])
+         (cond
+          [(and (eq? first-test 'else) (not (member 'else bound-vars)))
+           (make-begin first-body)]
+          [(null? first-body)
+           `(or ,first-test ,rest)]
+          [(and (eq? '=> (car first-body)) (not (member '=> bound-vars)))
+           `(let ([one ,first-test])
+              (if one (,(cadr first-body) one) ,rest))]
+          [else
+           `(if ,first-test ,(make-begin first-body) ,rest)]))
+       bound-vars)]
+     [(list? expr) (map (lambda (e) (transform e bound-vars)) expr)]
+     [else expr]))
   (transform expr '()))
       
 (define (alpha-conversion expr)
