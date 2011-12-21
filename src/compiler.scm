@@ -1,5 +1,6 @@
 (load "tests-driver.scm")
 (load "tests-2.4-req.scm")
+(load "tests-2.3-req.scm")
 (load "tests-2.2-req.scm")
 (load "tests-2.1-req.scm")
 (load "tests-1.9-req.scm")
@@ -383,6 +384,7 @@
    [(if? expr) (emit-if si env tail expr)]
    [(let? expr) (emit-let si env tail expr)]
    [(begin? expr) (emit-begin si env tail expr)]
+   [(quote? expr) (emit-quote si env (quote-expr expr)) (emit-ret-if tail)]
    [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
    [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
@@ -573,6 +575,66 @@
     (mark expr)
     (transform expr)))
 
+(define (quote? expr)
+  (tagged-list 'quote expr))
+(define quote-expr cadr)
+(define (emit-quote si env expr)
+  (cond
+   [(immediate? expr) (emit-immediate expr)]
+   [(pair? expr)
+    (emit-quote si env (car expr))
+    (emit-stack-save si)
+    (emit-quote (next-stack-index si) env (cdr expr))
+    (emit-stack-save (next-stack-index si))
+    (emit-cons si)]
+   [(vector? expr)
+    (emit-expr si env (vector-length expr))
+    (emit-stack-save si)
+    (emit-make-vector si)
+    (emit-stack-save si)
+    (let loop ([index 0])
+      (unless (= index (vector-length expr))
+        (emit-quote (next-stack-index si) env (vector-ref expr index))
+        (emit-stack-save (next-stack-index si))
+        (emit-stack-load si)
+        (emit "  add $~s, %rax" (* wordsize (add1 index)))
+        (emit-stack-to-heap (next-stack-index si) (- vectortag))
+        (loop (add1 index))))
+    (emit-stack-load si)]
+   [(string? expr)
+    (emit-expr si env (string-length expr))
+    (emit-stack-save si)
+    (emit-make-string si)
+    (emit-stack-save si)
+    (let loop ([index 0])
+      (unless (= index (string-length expr))
+        (emit "  add $~s, %rax" (if (= index 0) wordsize 1))
+        (emit "  movb $~s, ~s(%rax)" (char->integer (string-ref expr index)) (- stringtag))
+        (loop (add1 index))))
+    (emit-stack-load si)]
+   [else (error 'emit-quote (format "don't know how to quote ~s" expr))]))
+
+(define (lift-constants expr)
+  (let ([constants '()])
+    (define (transform expr)
+      (cond
+       [(and (quote? expr) (assoc expr constants)) => cadr]
+       [(quote? expr)
+        (set! constants (cons (list expr (unique-name 'c)) constants))
+        (cadr (assoc expr constants))]
+       [(string? expr) (transform `(quote ,expr))]
+       [(list? expr) (map transform expr)]
+       [else expr]))
+    (let ([texpr (transform expr)])
+      (if (null? constants)
+          expr
+          (make-let
+           'let
+           (map (lambda (val-cst)
+                  (bind (cadr val-cst) (car val-cst)))
+                constants)
+           texpr)))))
+  
 (define (closure-conversion expr)
   (let ([labels '()])
     (define (transform expr . label)
@@ -603,10 +665,10 @@
       (make-let 'labels labels body))))
 
 (define (all-conversions expr)
-  (closure-conversion (assignment-conversion (alpha-conversion (macro-expand expr)))))
+  (closure-conversion (lift-constants (assignment-conversion (alpha-conversion (macro-expand expr))))))
 
 (define (special? symbol)
-  (or (member symbol '(if begin let lambda closure set!))
+  (or (member symbol '(if begin let lambda closure set! quote))
       (primitive? symbol)))
 
 (define (flatmap f . lst)
@@ -735,6 +797,8 @@
 
 (define-primitive (make-string si env length)
   (emit-expr-save si env length)
+  (emit-make-string si))
+(define (emit-make-string si)
   (emit "  shr $~s, %rax" fxshift)
   (emit "  add $~s, %rax" wordsize)
   (emit-heap-alloc-dynamic)
@@ -771,8 +835,9 @@
   (emit-cmp-binop 'sete si env arg1 arg2))
 
 (define-primitive (make-vector si env length)
-  (emit-expr si env length)
-  (emit-stack-save si)
+  (emit-expr-save si env length)
+  (emit-make-vector si))
+(define (emit-make-vector si)
   (emit "  shr $~s, %rax" fxshift)
   (emit "  add $1, %rax")
   (emit "  shl $~s, %rax" wordshift)
@@ -812,6 +877,8 @@
 (define-primitive (cons si env arg1 arg2)
   (emit-binop si env arg1 arg2)
   (emit-stack-save (next-stack-index si))
+  (emit-cons si))
+(define (emit-cons si)
   (emit-heap-alloc pairsize)
   (emit "  or $~s, %rax" pairtag)
   (emit-stack-to-heap si (- paircar pairtag))
