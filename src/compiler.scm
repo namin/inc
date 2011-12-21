@@ -323,7 +323,7 @@
       (emit-any-expr si new-env tail (let-body expr))]
      [else
       (let ([b (first bindings)])
-        (emit-expr si (if (let*? expr) new-env env) (rhs b))
+        (emit-expr si env (rhs b))
         (emit-stack-save si)
         (process-let (rest bindings)
            (next-stack-index si)
@@ -354,8 +354,6 @@
        (rest lvars)
        k)))
 
-(define label? symbol?)
-
 (define (emit-variable-ref si env var)
   (cond
    [(lookup var env) =>
@@ -365,8 +363,6 @@
         (emit "  mov ~s(%rdi), %rax" (free-var-offset v))]
        [(number? v)
         (emit-stack-load v)]
-       [(label? v)
-        (emit-closure si env (make-closure v '()))]
        [else (error 'emit-variable-ref (format "looked up unknown value ~s for var ~s" v var))]))]
    [else (error 'emit-variable-ref (format "undefined variable ~s" var))]))
 
@@ -385,7 +381,7 @@
    [(variable? expr) (emit-variable-ref si env expr) (emit-ret-if tail)]
    [(closure? expr) (emit-closure si env expr) (emit-ret-if tail)]
    [(if? expr) (emit-if si env tail expr)]
-   [(or (let? expr) (let*? expr)) (emit-let si env tail expr)]
+   [(let? expr) (emit-let si env tail expr)]
    [(begin? expr) (emit-begin si env tail expr)]
    [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
    [(app? expr env) (emit-app si env tail expr)]
@@ -639,42 +635,25 @@
       (emit-stack-load si)
       (emit-stack-save (+ si delta))
       (move-arguments (- si wordsize) delta (rest args))))
-  (let ([target-proc (proc (call-target expr) env)])
-    (cond
-     [(not tail)
-      (emit-arguments (- si (* 2 wordsize)) (call-args expr))
-      (when (not target-proc)
-            (emit-expr si env (call-target expr))
-            (emit "  mov %rdi, ~s(%rsp)" si)
-            (emit "  mov %rax, %rdi")
-            (emit-heap-load (- closuretag)))
-      (emit-adjust-base si)
-      (cond
-       [target-proc => emit-call]
-       [else (emit-call "*%rax")])
-      (emit-adjust-base (- si))
-      (when (not target-proc)
-            (emit "  mov ~s(%rsp), %rdi" si))]
-     [else ; tail
-      (emit-arguments si (call-args expr))
-      (when (not target-proc)
-            (emit-expr (- si (* wordsize (length (call-args expr)))) env (call-target expr))
-            (emit "  mov %rax, %rdi"))
-      (move-arguments si (- (+ si wordsize)) (call-args expr))
-      (when (not target-proc)
-            (emit "  mov %rdi, %rax")
-            (emit-heap-load (- closuretag)))
-      (cond
-       [target-proc => emit-jmp]
-       [else (emit-jmp "*%rax")])])))
-
-(define (proc expr env)
-  (cond 
-   [(and (variable? expr) (lookup expr env)) =>
-    (lambda (val) (and (label? val) val))]
-   [else #f]))
-    
-
+  (cond
+   [(not tail)
+    (emit-arguments (- si (* 2 wordsize)) (call-args expr))
+    (emit-expr si env (call-target expr))
+    (emit "  mov %rdi, ~s(%rsp)" si)
+    (emit "  mov %rax, %rdi")
+    (emit-heap-load (- closuretag))
+    (emit-adjust-base si)
+    (emit-call "*%rax")
+    (emit-adjust-base (- si))
+    (emit "  mov ~s(%rsp), %rdi" si)]
+   [else ; tail
+    (emit-arguments si (call-args expr))
+    (emit-expr (- si (* wordsize (length (call-args expr)))) env (call-target expr))
+    (emit "  mov %rax, %rdi")
+    (move-arguments si (- (+ si wordsize)) (call-args expr))
+    (emit "  mov %rdi, %rax")
+    (emit-heap-load (- closuretag))
+    (emit-jmp "*%rax")]))
 
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
