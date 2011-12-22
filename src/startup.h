@@ -18,6 +18,7 @@
 #define vector_tag           0x05
 #define string_tag           0x06
 #define closure_tag          0x02
+#define symbol_tag           0x03
 
 /* all scheme values are of type ptrs */
 typedef unsigned long ptr;

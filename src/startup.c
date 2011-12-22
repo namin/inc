@@ -6,7 +6,7 @@
 #include "startup.h"
 #include "scheme_entry.h"
 
-#define IN_LIST 1
+#define IN 1
 #define OUT 0
 
 static void print_ptr_rec(ptr x, int state) {
@@ -26,7 +26,7 @@ static void print_ptr_rec(ptr x, int state) {
     else if (c == ' ')  printf("#\\space");
     else                printf("#\\%c", c);
   } else if ((x & obj_mask) == pair_tag) {
-    if (state != IN_LIST) printf("(");
+    if (state != IN) printf("(");
     ptr car = ((cell*)(x-pair_tag))->car;
     print_ptr_rec(car, OUT);
     ptr cdr = ((cell*)(x-pair_tag))->cdr;
@@ -36,10 +36,10 @@ static void print_ptr_rec(ptr x, int state) {
         print_ptr_rec(cdr, OUT);
       } else {
         printf(" ");
-        print_ptr_rec(cdr, IN_LIST);
+        print_ptr_rec(cdr, IN);
       }
     }
-    if (state != IN_LIST) printf(")");
+    if (state != IN) printf(")");
   } else if ((x & obj_mask) == vector_tag) {
     printf("#(");
 
@@ -53,7 +53,7 @@ static void print_ptr_rec(ptr x, int state) {
 
     printf(")");
   } else if ((x & obj_mask) == string_tag) {
-    printf("\"");
+    if (state != IN) printf("\"");
 
     string* p = (string*)(x-string_tag);
     unsigned long n = p->length >> fx_shift;
@@ -65,7 +65,9 @@ static void print_ptr_rec(ptr x, int state) {
       else                putchar(c);
     }
 
-    printf("\"");
+    if (state != IN) printf("\"");
+  } else if ((x & obj_mask) == symbol_tag) {
+    print_ptr_rec((x - symbol_tag) | string_tag, IN);
   } else if ((x & obj_mask) == closure_tag) {
     printf("#<procedure>");
   } else {

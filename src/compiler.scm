@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-2.8-req.scm")
 (load "tests-2.6-req.scm")
 (load "tests-2.4-req.scm")
 (load "tests-2.3-req.scm")
@@ -35,6 +36,7 @@
 (define vectortag   #x05)
 (define stringtag   #x06)
 (define closuretag  #x02)
+(define symboltag   #x03)
 (define wordsize       4) ; bytes
 (define wordshift      2)
 (define bytes          4)
@@ -124,7 +126,12 @@
        (putprop 'prim-name '*arg-count* 0)
        (putprop 'prim-name '*vararg* #t)
        (putprop 'prim-name '*lib-code*
-         (make-lambda 'varargs (make-begin '(b b* ...)))))]))
+         (make-lambda 'varargs (make-begin '(b b* ...)))))]
+    [(_ prim-name b)
+     (begin
+       (set! lib-primitives (cons 'prim-name lib-primitives))
+       (putprop 'prim-name '*is-lib-prim* #t)
+       (putprop 'prim-name '*lib-code* 'b))]))
 (load "library.scm")
 
 (define (primitive? x)
@@ -546,7 +553,7 @@
 (define (alpha-conversion expr)
   (define (transform expr env)
     (cond
-     [(variable? expr)
+     [(and (variable? expr) (not (lib-primitive? expr)))
       (or (lookup expr env)
           (error 'alpha-conversion (format "undefined variable ~s" expr)))]
      [(lambda? expr)
@@ -570,6 +577,7 @@
                       (transform (rhs binding) env)))
               (let-bindings expr))
          (transform (let-body expr) new-env)))]
+     [(quote? expr) expr]
      [(and (list? expr) (not (null? expr)) (special? (car expr)))
       (cons (car expr) (map (lambda (e) (transform e env)) (cdr expr)))]
      [(list? expr) (map (lambda (e) (transform e env)) expr)]
@@ -626,6 +634,7 @@
 (define (translate-quote expr)
   (cond
    [(immediate? expr) expr]
+   [(symbol? expr) (list 'make-symbol (translate-quote (symbol->string expr)))]
    [(pair? expr)
     (list 'cons (translate-quote (car expr)) (translate-quote (cdr expr)))]
    [(vector? expr)
@@ -720,18 +729,24 @@
      [(list? expr) (map transform expr)]
      [else expr]))
   (transform expr))
-(define-primitive (primitive-ref si env label)
-  (let ([done-label (unique-label)])
+(define-primitive (primitive-ref si env prim-name)
+  (let ([label (primitive-label prim-name)]
+        [done-label (unique-label)])
     (emit "  mov ~s, %eax" label)
     (emit "  testl %eax, %eax")
     (emit "  jne ~s" done-label)
     (emit-adjust-base si)
-    (emit-call (primitive-alloc label))
+    (emit-call (primitive-alloc prim-name))
     (emit-adjust-base (- si))
     (emit "  mov %eax, ~s" label)
     (emit-label done-label)))
-(define (primitive-alloc label)
-  (string->symbol (format "~a_alloc" label)))
+(define (primitive-label name)
+  ;; TODO: auto-convert arbitrary scheme symbol to acceptable assembly label.
+  (cond
+   [(eq? name 'string->symbol) 'string_to_symbol]
+   [else name]))
+(define (primitive-alloc name)
+  (string->symbol (format "~a_alloc" (primitive-label name))))
 
 (define (closure-conversion expr)
   (let ([labels '()]
@@ -793,8 +808,9 @@
     (let ([labels (all-conversions (lib-primitive-code prim-name))])
       (emit-labels labels (lambda (expr env)
         ((emit-code env #t) (make-code '() '() expr) (primitive-alloc prim-name))))
-      (emit ".global ~s" prim-name)
-      (emit ".comm ~s,4,4" prim-name)))
+      (let ([label (primitive-label prim-name)])
+        (emit ".global ~s" label)
+        (emit ".comm ~s,4,4" label))))
   (for-each emit-library-primitive lib-primitives))
 
 (define (emit-labels expr k)
@@ -936,6 +952,16 @@
   (emit "  cmp $~s, %al" tag)
   (emit-cmp-bool))
 
+(define-primitive (make-symbol si env str)
+  (emit-expr si env str)
+  (emit "  sub $~s, %eax" stringtag)
+  (emit "  or $~s, %eax" symboltag))
+(define-primitive (string-symbol si env symbol)
+  (emit-expr si env symbol)
+  (emit "  sub $~s, %eax" symboltag)
+  (emit "  or $~s, %eax" stringtag))
+(define-primitive (symbol? si env arg)
+  (emit-object? symboltag si env arg))
 (define-primitive (make-string si env length)
   (emit-expr-save si env length)
   (emit-make-string si))
