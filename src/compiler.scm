@@ -677,9 +677,7 @@
         (map transform expr)]
        [else
         expr]))
-    (let* ([body (if (letrec? expr)
-                     (transform-letrec expr)
-                     (transform expr))])
+    (let* ([body (transform expr)])
       (make-let 'labels labels body))))
 
 (define (all-conversions expr)
