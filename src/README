@@ -5,7 +5,7 @@ To run the tests, make sure that your compiler file is called
 (load "tests-1.1-req.scm") ; and any other test files you may have.
 
 Also, make sure that your compiler defines the function
-compile-program that takes an expression and uses "emit" to emit the
+emit-program that takes an expression and uses "emit" to emit the
 appropriate instructions.
 
 The tests-driver defines the procedure "test-all" that will run all
