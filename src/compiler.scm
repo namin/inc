@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-2.6-req.scm")
 (load "tests-2.4-req.scm")
 (load "tests-2.3-req.scm")
 (load "tests-2.2-req.scm")
@@ -35,6 +36,7 @@
 (define stringtag   #x06)
 (define closuretag  #x02)
 (define wordsize       4) ; bytes
+(define wordshift      2)
 (define bytes          4)
 
 (define registers
@@ -71,13 +73,13 @@
 
 (define-syntax define-primitive
   (syntax-rules ()
-    [(_ (prim-name si arg* ...) b b* ...)
+    [(_ (prim-name si env arg* ...) b b* ...)
      (begin
        (putprop 'prim-name '*is-prim* #t)
        (putprop 'prim-name '*arg-count*
          (length '(arg* ...)))
        (putprop 'prim-name '*emitter*
-         (lambda (si arg* ...) b b* ...)))]))
+         (lambda (si env arg* ...) b b* ...)))]))
 
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
@@ -93,7 +95,8 @@
 
 (define (emit-primcall si env expr)
   (let ([prim (car expr)] [args (cdr expr)])
-    (check-primcall-args prim args)
+    (or (check-primcall-args prim args)
+        (error 'emit-primcall (format "incorrect number of arguments to ~s" prim)))
     (apply (primitive-emitter prim) si env args)))
 
 (define-primitive (fxadd1 si env arg)
@@ -402,6 +405,22 @@
         (set! counts (cons (cons name 1) counts))
         name]))))
 
+;; TODO: support library functions as described in the paper (3.14)
+(define (library-hack expr)
+  `(letrec ([length (lambda (lst)
+                      (if (null? lst)
+                          0
+                          (fxadd1 (length (cdr lst)))))]
+            [vector (lambda args
+                      (let ([v (make-vector (length args))])
+                        (letrec ([fill (lambda (index args)
+                                         (unless (null? args)
+                                                 (vector-set! v index (car args))
+                                                 (fill (fxadd1 index) (cdr args))))])
+                          (fill 0 args)
+                          v)))])
+     ,expr))
+                                                    
 (define (macro-expand expr)
   (define (transform expr bound-vars)
     (cond
@@ -411,7 +430,7 @@
       (make-lambda
        (lambda-formals expr)
        (transform (lambda-body expr)
-                  (append (lambda-formals expr) bound-vars)))]
+                  (append (lambda-vars expr) bound-vars)))]
      [(let? expr)
       (make-let
        (let-kind expr)
@@ -506,11 +525,11 @@
           (error 'alpha-conversion (format "undefined variable ~s" expr)))]
      [(lambda? expr)
       (let ([new-env (bulk-extend-env
-                      (lambda-formals expr)
-                      (map unique-name (lambda-formals expr))
+                      (lambda-vars expr)
+                      (map unique-name (lambda-vars expr))
                       env)])
         (make-lambda
-         (map (lambda (v) (lookup v new-env)) (lambda-formals expr))
+         (map-formals (lambda (v) (lookup v new-env)) (lambda-formals expr))
          (transform (lambda-body expr) new-env)))]
      [(let? expr)
       (let* ([lvars (map lhs (let-bindings expr))]
@@ -546,7 +565,7 @@
        [(set? expr) 
         `(set-car! ,(set-lhs expr) ,(transform (set-rhs expr)))]
        [(lambda? expr)
-        (let ([vars (filter variable-assigned (lambda-formals expr))])
+        (let ([vars (filter variable-assigned (lambda-vars expr))])
           (make-lambda
            (lambda-formals expr)
            (if (null? vars)
@@ -664,7 +683,7 @@
       (make-let 'labels labels body))))
 
 (define (all-conversions expr)
-  (closure-conversion (lift-constants (assignment-conversion (alpha-conversion (macro-expand expr))))))
+  (closure-conversion (lift-constants (assignment-conversion (alpha-conversion (macro-expand (library-hack expr)))))))
 
 (define (special? symbol)
   (or (member symbol '(if begin let lambda closure set! quote))
@@ -676,7 +695,7 @@
 (define (free-vars expr)
   (cond
    [(variable? expr) (list expr)]
-   [(lambda? expr) (filter (lambda (v) (not (member v (lambda-formals expr))))
+   [(lambda? expr) (filter (lambda (v) (not (member v (lambda-vars expr))))
                            (free-vars (lambda-body expr)))]
    [(let? expr)
     (append
@@ -696,6 +715,17 @@
 
 (define (lambda? expr) (tagged-list 'lambda expr))
 (define lambda-formals cadr)
+(define (formals-to-vars formals)
+  (cond
+   [(list? formals) formals]
+   [(pair? formals) (cons (car formals) (formals-to-vars (cdr formals)))]
+   [else (list formals)]))
+(define (lambda-vars expr) (formals-to-vars (lambda-formals expr)))
+(define (map-formals f formals)
+  (cond
+   [(list? formals) (map f formals)]
+   [(pair? formals) (cons (f (car formals)) (map-formals f (cdr formals)))]
+   [else (f formals)]))
 (define (lambda-body expr) (make-body (cddr expr)))
 (define (make-lambda formals body)
   (list 'lambda formals body))
@@ -723,15 +753,50 @@
 (define (make-code formals free body)
   (list 'code formals free body))
 (define code-formals cadr)
+(define (code-bound-variables expr) (formals-to-vars (code-formals expr)))
+(define (code-vararg? expr)
+  (not (list? (code-formals expr))))
 (define code-free-variables caddr)
 (define code-body cadddr)
 (define (emit-code env)
   (lambda (expr label)
     (emit-function-header label)
-    (let ([fmls (code-formals expr)]
+    (let ([bvs (code-bound-variables expr)]
           [fvs (code-free-variables expr)]
           [body (code-body expr)])
-      (extend-env-with (- wordsize) env fmls (lambda (si env)
+      (when (code-vararg? expr)
+            (let ([start-label (unique-label)]
+                  [fill-label (unique-label)]
+                  [loop-label (unique-label)])
+              (emit "  mov %eax, %edx")
+              (emit-immediate '())
+              (emit "  cmp $~s, %edx" (- (length bvs) 1))
+              (emit "  jle ~a" fill-label)
+              (emit-label loop-label)
+              (emit "  cmp $~s, %edx" (length bvs))
+              (emit "  jl ~a" start-label)
+              (emit "  shl $~s, %edx" wordshift)
+              (emit "  sub %edx, %esp")
+              (emit-stack-save (next-stack-index 0))
+              (emit "  mov %edx, %eax")
+              (emit-stack-save (next-stack-index (next-stack-index 0)))
+              (emit-cons 0)
+              (emit-stack-save 0)
+              (emit-stack-load (next-stack-index (next-stack-index 0)))
+              (emit "  mov %eax, %edx")
+              (emit-stack-load 0)
+              (emit "  add %edx, %esp")
+              (emit "  shr $~s, %edx" wordshift)
+              (emit "  sub $1, %edx")
+              (emit-jmp loop-label)
+              (emit-label fill-label)
+              (emit "  add $1, %edx")
+              (emit "  shl $~s, %edx" wordshift)
+              (emit "  sub %edx, %esp")
+              (emit-stack-save 0)
+              (emit "  add %edx, %esp")
+              (emit-label start-label)))
+      (extend-env-with (- wordsize) env bvs (lambda (si env)
         (close-env-with wordsize env fvs (lambda (env)
           (emit-tail-expr si env body))))))))
 
@@ -758,7 +823,9 @@
     (emit "  mov %eax, %edi")
     (emit-heap-load (- closuretag))
     (emit-adjust-base si)
-    (emit-call "*%eax")
+    (emit "  mov %eax, %edx")
+    (emit "  mov $~s, %eax" (length (call-args expr)))
+    (emit-call "*%edx")
     (emit-adjust-base (- si))
     (emit "  mov ~s(%esp), %edi" si)]
    [else ; tail
@@ -768,7 +835,9 @@
     (move-arguments si (- (+ si wordsize)) (call-args expr))
     (emit "  mov %edi, %eax")
     (emit-heap-load (- closuretag))
-    (emit-jmp "*%eax")]))
+    (emit "  mov %eax, %edx")
+    (emit "  mov $~s, %eax" (length (call-args expr)))
+    (emit-jmp "*%edx")]))
 
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
