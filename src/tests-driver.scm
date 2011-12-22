@@ -12,7 +12,7 @@
             all-tests))]))
 
 (define (build)
-  (unless (zero? (system "gcc -m32 -Wall -o stst startup.c stst.s"))
+  (unless (zero? (system "gcc -m32 -Wall -o stst startup.c lib.s stst.s"))
     (error 'make "could not build target")))
 
 (define (execute)
@@ -102,7 +102,6 @@
     (parameterize ([compile-port p])
        (compile-program expr))
     (close-output-port p)))
-
 
 (define (execute)
   (unless (fxzero? (system "./stst > stst.out"))

@@ -71,6 +71,33 @@
 (define (emit-immediate x)
   (emit "  mov $~s, %eax" (immediate-rep x)))
 
+(define (make-begin lst) 
+  (cond
+   [(null? (cdr lst)) (car lst)]
+   [else (cons 'begin lst)]))
+(define (begin? expr)
+  (and (tagged-list 'begin expr)
+       (or (not (null? (begin-seq expr)))
+           (error 'begin? (format "empty begin")))))
+(define begin-seq cdr)
+(define (lambda? expr) (tagged-list 'lambda expr))
+(define lambda-formals cadr)
+(define (formals-to-vars formals)
+  (cond
+   [(list? formals) formals]
+   [(pair? formals) (cons (car formals) (formals-to-vars (cdr formals)))]
+   [else (list formals)]))
+(define (lambda-vars expr) (formals-to-vars (lambda-formals expr)))
+(define (map-formals f formals)
+  (cond
+   [(list? formals) (map f formals)]
+   [(pair? formals) (cons (f (car formals)) (map-formals f (cdr formals)))]
+   [else (f formals)]))
+(define (lambda-body expr) (make-body (cddr expr)))
+(define (make-lambda formals body)
+  (list 'lambda formals body))
+
+(define lib-primitives '())
 (define-syntax define-primitive
   (syntax-rules ()
     [(_ (prim-name si env arg* ...) b b* ...)
@@ -80,9 +107,34 @@
          (length '(arg* ...)))
        (putprop 'prim-name '*emitter*
          (lambda (si env arg* ...) b b* ...)))]))
+(define-syntax define-lib-primitive
+  (syntax-rules ()
+    [(_ (prim-name arg* ...) b b* ...)
+     (begin
+       (set! lib-primitives (cons 'prim-name lib-primitives))
+       (putprop 'prim-name '*is-lib-prim* #t)
+       (putprop 'prim-name '*arg-count*
+         (length '(arg* ...)))
+       (putprop 'prim-name '*lib-code*
+         (make-lambda '(arg* ...) (make-begin '(b b* ...)))))]
+    [(_ (prim-name . varargs) b b* ...)
+     (begin
+       (set! lib-primitives (cons 'prim-name lib-primitives))
+       (putprop 'prim-name '*is-lib-prim* #t)
+       (putprop 'prim-name '*arg-count* 0)
+       (putprop 'prim-name '*vararg* #t)
+       (putprop 'prim-name '*lib-code*
+         (make-lambda 'varargs (make-begin '(b b* ...)))))]))
+(load "library.scm")
 
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
+
+(define (lib-primitive? x)
+  (and (symbol? x) (getprop x '*is-lib-prim*)))
+
+(define (lib-primitive-code x)
+  (or (getprop x '*lib-code*) (error 'lib-primitive-code (format "primitive ~s has no lib code" x))))
 
 (define (primitive-emitter x)
   (or (getprop x '*emitter*) (error 'primitive-emitter (format "primitive ~s has no emitter" x))))
@@ -248,15 +300,6 @@
 (define (tagged-list tag expr)
   (and (list? expr) (not (null? expr)) (eq? (car expr) tag)))
 
-(define (make-begin lst) 
-  (if (null? (cdr lst))
-      (car lst)
-      (cons 'begin lst)))
-(define (begin? expr)
-  (and (tagged-list 'begin expr)
-       (or (not (null? (begin-seq expr)))
-           (error 'begin? (format "empty begin")))))
-(define begin-seq cdr)
 (define (emit-begin si env tail expr)
   (emit-seq si env tail (begin-seq expr)))
 (define (emit-seq si env tail seq)
@@ -404,22 +447,6 @@
        [else
         (set! counts (cons (cons name 1) counts))
         name]))))
-
-;; TODO: support library functions as described in the paper (3.14)
-(define (library-hack expr)
-  `(letrec ([length (lambda (lst)
-                      (if (null? lst)
-                          0
-                          (fxadd1 (length (cdr lst)))))]
-            [vector (lambda args
-                      (let ([v (make-vector (length args))])
-                        (letrec ([fill (lambda (index args)
-                                         (unless (null? args)
-                                                 (vector-set! v index (car args))
-                                                 (fill (fxadd1 index) (cdr args))))])
-                          (fill 0 args)
-                          v)))])
-     ,expr))
                                                     
 (define (macro-expand expr)
   (define (transform expr bound-vars)
@@ -652,7 +679,27 @@
                   (bind (cadr val-cst) (car val-cst)))
                 constants)
            texpr)))))
-  
+
+(define (annotate-lib-primitives expr)
+  (define (transform expr)
+    (cond
+     [(and (variable? expr) (lib-primitive? expr)) `(primitive-ref ,expr)]
+     [(list? expr) (map transform expr)]
+     [else expr]))
+  (transform expr))
+(define-primitive (primitive-ref si env label)
+  (let ([done-label (unique-label)])
+    (emit "  mov ~s, %eax" label)
+    (emit "  testl %eax, %eax")
+    (emit "  jne ~s" done-label)
+    (emit-adjust-base si)
+    (emit-call (primitive-alloc label))
+    (emit-adjust-base (- si))
+    (emit "  mov %eax, ~s" label)
+    (emit-label done-label)))
+(define (primitive-alloc label)
+  (string->symbol (format "~a_alloc" label)))
+
 (define (closure-conversion expr)
   (let ([labels '()])
     (define (transform expr . label)
@@ -681,11 +728,14 @@
       (make-let 'labels labels body))))
 
 (define (all-conversions expr)
-  (closure-conversion (lift-constants (assignment-conversion (alpha-conversion (macro-expand (library-hack expr)))))))
+  (closure-conversion (annotate-lib-primitives (lift-constants (assignment-conversion (alpha-conversion (macro-expand expr)))))))
+(define (all-lib-conversions expr)
+  (closure-conversion (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr))))))
 
 (define (special? symbol)
   (or (member symbol '(if begin let lambda closure set! quote))
-      (primitive? symbol)))
+      (primitive? symbol)
+      (lib-primitive? symbol)))
 
 (define (flatmap f . lst)
   (apply append (apply map f lst)))
@@ -700,33 +750,26 @@
      (flatmap free-vars (map rhs (let-bindings expr)))
      (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
              (free-vars (let-body expr))))]
+   [(tagged-list 'primitive-ref expr) '()]
    [(list? expr) (flatmap free-vars (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
    [else '()]))
 
-(define (emit-labels expr)
+(define (emit-library)
+  (define (emit-library-primitive prim-name)
+    (let ([labels (all-lib-conversions (lib-primitive-code prim-name))])
+      (emit-labels labels (lambda (expr env)
+        ((emit-code env #t) (make-code '() '() expr) (primitive-alloc prim-name))))
+      (emit ".global ~s" prim-name)
+      (emit ".comm ~s,4,4" prim-name)))
+  (for-each emit-library-primitive lib-primitives))
+
+(define (emit-labels expr k)
   (let* ([bindings (labels-bindings expr)]
          [labels (map lhs bindings)]
          [codes (map rhs bindings)]
          [env (make-initial-env '())])
-    (for-each (emit-code env) codes labels)
-    (emit-scheme-entry (labels-body expr) env)))
-
-(define (lambda? expr) (tagged-list 'lambda expr))
-(define lambda-formals cadr)
-(define (formals-to-vars formals)
-  (cond
-   [(list? formals) formals]
-   [(pair? formals) (cons (car formals) (formals-to-vars (cdr formals)))]
-   [else (list formals)]))
-(define (lambda-vars expr) (formals-to-vars (lambda-formals expr)))
-(define (map-formals f formals)
-  (cond
-   [(list? formals) (map f formals)]
-   [(pair? formals) (cons (f (car formals)) (map-formals f (cdr formals)))]
-   [else (f formals)]))
-(define (lambda-body expr) (make-body (cddr expr)))
-(define (make-lambda formals body)
-  (list 'lambda formals body))
+    (for-each (emit-code env #f) codes labels)
+    (k (labels-body expr) env)))
 
 (define (make-closure label fvs)
   (cons 'closure (cons label fvs)))
@@ -756,9 +799,9 @@
   (not (list? (code-formals expr))))
 (define code-free-variables caddr)
 (define code-body cadddr)
-(define (emit-code env)
+(define (emit-code env global?)
   (lambda (expr label)
-    (emit-function-header label)
+    ((if global? emit-function-header emit-label) label)
     (let ([bvs (code-bound-variables expr)]
           [fvs (code-free-variables expr)]
           [body (code-body expr)])
@@ -1011,4 +1054,10 @@
   (emit-call "L_scheme_entry")
   (restore-registers)
   (emit "  ret")
-  (emit-labels (all-conversions expr)))
+  (emit-labels (all-conversions expr) emit-scheme-entry))
+
+(define (compile-library)
+  (let ([p (open-output-file "lib.s" 'replace)])
+    (parameterize ([compile-port p])
+      (emit-library))
+    (close-output-port p)))
