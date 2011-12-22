@@ -663,22 +663,41 @@
   (let ([constants '()])
     (define (transform expr)
       (cond
+       [(and (quote? expr) (immediate? (quote-expr expr))) (quote-expr expr)]
        [(and (quote? expr) (assoc expr constants)) => cadr]
        [(quote? expr)
-        (set! constants (cons (list expr (unique-name 'c)) constants))
+        (set! constants (cons (list expr (list 'constant-ref (unique-name 'c))) constants))
         (cadr (assoc expr constants))]
        [(string? expr) (transform `(quote ,expr))]
        [(list? expr) (map transform expr)]
        [else expr]))
     (let ([texpr (transform expr)])
-      (if (null? constants)
-          expr
-          (make-let
-           'let
-           (map (lambda (val-cst)
-                  (bind (cadr val-cst) (car val-cst)))
-                constants)
-           texpr)))))
+      (make-let
+       'labels
+       (map (lambda (val-cst)
+              (bind (cadadr val-cst) '(datum)))
+            constants)
+       (if (null? constants)
+           texpr
+           (combine-exprs
+            (make-begin
+             (map (lambda (val-cst)
+                    (list 'constant-init (cadadr val-cst) (car val-cst)))
+                  constants))
+            texpr))))))
+(define (combine-exprs a b)
+  (cond
+   [(and (begin? a) (begin? b)) (make-begin (append (begin-seq a) (begin-seq b)))]
+   [(begin? a) (make-begin (append (begin-seq a) (list b)))]
+   [(begin? b) (make-begin (cons a (begin-seq b)))]
+   [else (make-begin (list a b))]))
+(define-primitive (constant-ref si env constant)
+  (emit "  mov ~s, %eax" constant))
+(define-primitive (constant-init si env constant value)
+  (emit ".local ~s" constant)
+  (emit ".comm ~s,4,4" constant)
+  (emit-expr si env value)
+  (emit "  mov %eax, ~s" constant))
 
 (define (annotate-lib-primitives expr)
   (define (transform expr)
@@ -701,12 +720,13 @@
   (string->symbol (format "~a_alloc" label)))
 
 (define (closure-conversion expr)
-  (let ([labels '()])
+  (let ([labels '()]
+        [constants (map lhs (labels-bindings expr))])
     (define (transform expr . label)
       (cond
        [(lambda? expr)
         (let ([label (or (and (not (null? label)) (car label)) (unique-label))]
-              [fvs (free-vars expr)])
+              [fvs (filter (lambda (v) (not (member v constants))) (free-vars expr))])
           (set! labels
                 (cons (bind label
                             (make-code (lambda-formals expr)
@@ -724,13 +744,11 @@
         (map transform expr)]
        [else
         expr]))
-    (let* ([body (transform expr)])
+    (let* ([body (transform (labels-body expr))])
       (make-let 'labels labels body))))
 
 (define (all-conversions expr)
-  (closure-conversion (annotate-lib-primitives (lift-constants (assignment-conversion (alpha-conversion (macro-expand expr)))))))
-(define (all-lib-conversions expr)
-  (closure-conversion (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr))))))
+  (closure-conversion (lift-constants (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr)))))))
 
 (define (special? symbol)
   (or (member symbol '(if begin let lambda closure set! quote))
@@ -756,7 +774,7 @@
 
 (define (emit-library)
   (define (emit-library-primitive prim-name)
-    (let ([labels (all-lib-conversions (lib-primitive-code prim-name))])
+    (let ([labels (all-conversions (lib-primitive-code prim-name))])
       (emit-labels labels (lambda (expr env)
         ((emit-code env #t) (make-code '() '() expr) (primitive-alloc prim-name))))
       (emit ".global ~s" prim-name)
