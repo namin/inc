@@ -1,7 +1,8 @@
 (define all-tests '())
 
 (define (compile-program x)
-  (emit-program x)) ;; implemented by compiler.scm
+  (emit-program x))        ;; implemented by compiler.scm
+(define (emit-library) #f) ;; (optionally) implemented by compiler.scm
 
 (define-syntax add-tests-with-string-output
   (syntax-rules (=>)
@@ -12,7 +13,9 @@
             all-tests))]))
 
 (define (build)
-  (unless (zero? (system "gcc -m32 -Wall -o stst startup.c lib.s stst.s"))
+  (unless (zero? (system (format "gcc -m32 -Wall -o stst ~a ~a stst.s"
+                                 (runtime-file)
+                                 (lib-file))))
     (error 'make "could not build target")))
 
 (define (execute)
@@ -80,12 +83,19 @@
 
 (define runtime-file 
   (make-parameter
-    "runtime.c"
+    "startup.c"
     (lambda (fname)
       (unless (string? fname)
         (error 'runtime-file (format "not a string ~s" fname)))
       fname)))
 
+(define lib-file 
+  (make-parameter
+    "lib.s"
+    (lambda (fname)
+      (unless (string? fname)
+        (error 'runtime-file (format "not a string ~s" fname)))
+      fname)))
 
 (define compile-port
   (make-parameter
@@ -130,3 +140,8 @@
   (apply fprintf (compile-port) args)
   (newline (compile-port)))
 
+(define (compile-library)
+  (let ([p (open-output-file (lib-file) 'replace)])
+    (parameterize ([compile-port p])
+      (emit-library))
+    (close-output-port p)))

@@ -10,8 +10,10 @@ appropriate instructions.
 
 The tests-driver defines the procedure "test-all" that will run all
 the tests provided, get the output, redirect it to a file "stst.s",
-and invokes gcc on that file as well as the runtime.c file that you
-should have written.
+and invokes gcc on that file as well as the startup.c file that you
+should have written, and the lib.s file that is generated from the
+compile-library thunk, which you'll need to call once and every time
+you change the emit-library thunk, which you can define.
 
 The tests-driver is written for [Petite] Chez Scheme 7.  You can
 obtain a copy of Petite Chez Scheme from:

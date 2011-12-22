@@ -1115,9 +1115,3 @@
   (restore-registers)
   (emit "  ret")
   (emit-labels (all-conversions expr) emit-scheme-entry))
-
-(define (compile-library)
-  (let ([p (open-output-file "lib.s" 'replace)])
-    (parameterize ([compile-port p])
-      (emit-library))
-    (close-output-port p)))
