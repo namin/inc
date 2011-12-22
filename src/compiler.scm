@@ -429,7 +429,6 @@
    [(if? expr) (emit-if si env tail expr)]
    [(let? expr) (emit-let si env tail expr)]
    [(begin? expr) (emit-begin si env tail expr)]
-   [(quote? expr) (emit-quote si env (quote-expr expr)) (emit-ret-if tail)]
    [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
    [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
@@ -623,6 +622,19 @@
 (define (quote? expr)
   (tagged-list 'quote expr))
 (define quote-expr cadr)
+
+(define (translate-quote expr)
+  (cond
+   [(immediate? expr) expr]
+   [(pair? expr)
+    (list 'cons (translate-quote (car expr)) (translate-quote (cdr expr)))]
+   [(vector? expr)
+    (cons 'vector (map translate-quote (vector->list expr)))]
+   [(string? expr)
+    (cons 'string (map translate-quote (string->list expr)))]
+   [else (error 'translate-quote (format "don't know how to quote ~s" expr))]))
+
+;; not needed as quotes are translated
 (define (emit-quote si env expr)
   (cond
    [(immediate? expr) (emit-immediate expr)]
@@ -682,7 +694,9 @@
            (combine-exprs
             (make-begin
              (map (lambda (val-cst)
-                    (list 'constant-init (cadadr val-cst) (car val-cst)))
+                    (list 'constant-init
+                          (cadadr val-cst)
+                          (all-expr-conversions (translate-quote (quote-expr (car val-cst))))))
                   constants))
             texpr))))))
 (define (combine-exprs a b)
@@ -747,8 +761,10 @@
     (let* ([body (transform (labels-body expr))])
       (make-let 'labels labels body))))
 
+(define (all-expr-conversions expr)
+  (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr)))))
 (define (all-conversions expr)
-  (closure-conversion (lift-constants (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr)))))))
+  (closure-conversion (lift-constants (all-expr-conversions expr))))
 
 (define (special? symbol)
   (or (member symbol '(if begin let lambda closure set! quote))
