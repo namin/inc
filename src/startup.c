@@ -9,74 +9,88 @@
 #define IN 1
 #define OUT 0
 
-static void print_ptr_rec(ptr x, int state) {
+static void print_ptr_rec(FILE* port, ptr x, int state) {
   if ((x & fx_mask) == fx_tag) {
-    printf("%ld", ((long) x) >> fx_shift);
+    fprintf(port, "%ld", ((long) x) >> fx_shift);
   } else if (x == bool_f) {
-    printf("#f");
+    fprintf(port, "#f");
   } else if (x == bool_t) {
-    printf("#t");
+    fprintf(port, "#t");
   } else if (x == list_nil) {
-    printf("()");
+    fprintf(port, "()");
   } else if ((x & char_mask) == char_tag) {
     char c = (char) (x >> char_shift);
-    if      (c == '\t') printf("#\\tab");
-    else if (c == '\n') printf("#\\newline");
-    else if (c == '\r') printf("#\\return");
-    else if (c == ' ')  printf("#\\space");
-    else                printf("#\\%c", c);
+    if      (c == '\t') fprintf(port, "#\\tab");
+    else if (c == '\n') fprintf(port, "#\\newline");
+    else if (c == '\r') fprintf(port, "#\\return");
+    else if (c == ' ')  fprintf(port, "#\\space");
+    else                fprintf(port, "#\\%c", c);
   } else if ((x & obj_mask) == pair_tag) {
-    if (state != IN) printf("(");
+    if (state != IN) fprintf(port, "(");
     ptr car = ((cell*)(x-pair_tag))->car;
-    print_ptr_rec(car, OUT);
+    print_ptr_rec(port, car, OUT);
     ptr cdr = ((cell*)(x-pair_tag))->cdr;
     if (cdr != list_nil) {
       if ((cdr & obj_mask) != pair_tag) {
-        printf(" . ");
-        print_ptr_rec(cdr, OUT);
+        fprintf(port, " . ");
+        print_ptr_rec(port, cdr, OUT);
       } else {
-        printf(" ");
-        print_ptr_rec(cdr, IN);
+        fprintf(port, " ");
+        print_ptr_rec(port, cdr, IN);
       }
     }
-    if (state != IN) printf(")");
+    if (state != IN) fprintf(port, ")");
   } else if ((x & obj_mask) == vector_tag) {
-    printf("#(");
+    fprintf(port, "#(");
 
     vector* p = (vector*)(x-vector_tag);
     unsigned long n = p->length >> fx_shift;
     unsigned long i;
     for (i = 0; i < n; i++) {
-      if (i > 0) printf(" ");
-      print_ptr_rec(p->buf[i], OUT);
+      if (i > 0) fprintf(port, " ");
+      print_ptr_rec(port, p->buf[i], OUT);
     }
 
-    printf(")");
+    fprintf(port, ")");
   } else if ((x & obj_mask) == string_tag) {
-    if (state != IN) printf("\"");
+    if (state != IN) fprintf(port, "\"");
 
     string* p = (string*)(x-string_tag);
     unsigned long n = p->length >> fx_shift;
     unsigned long i;
     for (i = 0; i < n; i++) {
       int c = p->buf[i];
-      if      (c == '"' ) printf("\\\"");
-      else if (c == '\\') printf("\\\\");
-      else                putchar(c);
+      if      (c == '"' ) fprintf(port, "\\\"");
+      else if (c == '\\') fprintf(port, "\\\\");
+      else                fputc(c, port);
     }
 
-    if (state != IN) printf("\"");
+    if (state != IN) fprintf(port, "\"");
   } else if ((x & obj_mask) == symbol_tag) {
-    print_ptr_rec((x - symbol_tag) | string_tag, IN);
+    print_ptr_rec(port, (x - symbol_tag) | string_tag, IN);
   } else if ((x & obj_mask) == closure_tag) {
-    printf("#<procedure>");
+    fprintf(port, "#<procedure>");
   } else {
-    printf("#<unknown 0x%08lx>", x);
+    fprintf(port, "#<unknown 0x%08lx>", x);
   }
 }
 
+void ik_error(ptr x) {
+  ptr caller = ((cell*)(x-pair_tag))->car;
+  ptr msg = ((cell*)(x-pair_tag))->cdr;
+  fprintf(stderr, "Exception");
+  if (caller != bool_f) {
+    fprintf(stderr, " in ");
+    print_ptr_rec(stderr, caller, OUT);
+  }
+  fprintf(stderr, ": ");
+  print_ptr_rec(stderr, msg, IN);
+  fprintf(stderr, "\n");
+  exit(0);
+}
+
 static void print_ptr(ptr x) {
-  print_ptr_rec(x, OUT);
+  print_ptr_rec(stdout, x, OUT);
   printf("\n");
 }
 

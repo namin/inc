@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-2.9-req.scm")
 (load "tests-2.8-req.scm")
 (load "tests-2.6-req.scm")
 (load "tests-2.4-req.scm")
@@ -108,7 +109,15 @@
        (putprop 'prim-name '*arg-count*
          (length '(arg* ...)))
        (putprop 'prim-name '*emitter*
-         (lambda (si env arg* ...) b b* ...)))]))
+         (lambda (si env arg* ...) b b* ...)))]
+    [(_ (prim-name si env arg* ... . vararg) b b* ...)
+     (begin
+       (putprop 'prim-name '*is-prim* #t)
+       (putprop 'prim-name '*arg-count*
+         (length '(arg* ...)))
+       (putprop 'prim-name '*vararg* #t)
+       (putprop 'prim-name '*emitter*
+         (lambda (si env arg* ... . vararg) b b* ...)))]))
 (define-syntax define-lib-primitive
   (syntax-rules ()
     [(_ (prim-name arg* ...) b b* ...)
@@ -150,7 +159,7 @@
   (and (pair? expr) (primitive? (car expr))))
 
 (define (check-primcall-args prim args)
-  (= (getprop prim '*arg-count*) (length args)))
+  ((if (getprop prim '*vararg*) <= =) (getprop prim '*arg-count*) (length args)))
 
 (define (emit-primcall si env expr)
   (let ([prim (car expr)] [args (cdr expr)])
@@ -436,6 +445,7 @@
    [(if? expr) (emit-if si env tail expr)]
    [(let? expr) (emit-let si env tail expr)]
    [(begin? expr) (emit-begin si env tail expr)]
+   [(foreign-call? expr) (emit-foreign-call si env expr) (emit-ret-if tail)]
    [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
    [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
@@ -690,6 +700,7 @@
         (set! constants (cons (list expr (list 'constant-ref (unique-name 'c))) constants))
         (cadr (assoc expr constants))]
        [(string? expr) (transform `(quote ,expr))]
+       [(foreign-call? expr) (make-foreign-call (foreign-call-name expr) (map transform (foreign-call-args expr)))]
        [(list? expr) (map transform expr)]
        [else expr]))
     (let ([texpr (transform expr)])
@@ -782,7 +793,7 @@
   (closure-conversion (lift-constants (all-expr-conversions expr))))
 
 (define (special? symbol)
-  (or (member symbol '(if begin let lambda closure set! quote))
+  (or (member symbol '(if begin let lambda closure set! quote foreign-call))
       (primitive? symbol)
       (lib-primitive? symbol)))
 
@@ -800,6 +811,7 @@
      (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
              (free-vars (let-body expr))))]
    [(tagged-list 'primitive-ref expr) '()]
+   [(foreign-call? expr) (free-vars (foreign-call-args expr))]
    [(list? expr) (flatmap free-vars (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
    [else '()]))
 
@@ -930,6 +942,23 @@
     (emit "  mov $~s, %eax" (length (call-args expr)))
     (emit-jmp "*%edx")]))
 
+(define (foreign-call? expr)
+  (tagged-list 'foreign-call expr))
+(define (make-foreign-call name args)
+  (cons 'foreign-call (cons name args)))
+(define foreign-call-name cadr)
+(define foreign-call-args cddr)
+(define (emit-foreign-call si env expr)
+  (let ([new-si (let loop ([si si] [args (reverse (foreign-call-args expr))])
+                  (cond
+                   [(null? args) (+ si wordsize)]
+                   [else
+                    (emit-expr-save si env (car args))
+                    (loop (next-stack-index si) (cdr args))]))])
+    (emit-adjust-base new-si)
+    (emit-call (foreign-call-name expr))
+    (emit-adjust-base (- new-si))))
+            
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
   (let ([alloc-size (* (add1 (div (sub1 size) heap-cell-size)) heap-cell-size)])
