@@ -35,7 +35,6 @@
 (define stringtag   #x06)
 (define closuretag  #x02)
 (define wordsize       4) ; bytes
-(define wordshift      2)
 (define bytes          4)
 
 (define registers
@@ -777,10 +776,8 @@
     (emit "  mov %ebp, %eax")
     (emit "  add $~s, %ebp" (* alloc-size bytes))))
 (define (emit-heap-alloc-dynamic)
-  (emit "  sub $1, %eax")
-  (emit "  shr $~s, %eax" objshift)
-  (emit "  add $1, %eax")
-  (emit "  shl $~s, %eax" (+ objshift 2))
+  (emit "  add $~s, %eax" (sub1 heap-cell-size))
+  (emit "  and $~s, %eax" (- heap-cell-size))
   (emit "  mov %ebp, %edx")
   (emit "  add %eax, %ebp")
   (emit "  mov %edx, %eax"))
