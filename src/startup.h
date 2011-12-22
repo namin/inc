@@ -12,9 +12,9 @@
 #define obj_mask             0x07
 #define obj_shift               3
 #define pair_tag             0x01
-#define pair_size              16
+#define pair_size               8
 #define pair_car                0
-#define pair_cdr                8
+#define pair_cdr                4
 #define vector_tag           0x05
 #define string_tag           0x06
 #define closure_tag          0x02
