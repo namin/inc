@@ -767,12 +767,13 @@
       (cond
        [(lambda? expr)
         (let ([label (or (and (not (null? label)) (car label)) (unique-label))]
-              [fvs (filter (lambda (v) (not (member v constants))) (free-vars expr))])
+              [fvs (filter (lambda (v) (not (member v constants))) (free-vars expr))]
+	      [body (transform (lambda-body expr))])
           (set! labels
                 (cons (bind label
                             (make-code (lambda-formals expr)
                                        fvs
-                                       (transform (lambda-body expr))))
+                                       body))
                     labels))
           (make-closure label fvs))]
        [(any-let? expr)
