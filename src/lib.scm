@@ -57,5 +57,12 @@
         symbol)))
 
 (define-lib-primitive (error . args)
-  ;; stub
-  args)
+  (foreign-call "ik_error" args))
+
+(define-lib-primitive (string-set! s i c)
+  (cond
+   [(not (string? s)) (error)]
+   [(not (fixnum? i)) (error)]
+   [(not (char? c)) (error)]
+   [(not (and (fx<= 0 i) (fx< i (string-length s)))) (error)]
+   [else ($string-set! s i c)]))

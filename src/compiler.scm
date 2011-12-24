@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-3.3-req.scm")
 (load "tests-3.1-req.scm")
 (load "tests-2.9-req.scm")
 (load "tests-2.8-req.scm")
@@ -760,6 +761,7 @@
   ;; TODO: auto-convert arbitrary scheme symbol to acceptable assembly label.
   (cond
    [(eq? name 'string->symbol) 'string_to_symbol]
+   [(eq? name 'string-set!) 'string_set_bang]
    [else name]))
 (define (primitive-alloc name)
   (string->symbol (format "~a_alloc" (primitive-label name))))
@@ -1007,7 +1009,7 @@
   (emit "  or $~s, %eax" stringtag))
 (define-primitive (string? si env arg)
   (emit-object? stringtag si env arg))
-(define-primitive (string-set! si env string index value)
+(define-primitive ($string-set! si env string index value)
   (emit-expr si env index)
   (emit "  shr $~s, %eax" fxshift)
   (emit "  add $~s, %eax" wordsize)

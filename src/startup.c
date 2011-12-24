@@ -76,15 +76,17 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
 }
 
 void ik_error(ptr x) {
-  ptr caller = ((cell*)(x-pair_tag))->car;
-  ptr msg = ((cell*)(x-pair_tag))->cdr;
   fprintf(stderr, "Exception");
-  if (caller != bool_f) {
-    fprintf(stderr, " in ");
-    print_ptr_rec(stderr, caller, OUT);
+  if ((x & obj_mask) == pair_tag) {
+    ptr caller = ((cell*)(x-pair_tag))->car;
+    ptr msg = ((cell*)(x-pair_tag))->cdr;
+    if (caller != bool_f) {
+      fprintf(stderr, " in ");
+      print_ptr_rec(stderr, caller, OUT);
+    }
+    fprintf(stderr, ": ");
+    print_ptr_rec(stderr, msg, IN);
   }
-  fprintf(stderr, ": ");
-  print_ptr_rec(stderr, msg, IN);
   fprintf(stderr, "\n");
   exit(0);
 }
