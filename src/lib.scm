@@ -55,3 +55,7 @@
       (let ([symbol (make-symbol str)])
         (cell_set __symbols__ (cons symbol (cell_get __symbols__)))
         symbol)))
+
+(define-lib-primitive (error . args)
+  ;; stub
+  args)

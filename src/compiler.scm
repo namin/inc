@@ -461,6 +461,9 @@
                  [new-name (string->symbol (format "~s_~s" name count))])
             (set-cdr! p (add1 count))
             new-name))]
+       [(lib-primitive? name)
+        (set! counts (cons (cons name 1) counts))
+	(unique-name name)]
        [else
         (set! counts (cons (cons name 1) counts))
         name]))))
@@ -564,8 +567,9 @@
 (define (alpha-conversion expr)
   (define (transform expr env)
     (cond
-     [(and (variable? expr) (not (lib-primitive? expr)))
+     [(variable? expr)
       (or (lookup expr env)
+          (and (lib-primitive? expr) expr)
           (error 'alpha-conversion (format "undefined variable ~s" expr)))]
      [(lambda? expr)
       (let ([new-env (bulk-extend-env
@@ -796,8 +800,7 @@
 
 (define (special? symbol)
   (or (member symbol '(if begin let lambda closure set! quote foreign-call))
-      (primitive? symbol)
-      (lib-primitive? symbol)))
+      (primitive? symbol)))
 
 (define (flatmap f . lst)
   (apply append (apply map f lst)))
