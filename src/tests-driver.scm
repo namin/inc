@@ -140,7 +140,7 @@
   (apply fprintf (compile-port) args)
   (newline (compile-port)))
 
-(define (compile-library)
+(define (compile-lib)
   (let ([p (open-output-file (lib-file) 'replace)])
     (parameterize ([compile-port p])
       (emit-library))

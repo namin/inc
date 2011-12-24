@@ -142,7 +142,7 @@
        (set! lib-primitives (cons 'prim-name lib-primitives))
        (putprop 'prim-name '*is-lib-prim* #t)
        (putprop 'prim-name '*lib-code* 'b))]))
-(load "library.scm")
+(load "lib.scm")
 
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
