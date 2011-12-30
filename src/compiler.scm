@@ -1022,17 +1022,16 @@
 (define foreign-call-name cadr)
 (define foreign-call-args cddr)
 (define (emit-foreign-call si env expr)
-  (let ([new-si (let loop ([si si] [args (reverse (foreign-call-args expr))])
+  (let ([new-si (let loop ([si (+ si wordsize)]
+			   [args (reverse (foreign-call-args expr))])
                   (cond
                    [(null? args) si]
                    [else
                     (emit-expr-save (next-stack-index si) env (car args))
                     (loop (next-stack-index si) (cdr args))]))])
-    (emit "  mov %ecx, ~s(%esp)" si)
     (emit-adjust-base new-si)
     (emit-call (foreign-call-name expr))
-    (emit-adjust-base (- new-si))
-    (emit "  mov ~s(%esp), %ecx" si)))
+    (emit-adjust-base (- new-si))))
             
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
@@ -1213,9 +1212,11 @@
   (emit-function-header "scheme_entry")
   (emit "  mov 4(%esp), %ecx")
   (backup-registers)
+  (emit "  mov %ecx, %esi")
   (emit "  mov 12(%esp), %ebp")
   (emit "  mov 8(%esp), %esp")
   (emit-call "L_scheme_entry")
+  (emit "  mov %esi, %ecx")
   (restore-registers)
   (emit "  ret")
   (emit-labels (all-conversions expr) emit-scheme-entry))

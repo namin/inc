@@ -14,3 +14,10 @@
    (error 'car "died")
    12) => ""]
 )
+
+(add-tests-with-string-output "S_log"
+ [(begin (log "hello") 1) => "1\n"] 
+)
+
+
+
