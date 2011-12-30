@@ -69,3 +69,34 @@
    [(not (char? c)) (error)]
    [(not (and (fx<= 0 i) (fx< i (string-length s)))) (error)]
    [else ($string-set! s i c)]))
+
+(define-lib-primitive (liftneg f a b)
+  (cond
+   [(and (fx< a 0) (fx>= b 0))
+    (fx- 0 (f (fx- 0 a) b))]
+   [(and (fx>= a 0) (fx< b 0))
+    (fx- 0 (f a (fx- 0 b)))]
+   [(and (fx< a 0) (fx< b 0))
+    (f (fx- 0 a) (fx- 0 b))]
+   [else
+    (f a b)]))
+
+(define-lib-primitive (liftneg1 f a b)
+  (cond
+   [(and (fx< a 0) (fx>= b 0))
+    (fx- 0 (f (fx- 0 a) b))]
+   [(and (fx>= a 0) (fx< b 0))
+    (f a (fx- 0 b))]
+   [(and (fx< a 0) (fx< b 0))
+    (fx- 0 (f (fx- 0 a) (fx- 0 b)))]
+   [else
+    (f a b)]))
+  
+(define-lib-primitive (fxquotient a b)
+  (liftneg (lambda (a b) ($fxquotient a b)) a b))
+
+(define-lib-primitive (fxremainder a b)
+  (liftneg1 (lambda (a b) ($fxremainder a b)) a b))
+
+
+	

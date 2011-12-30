@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-4.1.1-req.scm")
 (load "tests-3.4-req.scm")
 (load "tests-3.3-req.scm")
 (load "tests-3.2-req.scm")
@@ -261,6 +262,24 @@
   (emit "  shr $~s, %eax" fxshift)
   (emit "  mull ~s(%esp)" si))
 
+(define (emit-div si env arg1 arg2)
+  (emit-expr si env arg2)
+  (emit "  shr $~s, %eax" fxshift)
+  (emit-stack-save si)
+  (emit-expr (next-stack-index si) env arg1)
+  (emit "  mov $0, %edx")
+  (emit "  shr $~s, %eax" fxshift)
+  (emit "  divl ~s(%esp)" si))
+
+(define-primitive ($fxquotient si env arg1 arg2)
+  (emit-div si env arg1 arg2)
+  (emit "  shl $~s, %eax" fxshift))
+
+(define-primitive ($fxremainder si env arg1 arg2)
+  (emit-div si env arg1 arg2)
+  (emit "  mov %edx, %eax")
+  (emit "  shl $~s, %eax" fxshift))
+  
 (define-primitive (fxlogor si env arg1 arg2)
   (emit-binop si env arg1 arg2)
   (emit "  or ~s(%esp), %eax" si))
