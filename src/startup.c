@@ -75,6 +75,13 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
   }
 }
 
+ptr ik_log(ptr msg) {
+  fprintf(stderr, "log: ");
+  print_ptr_rec(stderr, msg, IN);
+  fprintf(stderr, "\n");
+  return 0;
+}
+
 void ik_error(ptr x) {
   fprintf(stderr, "Exception");
   if ((x & obj_mask) == pair_tag) {

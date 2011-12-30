@@ -59,6 +59,9 @@
 (define-lib-primitive (error . args)
   (foreign-call "ik_error" args))
 
+(define-lib-primitive (log msg)
+  (foreign-call "ik_log" msg))
+
 (define-lib-primitive (string-set! s i c)
   (cond
    [(not (string? s)) (error)]

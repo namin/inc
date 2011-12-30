@@ -1042,13 +1042,15 @@
 (define (emit-foreign-call si env expr)
   (let ([new-si (let loop ([si si] [args (reverse (foreign-call-args expr))])
                   (cond
-                   [(null? args) (+ si wordsize)]
+                   [(null? args) si]
                    [else
-                    (emit-expr-save si env (car args))
+                    (emit-expr-save (next-stack-index si) env (car args))
                     (loop (next-stack-index si) (cdr args))]))])
+    (emit "  mov %ecx, ~s(%esp)" si)
     (emit-adjust-base new-si)
     (emit-call (foreign-call-name expr))
-    (emit-adjust-base (- new-si))))
+    (emit-adjust-base (- new-si))
+    (emit "  mov ~s(%esp), %ecx" si)))
             
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
