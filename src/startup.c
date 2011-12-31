@@ -103,6 +103,26 @@ void ik_error(ptr x) {
   exit(0);
 }
 
+static int unshift(ptr x) {
+  return ((int) x) >> fx_shift;
+}
+
+static ptr shift(int x) {
+  return x << fx_shift;
+}
+
+static char* string_data(ptr x) {
+  string* p = (string*)(x-string_tag);
+  return p->buf;  
+}
+
+ptr s_write(ptr fd, ptr str, ptr len) {
+  int bytes = write(unshift(fd),
+		    string_data(str),
+		    unshift(len));
+  return shift(bytes);
+}
+
 static char* allocate_protected_space(int size) {
   int page = getpagesize();
   int status;

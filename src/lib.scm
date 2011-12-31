@@ -98,5 +98,9 @@
 (define-lib-primitive (fxremainder a b)
   (liftneg1 (lambda (a b) ($fxremainder a b)) a b))
 
+(define-lib-primitive (exit . args)
+  (let ([status (if (null? args) 0 (car args))])
+    (foreign-call "exit" status)))
 
-	
+(define-lib-primitive (write fd str len)
+  (foreign-call "s_write" fd str len))

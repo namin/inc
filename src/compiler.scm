@@ -746,7 +746,7 @@
   (cond
    [(eq? name 'string->symbol) 'string_to_symbol]
    [(eq? name 'string-set!) 'string_set_bang]
-   [else name]))
+   [else (string->symbol (format "P_~a" name))]))
 (define (primitive-alloc name)
   (string->symbol (format "~a_alloc" (primitive-label name))))
 
