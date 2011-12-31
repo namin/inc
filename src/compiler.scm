@@ -741,12 +741,17 @@
     (emit-adjust-base (- si))
     (emit "  mov %eax, ~s" label)
     (emit-label done-label)))
+
 (define (primitive-label name)
-  ;; TODO: auto-convert arbitrary scheme symbol to acceptable assembly label.
-  (cond
-   [(eq? name 'string->symbol) 'string_to_symbol]
-   [(eq? name 'string-set!) 'string_set_bang]
-   [else (string->symbol (format "P_~a" name))]))
+  (let ([lst (map (lambda (c)
+		    (case c
+		      [(#\-) #\_]
+		      [(#\>) #\g]
+		      [(#\?) #\p]
+		      [(#\!) #\b]
+		      [else c]))
+		  (string->list (symbol->string name)))])
+  (string->symbol (format "P_~a" (list->string lst)))))
 (define (primitive-alloc name)
   (string->symbol (format "~a_alloc" (primitive-label name))))
 
