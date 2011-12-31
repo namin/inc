@@ -123,6 +123,14 @@ ptr s_write(ptr fd, ptr str, ptr len) {
   return shift(bytes);
 }
 
+void s_fflush(ptr fd) {
+  fflush(fdopen(unshift(fd), "w"));
+}
+
+void scheme_write(ptr fd, ptr x) {
+  print_ptr_rec(fdopen(unshift(fd), "w"), x, OUT);
+}
+
 static char* allocate_protected_space(int size) {
   int page = getpagesize();
   int status;

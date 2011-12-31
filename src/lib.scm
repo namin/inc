@@ -152,8 +152,14 @@
 
 (define-lib-primitive (flush-output-port . args)
   (let ([port (if (null? args) (current-output-port) (car args))])
-    (output-port-write-buffer port)))
+    (output-port-write-buffer port)
+    (foreign-call "s_fflush" (output-port-fd port))))
 
 (define-lib-primitive (close-output-port port)
   ;; TODO: once open-output-port is defined, this should close real files.
   (flush-output-port port))
+
+(define-lib-primitive (write x . args)
+  (let ([port (if (null? args) (current-output-port) (car args))])
+    ;; This is cheating... should write it in Scheme.
+    (foreign-call "scheme_write" (output-port-fd port) x)))
