@@ -102,7 +102,7 @@
   (let ([status (if (null? args) 0 (car args))])
     (foreign-call "exit" status)))
 
-(define-lib-primitive (write fd str len)
+(define-lib-primitive (s_write fd str len)
   (foreign-call "s_write" fd str len))
 
 (define-lib-primitive stdout
@@ -145,9 +145,9 @@
   (and (vector? x) (fx= (vector-length x) 6) (eq? 'output-port (vector-ref x 0))))
 
 (define-lib-primitive (output-port-write-buffer port)
-  (write (output-port-fd port)
-	 (output-port-buffer port)
-	 (output-port-buffer-index port))
+  (s_write (output-port-fd port)
+	   (output-port-buffer port)
+	   (output-port-buffer-index port))
   (set-output-port-buffer-index! port 0))
 
 (define-lib-primitive (flush-output-port . args)
