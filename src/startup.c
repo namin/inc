@@ -75,6 +75,11 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
   }
 }
 
+static void print_ptr(ptr x) {
+  print_ptr_rec(stdout, x, OUT);
+  printf("\n");
+}
+
 ptr ik_log(ptr msg) {
   fprintf(stderr, "log: ");
   print_ptr_rec(stderr, msg, IN);
@@ -96,11 +101,6 @@ void ik_error(ptr x) {
   }
   fprintf(stderr, "\n");
   exit(0);
-}
-
-static void print_ptr(ptr x) {
-  print_ptr_rec(stdout, x, OUT);
-  printf("\n");
 }
 
 static char* allocate_protected_space(int size) {
