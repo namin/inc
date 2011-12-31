@@ -104,3 +104,56 @@
 
 (define-lib-primitive (write fd str len)
   (foreign-call "s_write" fd str len))
+
+(define-lib-primitive stdout
+  (make-output-port "" 1))
+
+(define-lib-primitive (current-output-port)
+  stdout)
+
+(define-lib-primitive BUFFER_SIZE 4096)
+
+(define-lib-primitive (make-output-port fname fd)
+  (vector 'output-port fname fd (make-string BUFFER_SIZE) 0 BUFFER_SIZE))
+
+(define-lib-primitive (output-port-fd port)
+  (vector-ref port 2))
+
+(define-lib-primitive (output-port-buffer port)
+  (vector-ref port 3))
+
+(define-lib-primitive (output-port-buffer-index port)
+  (vector-ref port 4))
+
+(define-lib-primitive (output-port-buffer-size port)
+  (vector-ref port 5))
+
+(define-lib-primitive (set-output-port-buffer-index! port index)
+  (vector-set! port 4 index))
+
+(define-lib-primitive (inc-output-port-buffer-index! port)
+  (set-output-port-buffer-index! port (fxadd1 (output-port-buffer-index port))))
+
+(define-lib-primitive (write-char c . args)
+  (let ([port (if (null? args) (current-output-port) (car args))])
+    (string-set! (output-port-buffer port) (output-port-buffer-index port) c)
+    (inc-output-port-buffer-index! port)
+    (when (fx= (output-port-buffer-index port) (output-port-buffer-size port))
+	  (output-port-write-buffer port))))
+
+(define-lib-primitive (output-port? x)
+  (and (vector? x) (fx= (vector-length x) 6) (eq? 'output-port (vector-ref x 0))))
+
+(define-lib-primitive (output-port-write-buffer port)
+  (write (output-port-fd port)
+	 (output-port-buffer port)
+	 (output-port-buffer-index port))
+  (set-output-port-buffer-index! port 0))
+
+(define-lib-primitive (flush-output-port . args)
+  (let ([port (if (null? args) (current-output-port) (car args))])
+    (output-port-write-buffer port)))
+
+(define-lib-primitive (close-output-port port)
+  ;; TODO: once open-output-port is defined, this should close real files.
+  (flush-output-port port))
