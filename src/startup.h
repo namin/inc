@@ -21,7 +21,7 @@
 #define symbol_tag           0x03
 
 /* all scheme values are of type ptrs */
-typedef unsigned long ptr;
+typedef unsigned int ptr;
 
 typedef struct {
   void* eax; /* 0   scratch  */

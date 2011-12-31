@@ -11,7 +11,7 @@
 
 static void print_ptr_rec(FILE* port, ptr x, int state) {
   if ((x & fx_mask) == fx_tag) {
-    fprintf(port, "%ld", ((long) x) >> fx_shift);
+    fprintf(port, "%d", ((int) x) >> fx_shift);
   } else if (x == bool_f) {
     fprintf(port, "#f");
   } else if (x == bool_t) {
@@ -44,8 +44,8 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
     fprintf(port, "#(");
 
     vector* p = (vector*)(x-vector_tag);
-    unsigned long n = p->length >> fx_shift;
-    unsigned long i;
+    unsigned int n = p->length >> fx_shift;
+    unsigned int i;
     for (i = 0; i < n; i++) {
       if (i > 0) fprintf(port, " ");
       print_ptr_rec(port, p->buf[i], OUT);
@@ -56,8 +56,8 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
     if (state != IN) fprintf(port, "\"");
 
     string* p = (string*)(x-string_tag);
-    unsigned long n = p->length >> fx_shift;
-    unsigned long i;
+    unsigned int n = p->length >> fx_shift;
+    unsigned int i;
     for (i = 0; i < n; i++) {
       int c = p->buf[i];
       if      (c == '"' ) fprintf(port, "\\\"");
@@ -71,7 +71,7 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
   } else if ((x & obj_mask) == closure_tag) {
     fprintf(port, "#<procedure>");
   } else {
-    fprintf(port, "#<unknown 0x%08lx>", x);
+    fprintf(port, "#<unknown 0x%08x>", x);
   }
 }
 
