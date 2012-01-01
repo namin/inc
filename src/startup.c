@@ -7,6 +7,7 @@
 #include "startup.h"
 #include "scheme_entry.h"
 
+#define DISPLAY 2
 #define IN 1
 #define OUT 0
 
@@ -25,13 +26,17 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
     fprintf(port, "#!eof");
   } else if ((x & char_mask) == char_tag) {
     char c = (char) (x >> char_shift);
-    if      (c == '\t') fprintf(port, "#\\tab");
-    else if (c == '\n') fprintf(port, "#\\newline");
-    else if (c == '\r') fprintf(port, "#\\return");
-    else if (c == ' ')  fprintf(port, "#\\space");
-    else                fprintf(port, "#\\%c", c);
+    if (state == DISPLAY) {
+      fputc(c, port);
+    } else {
+      if      (c == '\t') fprintf(port, "#\\tab");
+      else if (c == '\n') fprintf(port, "#\\newline");
+      else if (c == '\r') fprintf(port, "#\\return");
+      else if (c == ' ')  fprintf(port, "#\\space");
+      else                fprintf(port, "#\\%c", c);
+    }
   } else if ((x & obj_mask) == pair_tag) {
-    if (state != IN) fprintf(port, "(");
+    if (state == OUT) fprintf(port, "(");
     ptr car = ((cell*)(x-pair_tag))->car;
     print_ptr_rec(port, car, OUT);
     ptr cdr = ((cell*)(x-pair_tag))->cdr;
@@ -44,7 +49,7 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
         print_ptr_rec(port, cdr, IN);
       }
     }
-    if (state != IN) fprintf(port, ")");
+    if (state == OUT) fprintf(port, ")");
   } else if ((x & obj_mask) == vector_tag) {
     fprintf(port, "#(");
 
@@ -58,7 +63,7 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
 
     fprintf(port, ")");
   } else if ((x & obj_mask) == string_tag) {
-    if (state != IN) fprintf(port, "\"");
+    if (state == OUT) fprintf(port, "\"");
 
     string* p = (string*)(x-string_tag);
     unsigned int n = p->length >> fx_shift;
@@ -70,7 +75,7 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
       else                fputc(c, port);
     }
 
-    if (state != IN) fprintf(port, "\"");
+    if (state == OUT) fprintf(port, "\"");
   } else if ((x & obj_mask) == symbol_tag) {
     print_ptr_rec(port, (x - symbol_tag) | string_tag, IN);
   } else if ((x & obj_mask) == closure_tag) {
@@ -151,8 +156,23 @@ void scheme_write(ptr fd, ptr x, ptr opt) {
 ptr s_open_write(ptr fname) {
   char c_fname[FILENAME_MAX_LENGTH];
   cp_str_data(fname, c_fname, FILENAME_MAX_LENGTH);
-  int fd = open(c_fname, O_WRONLY | O_CREAT, 0640);
+  int fd = open(c_fname, O_WRONLY | O_CREAT | O_TRUNC, 0640);
   return shift(fd);
+}
+
+
+ptr s_open_read(ptr fname) {
+  char c_fname[FILENAME_MAX_LENGTH];
+  cp_str_data(fname, c_fname, FILENAME_MAX_LENGTH);
+  int fd = open(c_fname, O_RDONLY);
+  return shift(fd);
+}
+
+ptr s_read_char(ptr fd) {
+  char ca[1];
+  if ((read(unshift(fd), ca, 1)) < 1)
+    return eof_obj;
+  return (ca[0] << char_shift) | char_tag;
 }
 
 ptr s_close(ptr fd) {

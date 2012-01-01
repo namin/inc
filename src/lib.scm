@@ -198,5 +198,27 @@
 (define-lib-primitive (display x . args)
   (let ([port (if (null? args) (current-output-port) (car args))])
     (flush-output-port port)
-    (foreign-call "scheme_write" (output-port-fd port) x 1)
+    (foreign-call "scheme_write" (output-port-fd port) x 2)
     (flush-output-port port)))
+
+(define-lib-primitive (open-input-file fname . args)
+  (let ([fd (foreign-call "s_open_read" fname)])
+    (make-input-port fname fd)))
+    
+(define-lib-primitive (make-input-port fname fd)
+  (vector 'input-port fname fd))
+
+(define-lib-primitive (input-port-fname port)
+  (vector-ref port 1))
+
+(define-lib-primitive (input-port-fd port)
+  (vector-ref port 2))
+
+(define-lib-primitive (input-port? x)
+  (and (vector? x) (fx= (vector-length x) 3) (eq? 'input-port (vector-ref x 0))))
+
+(define-lib-primitive (read-char port)
+  (foreign-call "s_read_char" (input-port-fd port)))
+
+(define-lib-primitive (close-input-port port)
+  (foreign-call "s_close" (input-port-fd port)))
