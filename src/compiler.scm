@@ -1019,7 +1019,7 @@
   (cond
    [(not tail)
     (emit-arguments (- si (* 2 wordsize)) (call-args expr))
-    (emit-expr si env (call-target expr))
+    (emit-expr (- si (* wordsize (+ 2 (length (call-args expr))))) env (call-target expr))
     (emit "  mov %edi, ~s(%esp)" si)
     (emit "  mov %eax, %edi")
     (emit-ensure-procedure si env expr)

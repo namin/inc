@@ -164,9 +164,8 @@
 
 (define-lib-primitive (close-output-port port)
   (flush-output-port port)
-  ;; (unless (string=? "" (output-port-fname port))
-  ;;   (foreign-call "s_close" (output-port-fd port)))
-)
+  (unless (string=? "" (output-port-fname port))
+	  (foreign-call "s_close" (output-port-fd port))))
 
 (define-lib-primitive (write x . args)
   (let ([port (if (null? args) (current-output-port) (car args))])
