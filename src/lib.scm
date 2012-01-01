@@ -35,7 +35,7 @@
 (define-lib-primitive __symbols__
   (make_cell '()))
 
-(define-lib-primitive (string_equals s1 s2)
+(define-lib-primitive (string=? s1 s2)
   (letrec ([rec (lambda (index)
                   (or (fx= index (string-length s1))
                       (and (char= (string-ref s1 index) (string-ref s2 index))
@@ -46,7 +46,7 @@
   (letrec ([rec (lambda (symbols)
                   (cond
                    [(null? symbols) #f]
-                   [(string_equals str (string-symbol (car symbols))) (car symbols)]
+                   [(string=? str (string-symbol (car symbols))) (car symbols)]
                    [else (rec (cdr symbols))]))])
     (rec (cell_get __symbols__))))
 
@@ -113,8 +113,15 @@
 
 (define-lib-primitive BUFFER_SIZE 4096)
 
+(define-lib-primitive (open-output-file fname . args)
+  (let ([fd (foreign-call "s_open_write" fname)])
+    (make-output-port fname fd)))
+    
 (define-lib-primitive (make-output-port fname fd)
   (vector 'output-port fname fd (make-string BUFFER_SIZE) 0 BUFFER_SIZE))
+
+(define-lib-primitive (output-port-fname port)
+  (vector-ref port 1))
 
 (define-lib-primitive (output-port-fd port)
   (vector-ref port 2))
@@ -156,10 +163,20 @@
     (foreign-call "s_fflush" (output-port-fd port))))
 
 (define-lib-primitive (close-output-port port)
-  ;; TODO: once open-output-port is defined, this should close real files.
-  (flush-output-port port))
+  (flush-output-port port)
+  ;; (unless (string=? "" (output-port-fname port))
+  ;;   (foreign-call "s_close" (output-port-fd port)))
+)
 
 (define-lib-primitive (write x . args)
   (let ([port (if (null? args) (current-output-port) (car args))])
+    (flush-output-port port)
     ;; This is cheating... should write it in Scheme.
-    (foreign-call "scheme_write" (output-port-fd port) x)))
+    (foreign-call "scheme_write" (output-port-fd port) x 0)
+    (flush-output-port port)))
+
+(define-lib-primitive (display x . args)
+  (let ([port (if (null? args) (current-output-port) (car args))])
+    (flush-output-port port)
+    (foreign-call "scheme_write" (output-port-fd port) x 1)
+    (flush-output-port port)))

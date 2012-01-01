@@ -785,9 +785,10 @@
   (let ([lst (map (lambda (c)
 		    (case c
 		      [(#\-) #\_]
+		      [(#\!) #\b]
+		      [(#\=) #\e]
 		      [(#\>) #\g]
 		      [(#\?) #\p]
-		      [(#\!) #\b]
 		      [else c]))
 		  (string->list (symbol->string name)))])
   (string->symbol (format "P_~a" (list->string lst)))))

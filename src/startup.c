@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -8,6 +9,8 @@
 
 #define IN 1
 #define OUT 0
+
+#define FILENAME_MAX_LENGTH 100
 
 static void print_ptr_rec(FILE* port, ptr x, int state) {
   if ((x & fx_mask) == fx_tag) {
@@ -118,6 +121,16 @@ static char* string_data(ptr x) {
   return p->buf;  
 }
 
+static void cp_str_data(ptr x, char* buf, int buf_length) {
+  string* p = (string*)(x-string_tag);
+  unsigned int n = p->length >> fx_shift;
+  unsigned int i;
+  for (i = 0; i < n || i < buf_length-1; i++) {
+    buf[i] = p->buf[i];
+  }
+  buf[i] = '\0';
+}
+
 ptr s_write(ptr fd, ptr str, ptr len) {
   int bytes = write(unshift(fd),
 		    string_data(str),
@@ -129,8 +142,21 @@ void s_fflush(ptr fd) {
   fflush(fdopen(unshift(fd), "w"));
 }
 
-void scheme_write(ptr fd, ptr x) {
-  print_ptr_rec(fdopen(unshift(fd), "w"), x, OUT);
+void scheme_write(ptr fd, ptr x, ptr opt) {
+  FILE* port = fdopen(unshift(fd), "w");
+  print_ptr_rec(port, x, unshift(opt));
+  fflush(port);
+}
+
+ptr s_open_write(ptr fname) {
+  char c_fname[FILENAME_MAX_LENGTH];
+  cp_str_data(fname, c_fname, FILENAME_MAX_LENGTH);
+  int fd = open(c_fname, O_WRONLY | O_CREAT, 0640);
+  return shift(fd);
+}
+
+ptr s_close(ptr fd) {
+  return shift(close(unshift(fd)));
 }
 
 static char* allocate_protected_space(int size) {
