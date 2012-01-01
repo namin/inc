@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-4.2.1-req.scm")
 (load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
 (load "tests-3.3-req.scm")
@@ -489,10 +490,38 @@
        [else
         (set! counts (cons (cons name 1) counts))
         name]))))
-                                                    
+
+(define (define? expr)
+  (tagged-list 'define expr))
+;; TODO: support syntatic (define (f ...) ...) form.
+(define (define-lhs expr)
+  (cadr expr))
+(define (define-rhs expr)
+  (make-body (cddr expr)))
 (define (macro-expand expr)
   (define (transform expr bound-vars)
     (cond
+     [(and (begin? expr) (not (null? (filter define? (begin-seq expr)))))
+      (let loop ([prev '()] [defs '()] [todo (begin-seq expr)])
+	(cond
+	 [(define? (car todo))
+	  (loop prev
+		(append defs (list (bind (define-lhs (car todo)) (define-rhs (car todo)))))
+		(cdr todo))]
+	 [(null? defs)
+	  (loop (append prev (list (car todo)))
+		defs
+		(cdr todo))]
+	 [else
+	  (let ([last (make-let
+		       'letrec
+		       defs
+		       (make-body todo))])
+	    (transform
+	     (if (null? prev)
+		 last
+		 (combine-exprs (make-begin prev) last))
+	     bound-vars))]))]
      [(set? expr)
       (make-set! (set-lhs expr) (transform (set-rhs expr) bound-vars))]
      [(lambda? expr)
