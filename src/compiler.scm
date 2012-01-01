@@ -1,7 +1,5 @@
 (load "tests-driver.scm")
-(load "tests-4.2.3-req.scm")
-(load "tests-4.2.2-req.scm")
-(load "tests-4.2.1-req.scm")
+(load "tests-4.2-req.scm")
 (load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
 (load "tests-3.3-req.scm")
