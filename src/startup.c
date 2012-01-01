@@ -18,6 +18,8 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
     fprintf(port, "#t");
   } else if (x == list_nil) {
     fprintf(port, "()");
+  } else if (x == eof_obj) {
+    fprintf(port, "#!eof");
   } else if ((x & char_mask) == char_tag) {
     char c = (char) (x >> char_shift);
     if      (c == '\t') fprintf(port, "#\\tab");

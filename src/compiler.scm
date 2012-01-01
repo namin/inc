@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-4.2.2-req.scm")
 (load "tests-4.2.1-req.scm")
 (load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
@@ -31,6 +32,7 @@
 (define bool-bit       6)
 (define boolmask    #xBF)
 (define list-nil    #x3F)
+(define eof-obj     #x7F)
 (define charshift      8)
 (define charmask    #x3F)
 (define chartag     #x0F)
@@ -211,6 +213,14 @@
   (emit-expr si env arg)
   (emit "  cmp $~s, %al" list-nil)
   (emit-cmp-bool))
+
+(define-primitive (eof-object? si env arg)
+  (emit-expr si env arg)
+  (emit "  cmp $~s, %al" eof-obj)
+  (emit-cmp-bool))
+
+(define-primitive (eof-object si env)
+  (emit "  mov $~s, %eax" eof-obj))
 
 (define-primitive (boolean? si env arg)
   (emit-expr si env arg)
