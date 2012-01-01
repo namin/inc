@@ -70,6 +70,27 @@
    [(not (and (fx<= 0 i) (fx< i (string-length s)))) (error)]
    [else ($string-set! s i c)]))
 
+(define-lib-primitive (string-ref s i)
+  (cond
+   [(not (string? s)) (error)]
+   [(not (fixnum? i)) (error)]
+   [(not (and (fx<= 0 i) (fx< i (string-length s)))) (error)]
+   [else ($string-ref s i)]))
+
+(define-lib-primitive (vector-set! v i e)
+  (cond
+   [(not (vector? v)) (error)]
+   [(not (fixnum? i)) (error)]
+   [(not (and (fx<= 0 i) (fx< i (vector-length v)))) (error)]
+   [else ($vector-set! v i e)]))
+
+(define-lib-primitive (vector-ref v i)
+  (cond
+   [(not (vector? v)) (error)]
+   [(not (fixnum? i)) (error)]
+   [(not (and (fx<= 0 i) (fx< i (vector-length v)))) (error)]
+   [else ($vector-ref v i)]))
+
 (define-lib-primitive (liftneg f a b)
   (cond
    [(and (fx< a 0) (fx>= b 0))

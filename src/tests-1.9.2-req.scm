@@ -80,5 +80,5 @@
                      (begin (vector-set! v i i) (f v (fxsub1 i)))
                      v))])
      (let ((v (make-vector 100)))
-       (vector-length (f v 100)))) => "100\n"])
+       (vector-length (f v (fxsub1 100))))) => "100\n"])
 
