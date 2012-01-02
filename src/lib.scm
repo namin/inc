@@ -162,12 +162,11 @@
 (define-lib-primitive (inc-output-port-buffer-index! port)
   (set-output-port-buffer-index! port (fxadd1 (output-port-buffer-index port))))
 
-(define-lib-primitive (write-char c . args)
-  (let ([port (if (null? args) (current-output-port) (car args))])
-    (string-set! (output-port-buffer port) (output-port-buffer-index port) c)
-    (inc-output-port-buffer-index! port)
-    (when (fx= (output-port-buffer-index port) (output-port-buffer-size port))
-	  (output-port-write-buffer port))))
+(define-lib-primitive (write-char c (port (current-output-port)))
+  (string-set! (output-port-buffer port) (output-port-buffer-index port) c)
+  (inc-output-port-buffer-index! port)
+  (when (fx= (output-port-buffer-index port) (output-port-buffer-size port))
+	(output-port-write-buffer port)))
 
 (define-lib-primitive (output-port? x)
   (and (vector? x) (fx= (vector-length x) 6) (eq? 'output-port (vector-ref x 0))))
@@ -178,28 +177,25 @@
 	   (output-port-buffer-index port))
   (set-output-port-buffer-index! port 0))
 
-(define-lib-primitive (flush-output-port . args)
-  (let ([port (if (null? args) (current-output-port) (car args))])
-    (output-port-write-buffer port)
-    (foreign-call "s_fflush" (output-port-fd port))))
+(define-lib-primitive (flush-output-port (port (current-output-port)))
+  (output-port-write-buffer port)
+  (foreign-call "s_fflush" (output-port-fd port)))
 
 (define-lib-primitive (close-output-port port)
   (flush-output-port port)
   (unless (string=? "" (output-port-fname port))
 	  (foreign-call "s_close" (output-port-fd port))))
 
-(define-lib-primitive (write x . args)
-  (let ([port (if (null? args) (current-output-port) (car args))])
-    (flush-output-port port)
-    ;; This is cheating... should write it in Scheme.
-    (foreign-call "scheme_write" (output-port-fd port) x 0)
-    (flush-output-port port)))
+(define-lib-primitive (write x (port (current-output-port)))
+  (flush-output-port port)
+  ;; This is cheating... should write it in Scheme.
+  (foreign-call "scheme_write" (output-port-fd port) x 0)
+  (flush-output-port port))
 
-(define-lib-primitive (display x . args)
-  (let ([port (if (null? args) (current-output-port) (car args))])
-    (flush-output-port port)
-    (foreign-call "scheme_write" (output-port-fd port) x 2)
-    (flush-output-port port)))
+(define-lib-primitive (display x (port (current-output-port)))
+  (flush-output-port port)
+  (foreign-call "scheme_write" (output-port-fd port) x 2)
+  (flush-output-port port))
 
 (define-lib-primitive (open-input-file fname . args)
   (let ([fd (foreign-call "s_open_read" fname)])

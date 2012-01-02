@@ -94,13 +94,14 @@
 (define lambda-formals cadr)
 (define (formals-to-vars formals)
   (cond
-   [(list? formals) formals]
+   [(list? formals) (map (lambda (x) (if (list? x) (car x) x)) formals)]
    [(pair? formals) (cons (car formals) (formals-to-vars (cdr formals)))]
    [else (list formals)]))
-(define (lambda-vars expr) (formals-to-vars (lambda-formals expr)))
+(define (lambda-vars expr)
+  (formals-to-vars (lambda-formals expr)))
 (define (map-formals f formals)
   (cond
-   [(list? formals) (map f formals)]
+   [(list? formals) (map (lambda (x) (if (pair? x) (cons (f (car x)) (cdr x)) (f x))) formals)]
    [(pair? formals) (cons (f (car formals)) (map-formals f (cdr formals)))]
    [else (f formals)]))
 (define (lambda-body expr) (make-body (cddr expr)))
@@ -534,10 +535,32 @@
      [(set? expr)
       (make-set! (set-lhs expr) (transform (set-rhs expr) bound-vars))]
      [(lambda? expr)
-      (make-lambda
-       (lambda-formals expr)
-       (transform (lambda-body expr)
-                  (append (lambda-vars expr) bound-vars)))]
+      (let* ([formals (lambda-formals expr)]
+	     [optional-args (filter list? (if (list? formals) formals '()))])
+	(if (null? optional-args)
+	    (make-lambda
+	     formals
+	     (transform (lambda-body expr)
+			(append (lambda-vars expr) bound-vars)))
+	    (let ([new-formals (map (lambda (x)
+				      (if (list? x)
+					  (list (car x))
+					  x))
+				    formals)]
+		  [bindings (map (lambda (var-val)
+				   (let ([var (car var-val)]
+					 [val (cadr var-val)])
+				     (bind var
+					   `(if ,var ,var ,val))))
+				 optional-args)])
+	      (make-lambda
+	       new-formals
+	       (transform
+		(make-let
+		 'let*
+		 bindings
+		 (lambda-body expr))
+		(append (lambda-vars expr) bound-vars))))))]
      [(let? expr)
       (make-let
        (let-kind expr)
@@ -894,6 +917,13 @@
 (define (code-bound-variables expr) (formals-to-vars (code-formals expr)))
 (define (code-vararg? expr)
   (not (list? (code-formals expr))))
+(define (code-optarg? expr)
+  (and (list? (code-formals expr)) (not (null? (filter list? (code-formals expr))))))
+(define (code-opt-start-index expr)
+  (let loop ([index 0] [formals (code-formals expr)])
+    (if (list? (car formals))
+	index
+	(loop (add1 index) (cdr formals)))))
 (define code-free-variables caddr)
 (define code-body cadddr)
 (define (emit-code env global?)
@@ -902,13 +932,39 @@
     (let ([bvs (code-bound-variables expr)]
           [fvs (code-free-variables expr)]
           [body (code-body expr)])
-      (when (not (code-vararg? expr))
+      (when (and (not (code-vararg? expr)) (not (code-optarg? expr)))
 	    (let ([start-label (unique-label)])
 	      (emit "  cmp $~s, %eax" (length bvs))
 	      (emit "  je ~a" start-label)
 	      (emit-error (- wordsize) env)
 	      (emit-label start-label)
 	      (emit "  mov $~s, %eax" (length bvs))))
+      (when (code-optarg? expr)
+	    (let ([start-index (code-opt-start-index expr)]
+		  [len (length bvs)]
+		  [check2-label (unique-label)]
+		  [loop-label (unique-label)]
+		  [start-label (unique-label)])
+	      (emit "  mov %eax, %edx")
+	      (emit "  cmp $~s, %edx" start-index)
+	      (emit "  jge ~a" check2-label)
+	      (emit-error (- wordsize) env)
+	      (emit-label check2-label)
+	      (emit "  cmp $~s, %edx" len)
+	      (emit "  jle ~a" loop-label)
+	      (emit-error (- wordsize) env)
+	      (emit-label loop-label)
+	      (emit "  cmp $~s, %edx" len)
+	      (emit "  je ~a" start-label)
+	      (emit "  add $1, %edx")
+	      (emit "  mov %edx, %eax")
+	      (emit "  shl $~s, %eax" wordshift)
+	      (emit "  neg %eax")
+	      (emit "  add %esp, %eax")
+	      (emit "  movl $~s, (%eax)" bool-f)
+	      (emit-jmp loop-label)
+	      (emit-label start-label)
+	      (emit "  mov %edx, %eax")))
       (when (code-vararg? expr)
             (let ([ok (unique-label)]
 		  [start-label (unique-label)]
