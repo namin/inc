@@ -479,7 +479,6 @@
    [(if? expr) (emit-if si env tail expr)]
    [(let? expr) (emit-let si env tail expr)]
    [(begin? expr) (emit-begin si env tail expr)]
-   [(foreign-call? expr) (emit-foreign-call si env expr) (emit-ret-if tail)]
    [(primcall? expr) (emit-primcall si env expr) (emit-ret-if tail)]
    [(app? expr env) (emit-app si env tail expr)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
@@ -877,7 +876,7 @@
   (closure-conversion (cps-conversion (lift-constants (all-expr-conversions expr)))))
 
 (define (special? symbol)
-  (or (member symbol '(if begin let lambda closure set! quote foreign-call apply))
+  (or (member symbol '(if begin let lambda closure set! quote apply))
       (primitive? symbol)))
 
 (define (flatmap f . lst)
@@ -894,7 +893,6 @@
      (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
              (free-vars (let-body expr))))]
    [(tagged-list 'primitive-ref expr) '()]
-   [(foreign-call? expr) (free-vars (foreign-call-args expr))]
    [(list? expr) (flatmap free-vars (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
    [else '()]))
 
@@ -1146,16 +1144,16 @@
   (cons 'foreign-call (cons name args)))
 (define foreign-call-name cadr)
 (define foreign-call-args cddr)
-(define (emit-foreign-call si env expr)
+(define-primitive (foreign-call si env name . args)
   (let ([new-si (let loop ([si (+ si wordsize)]
-			   [args (reverse (foreign-call-args expr))])
+			   [args (reverse args)])
                   (cond
                    [(null? args) si]
                    [else
                     (emit-expr-save (next-stack-index si) env (car args))
                     (loop (next-stack-index si) (cdr args))]))])
     (emit-adjust-base new-si)
-    (emit-call (foreign-call-name expr))
+    (emit-call name)
     (emit-adjust-base (- new-si))))
             
 (define heap-cell-size (ash 1 objshift))
