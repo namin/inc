@@ -817,6 +817,31 @@
 (define (primitive-alloc name)
   (string->symbol (format "~a_alloc" (primitive-label name))))
 
+(define (macro-expand-let expr)
+  (define (transform expr)
+    (cond
+     [(let? expr)
+      (let ([vars (map lhs (let-bindings expr))]
+	    [vals (map (lambda (binding) (transform (rhs binding)))
+		       (let-bindings expr))])
+	(cons (make-lambda
+	       vars
+	       (transform (let-body expr)))
+	      vals))]
+     [(list? expr) (map (lambda (e) (transform e)) expr)]
+     [else expr]))
+  (transform expr))
+
+(define (cps-conversion expr)
+  (make-let
+   'labels
+   (let-bindings expr)
+   (T-k (macro-expand-let (let-body expr)) (lambda (x) x))))
+
+;; TODO
+(define (T-k expr k)
+  expr)
+
 (define (closure-conversion expr)
   (let ([labels '()]
         [constants (map lhs (labels-bindings expr))])
@@ -849,7 +874,7 @@
 (define (all-expr-conversions expr)
   (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr)))))
 (define (all-conversions expr)
-  (closure-conversion (lift-constants (all-expr-conversions expr))))
+  (closure-conversion (cps-conversion (lift-constants (all-expr-conversions expr)))))
 
 (define (special? symbol)
   (or (member symbol '(if begin let lambda closure set! quote foreign-call apply))

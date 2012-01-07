@@ -17,7 +17,7 @@
        (loop))
      (exit))
    => "Hello World!"]
-  [(let ([s (make-string 10000)]
+  [(let ([s (make-string 100)]
          [t "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz12344567890<>,./?;:'\"[]{}\\|`~!@#$%^&*()-_=+"])
      (define fill-string!
        (lambda (i j)
