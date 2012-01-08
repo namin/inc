@@ -182,6 +182,10 @@ ptr s_close(ptr fd) {
 char* heap_alloc(memory* mem, char* stack, int size) {
   char* heap_cur = mem->heap_cur;
   char* heap_new = heap_cur + size;
+  if (heap_new >= mem->heap_top) {
+    fprintf(stderr, "Exception: overflow");
+    exit(0);
+  }
   mem->heap_cur = heap_new;
   return heap_cur;
 }
@@ -212,7 +216,7 @@ static void deallocate_protected_space(char* p, int size) {
 
 int main(int argc, char** argv) {
   int stack_size = (16 * 4096);
-  int heap_size = (100 * 16 * 4096);
+  int heap_size = (128 * 16 * 4096);
 
   char* stack_top = allocate_protected_space(stack_size);
   char* stack_base = stack_top + stack_size;
@@ -223,6 +227,8 @@ int main(int argc, char** argv) {
 
   memory mem;
   mem.heap_cur = heap;
+  mem.heap_base = heap;
+  mem.heap_top = heap + heap_size;
 
   print_ptr(scheme_entry(&ctxt, stack_base, &mem));
 
