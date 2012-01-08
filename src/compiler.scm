@@ -1185,7 +1185,7 @@
 (define (emit-heap-alloc size)
   (let ([alloc-size (* (add1 (div (sub1 size) heap-cell-size)) heap-cell-size)])
     (emit "  mov %ebp, %eax")
-    (emit "  add $~s, %ebp" (* alloc-size bytes))))
+    (emit "  add $~s, %ebp" alloc-size)))
 (define (emit-heap-alloc-dynamic)
   (emit "  add $~s, %eax" (sub1 heap-cell-size))
   (emit "  and $~s, %eax" (- heap-cell-size))
