@@ -205,7 +205,7 @@ static void deallocate_protected_space(char* p, int size) {
 
 int main(int argc, char** argv) {
   int stack_size = (16 * 4096);
-  int heap_size = (16 * 16 * 4096);
+  int heap_size = (100 * 16 * 4096);
 
   char* stack_top = allocate_protected_space(stack_size);
   char* stack_base = stack_top + stack_size;
