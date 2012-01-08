@@ -49,6 +49,8 @@
 (define wordsize       4) ; bytes
 (define wordshift      2)
 (define global-offset  4)
+(define closure-end #x07)
+(define return-addr #x17)
 
 (define registers
   '((eax scratch)
@@ -960,15 +962,18 @@
 (define (emit-closure si env expr)
   (let ([label (closure-label expr)]
         [fvs (closure-free-vars expr)])
-    (emit-heap-alloc-static si (* (add1 (length fvs)) wordsize))
+    (emit-heap-alloc-static si (* (+ 2 (length fvs)) wordsize))
     (emit "  movl $~s, (%eax)" label)
     (unless (null? fvs)
       (emit "  mov %eax, %edx")
       (let loop ([fvs fvs] [count 1])
-        (unless (null? fvs)
-          (emit-variable-ref si env (first fvs))
+        (cond
+	 [(null? fvs)
+	  (emit "  movl $~s, ~s(%edx)" closure-end (* count wordsize))]
+	 [else
+	  (emit-variable-ref si env (first fvs))
           (emit "  mov %eax, ~s(%edx)" (* count wordsize))
-          (loop (rest fvs) (add1 count))))
+          (loop (rest fvs) (add1 count))]))
       (emit "  mov %edx, %eax"))
     (emit "  or $~s, %eax" closuretag)))
 

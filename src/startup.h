@@ -20,6 +20,8 @@
 #define string_tag           0x06
 #define closure_tag          0x02
 #define symbol_tag           0x03
+#define closure_end          0x07
+#define return_addr          0x17
 
 /* all scheme values are of type ptrs */
 typedef unsigned int ptr;
