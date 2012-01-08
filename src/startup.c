@@ -179,6 +179,13 @@ ptr s_close(ptr fd) {
   return shift(close(unshift(fd)));
 }
 
+char* heap_alloc(memory* mem, char* stack, int size) {
+  char* heap_cur = mem->heap_cur;
+  char* heap_new = heap_cur + size;
+  mem->heap_cur = heap_new;
+  return heap_cur;
+}
+
 static char* allocate_protected_space(int size) {
   int page = getpagesize();
   int status;
