@@ -29,6 +29,14 @@
 		   `(if ,aexp
 			,(T-c exprt cont)
 			,(T-c exprf cont)))))]
+   [(let? expr)
+    (let ([vars (map lhs (let-bindings expr))]
+	  [vals (map rhs (let-bindings expr))])
+      (T*-k vals (lambda ($vals)
+		   (make-let
+		    'let
+		    (map bind vars $vals)
+		    (T-k (let-body expr) k)))))]
    [(app? expr)
     (let* ([$rv (unique-name '$rv)]
 	   [cont `(lambda (,$rv) ,(k $rv))])
@@ -58,6 +66,14 @@
 			     ,(T-c exprt $k)
 			     ,(T-c exprf $k)))))
 	,c))]
+   [(let? expr)
+    (let ([vars (map lhs (let-bindings expr))]
+	  [vals (map rhs (let-bindings expr))])
+      (T*-k vals (lambda ($vals)
+		   (make-let
+		    'let
+		    (map bind vars $vals)
+		    (T-c (let-body expr) c)))))]
    [(app? expr)
     (let ([f (call-target expr)]
 	  [es (call-args expr)])

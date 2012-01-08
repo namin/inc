@@ -502,6 +502,7 @@
    [(variable? expr)       (emit-variable-ref si env expr)   (emit-ret-if tail)]
    [(closure? expr)        (emit-closure si env expr)        (emit-ret-if tail)]
    [(if? expr)             (emit-if si env tail expr)        (assert      tail)]
+   [(let? expr)            (emit-let si env tail expr)       (assert      tail)]
    [(aexpr-primcall? expr) (emit-aexpr-primcall si env expr) (emit-ret-if tail)]
    [(primcall? expr)       (emit-primcall si env expr)       (assert      tail)]
    [(app? expr)            (emit-app si env tail expr)       (assert      tail)]
@@ -840,6 +841,7 @@
 (define (primitive-alloc name)
   (string->symbol (format "~a_alloc" (primitive-label name))))
 
+;; Not used, as let can avoid useless closure creation.
 (define (macro-expand-let expr)
   (define (transform expr)
     (cond
@@ -859,7 +861,7 @@
   (make-let
    'labels
    (let-bindings expr)
-   (cps-top (macro-expand-let (let-body expr)))))
+   (cps-top (let-body expr))))
 (load "cps.scm")
 
 (define (closure-conversion expr)
