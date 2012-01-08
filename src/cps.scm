@@ -5,7 +5,8 @@
   (or (lambda? expr)
       (immediate? expr)
       (symbol? expr)
-      (string? expr)))
+      (string? expr)
+      (aexpr-primcall? expr)))
 
 (define (T-k expr k)
   (cond

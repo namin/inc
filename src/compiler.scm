@@ -1,12 +1,12 @@
 (load "tests-driver.scm")
 ;(load "tests-4.2-req.scm")
-;(load "tests-4.1-req.scm")
+(load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
-;(load "tests-3.3-req.scm")
+(load "tests-3.3-req.scm")
 ;(load "tests-3.2-req.scm")
 (load "tests-3.1-req.scm")
-;(load "tests-2.9-req.scm")
-;(load "tests-2.8-req.scm")
+(load "tests-2.9-req.scm")
+(load "tests-2.8-req.scm")
 (load "tests-2.6-req.scm")
 (load "tests-2.4-req.scm")
 (load "tests-2.3-req.scm")
@@ -163,37 +163,42 @@
 (define (primitive-emitter x)
   (or (getprop x '*emitter*) (error 'primitive-emitter (format "primitive ~s has no emitter" x))))
 
+(define aexpr-primitives '(constant-ref primitive-ref))
+
+(define (aexpr-primcall? expr)
+  (and (pair? expr) (primitive? (car expr)) (member (car expr) aexpr-primitives)))
+
 (define (primcall? expr)
   (and (pair? expr) (primitive? (car expr))))
 
 (define (check-primcall-args prim args)
   ((if (getprop prim '*vararg*) <= =) (getprop prim '*arg-count*) (length args)))
 
+(define (emit-any-primcall si env prim args)
+  (or (check-primcall-args prim args)
+      (error 'emit-primcall (format "incorrect number of arguments to ~s" prim)))
+  (apply (primitive-emitter prim) si env args))
+
+(define (emit-aexpr-primcall si env expr)
+  (let ([prim (car expr)]
+	[args (cdr expr)])
+    (emit-any-primcall si env prim args)))
+
 (define (emit-primcall si env expr)
   (let ([prim (car expr)]
 	[cont (cadr expr)]
 	[args (cddr expr)])
-    (or (check-primcall-args prim args)
-        (error 'emit-primcall (format "incorrect number of arguments to ~s" prim)))
-    (apply (primitive-emitter prim) si env args)
-    (cond
-     [cont
-      (emit-stack-save si)
-      (emit-expr (next-stack-index si) env cont)
-      (emit "  mov %eax, %edi")
-      (emit-stack-load si)
-      (emit-stack-save (- wordsize))
-      (emit "  mov %edi, %eax")
-      (emit-heap-load (- closuretag))
-      (emit "  mov %eax, %edx")
-      (emit "  mov $1, %eax")
-      (emit-jmp "*%edx")]
-     [else ;; special case for error handling
-      (emit "  mov %eax, %edi")
-      (emit-heap-load (- closuretag))
-      (emit "  mov %eax, %edx")
-      (emit "  mov $1, %eax")
-      (emit-jmp "*%edx")])))
+    (emit-any-primcall si env prim args)
+    (emit-stack-save si)
+    (emit-expr (next-stack-index si) env cont)
+    (emit "  mov %eax, %edi")
+    (emit-stack-load si)
+    (emit-stack-save (- wordsize))
+    (emit "  mov %edi, %eax")
+    (emit-heap-load (- closuretag))
+    (emit "  mov %eax, %edx")
+    (emit "  mov $1, %eax")
+    (emit-jmp "*%edx")))
 
 (define-primitive (fxadd1 si env arg)
   (emit-expr si env arg)
@@ -493,12 +498,13 @@
 
 (define (emit-any-expr si env tail expr)
   (cond
-   [(immediate? expr) (emit-immediate expr)           (emit-ret-if tail)]
-   [(variable? expr)  (emit-variable-ref si env expr) (emit-ret-if tail)]
-   [(closure? expr)   (emit-closure si env expr)      (emit-ret-if tail)]
-   [(if? expr)        (emit-if si env tail expr)      (assert      tail)]
-   [(primcall? expr)  (emit-primcall si env expr)     (assert      tail)]
-   [(app? expr)       (emit-app si env tail expr)     (assert      tail)]
+   [(immediate? expr)      (emit-immediate expr)             (emit-ret-if tail)]
+   [(variable? expr)       (emit-variable-ref si env expr)   (emit-ret-if tail)]
+   [(closure? expr)        (emit-closure si env expr)        (emit-ret-if tail)]
+   [(if? expr)             (emit-if si env tail expr)        (assert      tail)]
+   [(aexpr-primcall? expr) (emit-aexpr-primcall si env expr) (emit-ret-if tail)]
+   [(primcall? expr)       (emit-primcall si env expr)       (assert      tail)]
+   [(app? expr)            (emit-app si env tail expr)       (assert      tail)]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
 
 (define unique-name
@@ -907,7 +913,7 @@
      (flatmap free-vars (map rhs (let-bindings expr)))
      (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
              (free-vars (let-body expr))))]
-   [(tagged-list 'primitive-ref expr) (free-vars (cadr expr))]
+   [(tagged-list 'primitive-ref expr) '()]
    [(list? expr) (flatmap free-vars (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
    [else '()]))
 
@@ -1142,15 +1148,16 @@
 	(emit "  mov $~s, %eax" (length (call-args expr))))
     (emit-jmp "*%edx")]))
 (define (emit-ensure-procedure si env expr)
-  (let ([ok (unique-label)])
-    (emit "  and $~s, %al" objmask)
-    (emit "  cmp $~s, %al" closuretag)
-    (emit "  je ~a" ok)
-    (emit-error si env)
-    (emit-label ok)
-    (emit "  mov %edi, %eax")))
+  (unless (equal? (call-target expr) '(primitive-ref error))
+    (let ([ok (unique-label)])
+      (emit "  and $~s, %al" objmask)
+      (emit "  cmp $~s, %al" closuretag)
+      (emit "  je ~a" ok)
+      (emit-error si env)
+      (emit-label ok)
+      (emit "  mov %edi, %eax"))))
 (define (emit-error si env)
-  (emit-tail-expr si env '(primitive-ref #f error)))
+  (emit-tail-expr si env '((primitive-ref error))))
   
 
 (define (foreign-call? expr)
