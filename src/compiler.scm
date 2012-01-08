@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-5.3-req.scm")
 (load "tests-4.2-req.scm")
 (load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
@@ -899,7 +900,7 @@
   (closure-conversion (cps-conversion (lift-constants (all-expr-conversions expr)))))
 
 (define (special? symbol)
-  (or (member symbol '(if begin let lambda closure set! quote apply))
+  (or (member symbol '(if begin let lambda closure set! quote apply call/cc))
       (primitive? symbol)))
 
 (define (flatmap f . lst)
