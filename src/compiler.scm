@@ -3,7 +3,7 @@
 (load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
 (load "tests-3.3-req.scm")
-;(load "tests-3.2-req.scm")
+(load "tests-3.2-req.scm")
 (load "tests-3.1-req.scm")
 (load "tests-2.9-req.scm")
 (load "tests-2.8-req.scm")
@@ -1159,7 +1159,7 @@
       (emit-label ok)
       (emit "  mov %edi, %eax"))))
 (define (emit-error si env)
-  (emit-tail-expr si env '((primitive-ref error))))
+  (emit-tail-expr si env '((primitive-ref error) #f)))
   
 
 (define (foreign-call? expr)
