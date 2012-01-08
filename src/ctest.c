@@ -15,7 +15,8 @@ char do_call(char c, char (*fun)(char)) {
 char fancy(char c) {
   return do_call(c, &inc);
 }
-ptr scheme_entry(context* ctxt, char* stack_base, char* heap){
+ptr scheme_entry(context* ctxt, char* stack_base, memory* mem) {
+  char* heap = mem->heap_cur;
   if (global_fun == 0) {
     global_fun = ((ptr) &inc) | closure_tag;
   }

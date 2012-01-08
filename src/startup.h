@@ -49,3 +49,14 @@ typedef struct {
   ptr length;
   char buf[1];
 } string;
+
+typedef struct {
+  char* heap_cur;
+  char* global_cur;
+  char* heap_base;
+  char* heap_top;
+  char* heap_base_alt;
+  char* heap_top_alt;
+  char* global_base;
+  char* stack_base;
+} memory;

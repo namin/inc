@@ -214,7 +214,10 @@ int main(int argc, char** argv) {
 
   context ctxt;
 
-  print_ptr(scheme_entry(&ctxt, stack_base, heap));
+  memory mem;
+  mem.heap_cur = heap;
+
+  print_ptr(scheme_entry(&ctxt, stack_base, &mem));
 
   deallocate_protected_space(stack_top, stack_size);
   deallocate_protected_space(heap, stack_size);
