@@ -217,18 +217,24 @@ static void deallocate_protected_space(char* p, int size) {
 int main(int argc, char** argv) {
   int stack_size = (16 * 4096);
   int heap_size = (128 * 16 * 4096);
+  int global_size = (16 * 4096);
 
   char* stack_top = allocate_protected_space(stack_size);
   char* stack_base = stack_top + stack_size;
 
   char* heap = allocate_protected_space(heap_size);
 
+  char* global = allocate_protected_space(global_size);
+
   context ctxt;
 
   memory mem;
   mem.heap_cur = heap;
+  mem.global_cur = global;
   mem.heap_base = heap;
   mem.heap_top = heap + heap_size;
+  mem.global_base = global;
+  mem.stack_base = stack_base;
 
   print_ptr(scheme_entry(&ctxt, stack_base, &mem));
 

@@ -48,8 +48,7 @@
 (define symboltag   #x03)
 (define wordsize       4) ; bytes
 (define wordshift      2)
-(define bytes          4)
-(define byteshift      2)
+(define global-offset  4)
 
 (define registers
   '((eax scratch)
@@ -803,11 +802,13 @@
    [(begin? b) (make-begin (cons a (begin-seq b)))]
    [else (make-begin (list a b))]))
 (define-primitive (constant-ref si env constant)
-  (emit "  mov ~s, %eax" constant))
+  (emit "  mov ~s, %eax" constant)
+  (emit-global-load))
 (define-primitive (constant-init si env constant value)
   (emit ".local ~s" constant)
   (emit ".comm ~s,4,4" constant)
   (emit-expr si env value)
+  (emit-global-save)
   (emit "  mov %eax, ~s" constant))
 
 (define (annotate-lib-primitives expr)
@@ -826,8 +827,20 @@
     (emit-adjust-base si)
     (emit-call (primitive-alloc prim-name))
     (emit-adjust-base (- si))
+    (emit-global-save)
     (emit "  mov %eax, ~s" label)
-    (emit-label done-label)))
+    (emit-label done-label)
+    (emit-global-load)))
+
+(define (emit-global-save)
+  (emit "  mov ~s(%ebp), %edx" global-offset)
+  (emit "  mov %eax, (%edx)")
+  (emit "  mov %edx, %eax")
+  (emit "  add $~s, %edx" wordsize)
+  (emit "  mov %edx, ~s(%ebp)" global-offset))
+
+(define (emit-global-load)
+  (emit "  mov (%eax), %eax"))
 
 (define (primitive-label name)
   (let ([lst (map (lambda (c)
