@@ -1,4 +1,7 @@
 Step-by-step development of a Scheme-to-x86 compiler, based on
-Abdulaziz Ghuloum's paper, _An Incremental Approach to Compiler
-Construction_, and extended draft tutorial, _Compilers: Backend to
+Abdulaziz Ghuloum's [paper][1], _An Incremental Approach to Compiler
+Construction_, and extended draft [tutorial][2], _Compilers: Backend to
 Frontend and Back to Front Again_.
+
+[1]: https://github.com/namin/inc/blob/master/docs/paper.pdf?raw=true
+[2]: https://github.com/namin/inc/blob/master/docs/tutorial.pdf?raw=true
