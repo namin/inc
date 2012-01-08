@@ -49,6 +49,7 @@
 (define wordsize       4) ; bytes
 (define wordshift      2)
 (define bytes          4)
+(define byteshift      2)
 
 (define registers
   '((eax scratch)
@@ -1184,13 +1185,13 @@
 (define heap-cell-size (ash 1 objshift))
 (define (emit-heap-alloc size)
   (let ([alloc-size (* (add1 (div (sub1 size) heap-cell-size)) heap-cell-size)])
-    (emit "  mov (%ebp), %eax")
-    (emit "  mov %eax, %edx")
-    (emit "  add $~s, %edx" (* alloc-size bytes))
-    (emit "  mov %edx, (%ebp)")))
+    (emit "  mov $~s, %eax" alloc-size)
+    (emit-heap-alloc-any)))
 (define (emit-heap-alloc-dynamic)
   (emit "  add $~s, %eax" (sub1 heap-cell-size))
   (emit "  and $~s, %eax" (- heap-cell-size))
+  (emit-heap-alloc-any))
+(define (emit-heap-alloc-any)
   (emit "  mov (%ebp), %edx")
   (emit "  add %edx, %eax")
   (emit "  mov %eax, (%ebp)")
