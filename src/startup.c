@@ -294,11 +294,15 @@ static void gc(memory* mem, char* stack) {
   }
 
   root = (ptr*)mem->stack_base;
-  root--; // skip top-level return addresses
+  root--; // skip top-level return address
   root--;
   while (root >= (ptr*) stack) {
-    if (*root == return_addr) root--; // skip return address
-    else *root = gc_forward(*root);
+    if (*root == return_addr) {
+      root--; // skip return address
+      root--;
+    } else {
+      *root = gc_forward(*root);
+    }
     root--;
   }
 
