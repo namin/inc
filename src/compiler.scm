@@ -858,20 +858,29 @@
 (define (flatmap f . lst)
   (apply append (apply map f lst)))
 
-(define (free-vars expr)
+(define (free-vars_ expr)
   (cond
    [(variable? expr) (list expr)]
    [(lambda? expr) (filter (lambda (v) (not (member v (lambda-vars expr))))
-                           (free-vars (lambda-body expr)))]
+                           (free-vars_ (lambda-body expr)))]
    [(let? expr)
     (append
-     (flatmap free-vars (map rhs (let-bindings expr)))
+     (flatmap free-vars_ (map rhs (let-bindings expr)))
      (filter (lambda (v) (not (member v (map lhs (let-bindings expr)))))
-             (free-vars (let-body expr))))]
+             (free-vars_ (let-body expr))))]
    [(tagged-list 'primitive-ref expr) '()]
-   [(foreign-call? expr) (free-vars (foreign-call-args expr))]
-   [(list? expr) (flatmap free-vars (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
+   [(foreign-call? expr) (free-vars_ (foreign-call-args expr))]
+   [(list? expr) (flatmap free-vars_ (if (and (not (null? expr)) (special? (car expr))) (cdr expr) expr))]
    [else '()]))
+
+(define (remove-dups xs)
+  (if (null? xs)
+      xs
+      (cons (first xs)
+	    (remove-dups (filter (lambda (el) (not (equal? (first xs) el))) xs)))))
+
+(define (free-vars expr)
+  (remove-dups (free-vars_ expr)))
 
 (define (emit-library)
   (define (emit-library-primitive prim-name)
