@@ -144,14 +144,16 @@ ptr s_write(ptr fd, ptr str, ptr len) {
   return shift(bytes);
 }
 
-void s_fflush(ptr fd) {
+ptr s_fflush(ptr fd) {
   fflush(fdopen(unshift(fd), "w"));
+  return 0;
 }
 
-void scheme_write(ptr fd, ptr x, ptr opt) {
+ptr scheme_write(ptr fd, ptr x, ptr opt) {
   FILE* port = fdopen(unshift(fd), "w");
   print_ptr_rec(port, x, unshift(opt));
   fflush(port);
+  return 0;
 }
 
 ptr s_open_write(ptr fname) {
@@ -160,7 +162,6 @@ ptr s_open_write(ptr fname) {
   int fd = open(c_fname, O_WRONLY | O_CREAT | O_TRUNC, 0640);
   return shift(fd);
 }
-
 
 ptr s_open_read(ptr fname) {
   char c_fname[FILENAME_MAX_LENGTH];
@@ -187,9 +188,9 @@ static char* gc_new_heap_top;
 
 static char* gc_get_forward_pointer(char* p) {
   ptr x = (ptr)*p;
-  if (x != gc_forward_mark) {
+  if (x != gc_forward_mark)
     return NULL;
-  }
+
   char* q = (char*) *(((ptr*)p)+1);
   assert(gc_new_heap_base <= q && q < gc_new_heap_top);
   return q;
@@ -350,7 +351,7 @@ char* heap_alloc(memory* mem, char* stack, int size) {
     heap_next = mem->heap_next;
     heap_new = heap_next + size;
     if (heap_new >= mem->heap_top) {
-      fprintf(stderr, "Exception: overflow");
+      fprintf(stderr, "Exception: overflow\n");
       exit(0);
     }
   }
