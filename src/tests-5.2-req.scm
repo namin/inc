@@ -4,7 +4,7 @@
   [(letrec ([f
      (lambda (i)
        (when (fx<= i 1000)
-         (let ([x (make-list 1000)])
+         (let ([x (make-vector 1000)])
            (f (fxadd1 i)))))])
     (f 0)
     100) => "100\n"]

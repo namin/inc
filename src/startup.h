@@ -22,6 +22,9 @@
 #define symbol_tag           0x03
 #define closure_end          0x07
 #define return_addr          0x17
+#define gc_forward_mark      0x27
+#define word_size               4
+#define word_shift              2
 
 /* all scheme values are of type ptrs */
 typedef unsigned int ptr;
@@ -53,12 +56,19 @@ typedef struct {
 } string;
 
 typedef struct {
-  char* heap_cur;
-  char* global_cur;
+  ptr label;
+  ptr fvs[1];
+} closure;
+
+typedef struct {
+  char* heap_next;
+  char* global_next;
+  ptr edi;
   char* heap_base;
   char* heap_top;
   char* heap_base_alt;
   char* heap_top_alt;
   char* global_base;
   char* stack_base;
+  char* scratch_base;
 } memory;

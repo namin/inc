@@ -1,5 +1,6 @@
 (load "tests-driver.scm")
 (load "tests-5.3-req.scm")
+(load "tests-5.2-req.scm")
 (load "tests-4.2-req.scm")
 (load "tests-4.1-req.scm")
 (load "tests-3.4-req.scm")
@@ -14,7 +15,7 @@
 (load "tests-2.2-req.scm")
 (load "tests-2.1-req.scm")
 (load "tests-1.9-req.scm")
-;(load "tests-1.8-req.scm")
+(load "tests-1.8-req.scm")
 (load "tests-1.7-req.scm")
 (load "tests-1.6-opt.scm")
 (load "tests-1.6-req.scm")
@@ -49,6 +50,7 @@
 (define wordsize       4) ; bytes
 (define wordshift      2)
 (define global-offset  4)
+(define edi-offset     8)
 (define closure-end #x07)
 (define return-addr #x17)
 
@@ -965,17 +967,16 @@
         [fvs (closure-free-vars expr)])
     (emit-heap-alloc-static si (* (+ 2 (length fvs)) wordsize))
     (emit "  movl $~s, (%eax)" label)
-    (unless (null? fvs)
-      (emit "  mov %eax, %edx")
-      (let loop ([fvs fvs] [count 1])
-        (cond
-	 [(null? fvs)
-	  (emit "  movl $~s, ~s(%edx)" closure-end (* count wordsize))]
-	 [else
-	  (emit-variable-ref si env (first fvs))
-          (emit "  mov %eax, ~s(%edx)" (* count wordsize))
-          (loop (rest fvs) (add1 count))]))
-      (emit "  mov %edx, %eax"))
+    (emit "  mov %eax, %edx")
+    (let loop ([fvs fvs] [count 1])
+      (cond
+       [(null? fvs)
+	(emit "  movl $~s, ~s(%edx)" closure-end (* count wordsize))]
+       [else
+	(emit-variable-ref si env (first fvs))
+	(emit "  mov %eax, ~s(%edx)" (* count wordsize))
+	(loop (rest fvs) (add1 count))]))
+    (emit "  mov %edx, %eax")
     (emit "  or $~s, %eax" closuretag)))
 
 (define (make-code formals free body)
@@ -1213,11 +1214,15 @@
 (define (emit-heap-alloc si)
   (let ([new-si (- si (* 2 wordsize))])
     (emit-adjust-base new-si)
-    (emit "  mov %ebp, ~s(%esp)" (* 0 wordsize))
-    (emit "  mov %esp, ~s(%esp)" (* 1 wordsize))
     (emit "  mov %eax, ~s(%esp)" (* 2 wordsize))
+    (emit "  mov %esp, %eax")
+    (emit "  add $~s, %eax"      (* 2 wordsize))
+    (emit "  mov %eax, ~s(%esp)" (* 1 wordsize))
+    (emit "  mov %ebp, ~s(%esp)" (* 0 wordsize))
+    (emit "  mov %edi, ~s(%ebp)" edi-offset)
     (emit-call "heap_alloc")
-    (emit-adjust-base (- new-si))))
+    (emit-adjust-base (- new-si))
+    (emit "  mov ~s(%ebp), %edi" edi-offset)))
 (define (emit-stack-to-heap si offset)
   (emit "  mov ~s(%esp), %edx" si)
   (emit "  mov %edx, ~s(%eax)" offset))
@@ -1389,6 +1394,7 @@
   (emit "  mov %ecx, %esi")
   (emit "  mov 12(%esp), %ebp")
   (emit "  mov 8(%esp), %esp")
+  (emit "  mov $0, %edi")
   (emit-call "L_scheme_entry")
   (emit "  mov %esi, %ecx")
   (restore-registers)

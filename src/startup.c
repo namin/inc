@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -179,15 +180,182 @@ ptr s_close(ptr fd) {
   return shift(close(unshift(fd)));
 }
 
-char* heap_alloc(memory* mem, char* stack, int size) {
-  char* heap_cur = mem->heap_cur;
-  char* heap_new = heap_cur + size;
-  if (heap_new >= mem->heap_top) {
-    fprintf(stderr, "Exception: overflow");
-    exit(0);
+static char* gc_next;
+static ptr* gc_queue;
+static char* gc_new_heap_base;
+static char* gc_new_heap_top;
+
+static char* gc_get_forward_pointer(char* p) {
+  ptr x = (ptr)*p;
+  if (x != gc_forward_mark) {
+    return NULL;
   }
-  mem->heap_cur = heap_new;
-  return heap_cur;
+  char* q = (char*) *(((ptr*)p)+1);
+  assert(gc_new_heap_base <= q && q < gc_new_heap_top);
+  return q;
+}
+
+static void gc_set_forward_pointer(char* p, char* q) {
+  assert(gc_new_heap_base <= q && q < gc_new_heap_top);
+  *p = gc_forward_mark;
+  *(((ptr*)p)+1) = (ptr)q;
+}
+
+static unsigned int gc_align(unsigned int n) {
+  unsigned int cell = 1 << obj_shift;
+  return ((n + cell - 1)/cell) * cell;
+}
+
+static int gc_ptr_object(ptr x) {
+  ptr tag = x & obj_mask;
+  switch (tag) {
+  case pair_tag:
+  case vector_tag:
+  case symbol_tag:
+  case string_tag:
+  case closure_tag:
+    return 1;
+  default:
+    return 0;
+  }
+}
+
+static unsigned int gc_size(ptr x) {
+  unsigned int n = 0;
+  ptr tag = x & obj_mask;
+  char* p = (char*)(x-tag);
+  switch (tag) {
+  case pair_tag:
+    n = 2 << word_shift;
+    break;
+  case vector_tag:
+    n = (((vector*)p)->length >> fx_shift) + 1;
+    n = n << word_shift;
+    break;
+  case symbol_tag:
+  case string_tag:
+    n = (((string*)p)->length >> fx_shift) + word_size;
+    break;
+  case closure_tag:
+    n = 0;
+    while (((closure*)p)->fvs[n++] != closure_end);
+    n++;
+    n = n << word_shift;
+    break;
+  }
+  return n;
+}
+
+static ptr gc_forward(ptr x) {
+  if (!gc_ptr_object(x))
+    return x;
+
+  ptr tag = x & obj_mask;
+  char* p = (char*)(x-tag);
+  char* q = gc_get_forward_pointer(p);
+  if (q != NULL) {
+    assert((((ptr)q) & obj_mask) == 0);
+    return ((ptr)q) | tag;
+  }
+
+  q = gc_next;
+  unsigned int n = gc_size(x);
+  unsigned int i = 0;
+  for (i=0; i<n; i++)
+    gc_next[i] = p[i];
+  gc_next = gc_next + gc_align(n);
+  gc_set_forward_pointer(p, q);
+  assert((((ptr)q) & obj_mask) == 0);
+  ptr f = ((ptr)q) | tag;
+  *(gc_queue++) = f;
+  return f;
+}
+
+static void gc_clean_new() {
+  char* p = gc_new_heap_base;
+  while (p < gc_new_heap_top) {
+    *p = 0;
+    p++;
+  }
+}
+
+static void gc(memory* mem, char* stack) {
+  gc_new_heap_base = mem->heap_base_alt;
+  gc_new_heap_top = mem->heap_top_alt;
+  gc_clean_new();
+
+  gc_next = mem->heap_base_alt;
+  gc_queue = (ptr*)(mem->scratch_base);
+
+  ptr* scan = gc_queue;
+  ptr* root = (ptr*)mem->global_base;
+  while (root < (ptr*)mem->global_next) {
+    *root = gc_forward(*root);
+    root++;
+  }
+
+  root = (ptr*)mem->stack_base;
+  root--; // skip top-level return addresses
+  root--;
+  while (root >= (ptr*) stack) {
+    if (*root == return_addr) root--; // skip return address
+    else *root = gc_forward(*root);
+    root--;
+  }
+
+  mem->edi = gc_forward(mem->edi);
+
+  while (scan < gc_queue) {
+    ptr x = *(scan++);
+
+    unsigned int n = gc_size(x);
+    assert(n != 0);
+
+    ptr tag = x & obj_mask;
+    char* q = (char*)(x-tag);
+    assert(gc_new_heap_base <= q && q < gc_new_heap_top);
+
+    if (tag == pair_tag) {
+      cell* p = (cell*)(x-tag);
+      p->car = gc_forward(p->car);
+      p->cdr = gc_forward(p->cdr);
+    } else if (tag == vector_tag) {
+      vector* p = (vector*)(x-tag);
+      unsigned int len = p->length >> fx_shift;
+      unsigned int i;
+      for (i=0; i<len; i++)
+	p->buf[i] = gc_forward(p->buf[i]);
+    } else if (tag == closure_tag) {
+      closure* p = (closure*)(x-tag);
+      unsigned int i = 0;
+      while (p->fvs[i] != closure_end) {
+	p->fvs[i] = gc_forward(p->fvs[i]);
+	i++;
+      }
+    }
+  }
+
+  mem->heap_next = gc_next;
+  mem->heap_base_alt = mem->heap_base;
+  mem->heap_top_alt = mem->heap_top;
+  mem->heap_base = gc_new_heap_base;
+  mem->heap_top = gc_new_heap_top;
+}
+
+char* heap_alloc(memory* mem, char* stack, int size) {
+  char* heap_next = mem->heap_next;
+  char* heap_new = heap_next + size;
+  if (heap_new >= mem->heap_top) {
+    gc(mem, stack);
+    heap_next = mem->heap_next;
+    heap_new = heap_next + size;
+    if (heap_new >= mem->heap_top) {
+      fprintf(stderr, "Exception: overflow");
+      exit(0);
+    }
+  }
+  mem->heap_next = heap_new;
+  return heap_next;
 }
 
 static char* allocate_protected_space(int size) {
@@ -216,25 +384,29 @@ static void deallocate_protected_space(char* p, int size) {
 
 int main(int argc, char** argv) {
   int stack_size = (16 * 4096);
-  int heap_size = (128 * 16 * 4096);
+  int heap_size = (4 * 16 * 4096);
   int global_size = (16 * 4096);
+  int scratch_size = (16 * 4096);
 
   char* stack_top = allocate_protected_space(stack_size);
   char* stack_base = stack_top + stack_size;
 
   char* heap = allocate_protected_space(heap_size);
-
   char* global = allocate_protected_space(global_size);
+  char* scratch = allocate_protected_space(scratch_size);
 
   context ctxt;
 
   memory mem;
-  mem.heap_cur = heap;
-  mem.global_cur = global;
+  mem.heap_next = heap;
+  mem.global_next = global;
   mem.heap_base = heap;
-  mem.heap_top = heap + heap_size;
+  mem.heap_top = heap + heap_size/2;
+  mem.heap_base_alt = mem.heap_top;
+  mem.heap_top_alt = heap + heap_size;
   mem.global_base = global;
   mem.stack_base = stack_base;
+  mem.scratch_base = scratch;
 
   print_ptr(scheme_entry(&ctxt, stack_base, &mem));
 
