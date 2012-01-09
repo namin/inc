@@ -311,9 +311,6 @@ static void gc(memory* mem, char* stack) {
   while (scan < gc_queue) {
     ptr x = *(scan++);
 
-    unsigned int n = gc_size(x);
-    assert(n != 0);
-
     ptr tag = x & obj_mask;
     char* q = (char*)(x-tag);
     assert(gc_new_heap_base <= q && q < gc_new_heap_top);
