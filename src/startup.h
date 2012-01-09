@@ -20,7 +20,6 @@
 #define string_tag           0x06
 #define closure_tag          0x02
 #define symbol_tag           0x03
-#define closure_end          0x07
 #define return_addr          0x17
 #define gc_forward_mark      0x27
 #define word_size               4
@@ -56,6 +55,7 @@ typedef struct {
 } string;
 
 typedef struct {
+  ptr length;
   ptr label;
   ptr fvs[1];
 } closure;

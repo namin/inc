@@ -238,9 +238,7 @@ static unsigned int gc_size(ptr x) {
     n = (((string*)p)->length >> fx_shift) + word_size;
     break;
   case closure_tag:
-    n = 0;
-    while (((closure*)p)->fvs[n++] != closure_end);
-    n++;
+    n = (((closure*)p)->length >> fx_shift) + 2;
     n = n << word_shift;
     break;
   }
@@ -328,11 +326,10 @@ static void gc(memory* mem, char* stack) {
 	p->buf[i] = gc_forward(p->buf[i]);
     } else if (tag == closure_tag) {
       closure* p = (closure*)(x-tag);
-      unsigned int i = 0;
-      while (p->fvs[i] != closure_end) {
+      unsigned int len = p->length >> fx_shift;
+      unsigned int i;
+      for (i=0; i<len; i++)
 	p->fvs[i] = gc_forward(p->fvs[i]);
-	i++;
-      }
     }
   }
 
