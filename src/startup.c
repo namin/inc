@@ -299,7 +299,6 @@ static void gc(memory* mem, char* stack) {
   while (root >= (ptr*) stack) {
     if (*root == return_addr) {
       root--; // skip return address
-      root--;
     } else {
       *root = gc_forward(*root);
     }
