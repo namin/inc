@@ -1,5 +1,7 @@
 (load "tests-driver.scm")
-(load "tests-5.3-req.scm")
+(define enable-cps #f)
+(when enable-cps
+  (load "tests-5.3-req.scm"))
 (load "tests-5.2-req.scm")
 (load "tests-4.2-req.scm")
 (load "tests-4.1-req.scm")
@@ -502,14 +504,18 @@
 
 (define (emit-any-expr si env tail expr)
   (cond
-   [(immediate? expr)      (emit-immediate expr)             (emit-ret-if tail)]
-   [(variable? expr)       (emit-variable-ref si env expr)   (emit-ret-if tail)]
-   [(closure? expr)        (emit-closure si env expr)        (emit-ret-if tail)]
-   [(if? expr)             (emit-if si env tail expr)        (assert      tail)]
-   [(let? expr)            (emit-let si env tail expr)       (assert      tail)]
-   [(aexpr-primcall? expr) (emit-aexpr-primcall si env expr) (emit-ret-if tail)]
-   [(primcall? expr)       (emit-primcall si env expr)       (assert      tail)]
-   [(app? expr)            (emit-app si env tail expr)       (assert      tail)]
+   [(immediate? expr)           (emit-immediate expr)             (emit-ret-if tail)]
+   [(variable? expr)            (emit-variable-ref si env expr)   (emit-ret-if tail)]
+   [(closure? expr)             (emit-closure si env expr)        (emit-ret-if tail)]
+   [(if? expr)                  (emit-if si env tail expr)        (assert (or (not enable-cps) tail))]
+   [(let? expr)                 (emit-let si env tail expr)       (assert (or (not enable-cps) tail))]
+   [(begin? expr)               (emit-begin si env tail expr)     (assert (not enable-cps))]
+   [(or (aexpr-primcall? expr)
+        (and (not enable-cps)
+             (primcall? expr))) (emit-aexpr-primcall si env expr) (emit-ret-if tail)]
+   [(and enable-cps
+         (primcall? expr))      (emit-primcall si env expr)       (assert      tail)]
+   [(app? expr)                 (emit-app si env tail expr)       (assert  (or (not enable-cps) tail))]
    [else (error 'emit-expr (format "~s is not an expression" expr))]))
 
 (define unique-name
@@ -882,7 +888,8 @@
    'labels
    (let-bindings expr)
    (cps-top (let-body expr))))
-(load "cps.scm")
+(when enable-cps
+  (load "cps.scm"))
 
 (define (closure-conversion expr)
   (let ([labels '()]
@@ -916,10 +923,11 @@
 (define (all-expr-conversions expr)
   (annotate-lib-primitives (assignment-conversion (alpha-conversion (macro-expand expr)))))
 (define (all-conversions expr)
-  (closure-conversion (cps-conversion (lift-constants (all-expr-conversions expr)))))
+  (closure-conversion ((if enable-cps cps-conversion (lambda (x) x)) (lift-constants (all-expr-conversions expr)))))
 
 (define (special? symbol)
-  (or (member symbol '(if begin let lambda closure set! quote apply call/cc))
+  (or (member symbol '(if begin let lambda closure set! quote apply))
+      (and enable-cps (eq? symbol 'call/cc))
       (primitive? symbol)))
 
 (define (flatmap f . lst)
@@ -1151,13 +1159,14 @@
       (emit-label done-label)))
   (cond
    [(not tail)
-    (emit-arguments (- si (* 2 wordsize)) (call-args expr))
-    (emit-expr (- si (* wordsize (+ 2 (length (call-args expr))))) env (call-target expr))
     (emit "  mov %edi, ~s(%esp)" si)
+    (emit "  movl $~s, ~s(%esp)" return-addr (next-stack-index si))
+    (emit-arguments (- si (* 4 wordsize)) (call-args expr))
+    (emit-expr (- si (* wordsize (+ 4 (length (call-args expr))))) env (call-target expr))
     (emit "  mov %eax, %edi")
     (emit-ensure-procedure si env expr)
     (emit-load-closure-label)
-    (emit-adjust-base si)
+    (emit-adjust-base (next-stack-index (next-stack-index si)))
     (emit "  mov %eax, %edx")
     (if (call-apply? expr)
 	(begin
@@ -1166,7 +1175,7 @@
 	  (emit "  add $4, %esp"))
 	(emit "  mov $~s, %eax" (length (call-args expr))))
     (emit-call "*%edx")
-    (emit-adjust-base (- si))
+    (emit-adjust-base (- (next-stack-index (next-stack-index si))))
     (emit "  mov ~s(%esp), %edi" si)]
    [else ; tail
     (emit-arguments si (call-args expr))
@@ -1191,8 +1200,7 @@
       (emit-label ok)
       (emit "  mov %edi, %eax"))))
 (define (emit-error si env)
-  (emit-tail-expr si env '((primitive-ref error) #f)))
-  
+  (emit-tail-expr si env (if enable-cps '((primitive-ref error) #f) '((primitive-ref error)))))
 
 (define (foreign-call? expr)
   (tagged-list 'foreign-call expr))
