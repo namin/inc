@@ -42,9 +42,9 @@
   (emit "~a:" label))
 
 (define (emit-function-header f)
-  (emit "  .text")
-  (emit "  .globl ~a" f)
-  (emit "  .type ~a, @function" f)
+  (emit "    .text")
+  (emit "    .globl ~a" f)
+  (emit "    .type ~a, @function" f)
   (emit-label f))
 
 (define (emit-immediate x)
