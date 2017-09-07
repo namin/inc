@@ -3,6 +3,7 @@
 (load "tests-driver.scm")
 (load "tests-1.1-req.scm")
 (load "tests-1.2-req.scm")
+(load "tests-1.3-req.scm")
 
 ;; Preamble
 
@@ -46,8 +47,22 @@
   (emit "  .type ~a, @function" f)
   (emit-label f))
 
-(define (compile-program x)
-  (unless (immediate? x) (error "" "Not an immediate value"))
-  (emit-function-header "scheme_entry")
-  (emit "    movl $~a, %eax" (immediate-rep x))
+(define (emit-immediate x)
+  (emit "    movl $~a, %eax" (immediate-rep x)))
+
+(define (emit-ret)
   (emit "    ret"))
+
+(define (compile-program x)
+  (emit-function-header "scheme_entry")
+
+  (cond
+   [(immediate? x) (emit-immediate x)]
+   [(equal? (car x) '$fxadd1)
+      (emit-immediate (cadr x))
+      (emit "    addl $~s, %eax" (immediate-rep 1))]
+   [(equal? (car x) 'fxsub1)
+    (emit-immediate (cadr x))
+    (emit "    subl $~s, %eax" (immediate-rep 1))])
+
+  (emit-ret))
