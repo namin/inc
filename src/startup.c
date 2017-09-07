@@ -20,6 +20,15 @@ int main() {
     if ((val & fxmask) == fxtag) {
         printf("%d\n", val >> fxshift);
 
+    } else if ((val & charmask) == chartag) {
+        char c = val >> charshift;
+
+        if      (c == '\t') printf("#\\tab\n");
+        else if (c == '\n') printf("#\\newline\n");
+        else if (c == '\r') printf("#\\return\n");
+        else if (c == ' ')  printf("#\\space\n");
+        else                printf("#\\%c\n", c);
+
     } else if (val == bool_t) {
         printf("#t\n");
 
