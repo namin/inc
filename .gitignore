@@ -1,1 +1,3 @@
-/src/compiler.scm
+src/stst
+src/stst.out
+src/stst.s
