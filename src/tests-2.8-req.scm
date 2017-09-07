@@ -17,7 +17,7 @@
  [(eq? 'foo 'foo) => "#t\n"]
  ['foo => "foo\n"]
  ['(foo bar baz) => "(foo bar baz)\n"]
- ['(foo foo foo foo foo foo foo foo foo foo foo) 
+ ['(foo foo foo foo foo foo foo foo foo foo foo)
   => "(foo foo foo foo foo foo foo foo foo foo foo)\n"]
- 
+
 )

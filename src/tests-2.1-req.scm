@@ -1,32 +1,32 @@
 ;;; one possible implementation strategy for procedures is via closure
-;;; conversion.  
+;;; conversion.
 
 ;;; Lambda does many things at the same time:
 ;;; 1) It creates a procedure object (ie. one that passes procedure?)
-;;; 2) It contains both code (what to do when applied) and data (what 
+;;; 2) It contains both code (what to do when applied) and data (what
 ;;;    variables it references.
 ;;; 3) The procedure object, in addition to passing procedure?, can be
 ;;;    applied to arguments.
 
 ;;; First step: separate code from data:
-;;; convert every program containing lambda to a program containing 
+;;; convert every program containing lambda to a program containing
 ;;; codes and closures:
 ;;; (let ([f (lambda () 12)]) (procedure? f))
 ;;; =>
-;;; (codes ([f-code (code () () 12)]) 
+;;; (codes ([f-code (code () () 12)])
 ;;;   (let ([f (closure f-code)])
 ;;;     (procedure? f)))
 ;;;
-;;; The codes binds code names to code points.  Every code 
+;;; The codes binds code names to code points.  Every code
 ;;; is of the form (code (formals ...) (free-vars ...) body)
-;;; 
-;;; sexpr 
+;;;
+;;; sexpr
 ;;; => recordize
 ;;; recognize lambda forms and applications
 ;;; =>
 ;;; (let ([y 12])
 ;;;   (let ([f (lambda (x) (fx+ y x))])
-;;;     (fx+ (f 10) (f 0)))) 
+;;;     (fx+ (f 10) (f 0))))
 ;;; => convert closures
 ;;; (let ([y 12])
 ;;;   (let ([f (closure (code (x) (y) (fx+ x y)) y)])
@@ -37,16 +37,16 @@
 ;;;     (let ([f (closure code0 y)])
 ;;;       (fx+ (call f 10) (call f 0)))))
 ;;; => code generation
-;;; 1) codes form generates unique-labels for every code and 
+;;; 1) codes form generates unique-labels for every code and
 ;;;    binds the names of the code to these labels.
 ;;; 2) Every code object has a list of formals and a list of free vars.
 ;;;    The formals are at stack locations -4(%esp), -8(%esp), -12(%esp), ...
 ;;;    The free vars are at -2(%edi), 2(%edi), 6(%edi), 10(%edi) ...
 ;;;    These are inserted in the environment and then the body of the code
 ;;;    is generated.
-;;; 3) A (closure code-name free-vars ...) is generated the same way a 
+;;; 3) A (closure code-name free-vars ...) is generated the same way a
 ;;;    (vector val* ...) is generated:  First, the code-label and the free
-;;;    variables are placed at 0(%ebp), 4(%ebp), 8(%ebp), etc.. 
+;;;    variables are placed at 0(%ebp), 4(%ebp), 8(%ebp), etc..
 ;;;    A closure pointer is placed in %eax, and %ebp is incremented to the
 ;;;    next boundary.
 ;;; 4) A (call f arg* ...) does the following:
@@ -83,11 +83,11 @@
   [(let ([f (lambda () 12)]) (f)) => "12\n"]
   [(let ([f (lambda () (fx+ 12 13))]) (f)) => "25\n"]
   [(let ([f (lambda () 13)]) (fx+ (f) (f))) => "26\n"]
-  [(let ([f (lambda () 
+  [(let ([f (lambda ()
               (let ([g (lambda () (fx+ 2 3))])
                 (fx* (g) (g))))])
     (fx+ (f) (f))) => "50\n"]
-  [(let ([f (lambda () 
+  [(let ([f (lambda ()
               (let ([f (lambda () (fx+ 2 3))])
                 (fx* (f) (f))))])
     (fx+ (f) (f))) => "50\n"]
@@ -120,7 +120,7 @@
                  (fx* n (f f (fxsub1 n)))))])
    (f f 5)) => "120\n"]
 )
- 
+
 
 (add-tests-with-string-output "closures"
  [(let ([n 12])

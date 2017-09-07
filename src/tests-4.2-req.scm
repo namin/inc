@@ -1,7 +1,6 @@
-
 (add-tests-with-string-output "eof-object"
   [(eof-object? (eof-object)) => "#t\n"]
-  
+
   [(null? (eof-object)) => "#f\n"]
   [(boolean? (eof-object)) => "#f\n"]
   [(string? (eof-object)) => "#f\n"]
@@ -30,7 +29,7 @@
        (display "Hello World!" p)
        (close-output-port p))
      (let ([p (open-input-file "stst.tmp")])
-       (define loop 
+       (define loop
          (lambda ()
            (let ([x (read-char p)])
              (if (eof-object? x)
@@ -57,18 +56,18 @@
        (lambda (i p)
          (cond
            [(fx= i (string-length s)) (close-output-port p)]
-           [else 
-            (write-char (string-ref s i) p) 
+           [else
+            (write-char (string-ref s i) p)
             (write-string! (fxadd1 i) p)])))
      (define verify
        (lambda (i p)
          (let ([x (read-char p)])
            (cond
-             [(eof-object? x) 
+             [(eof-object? x)
               (close-input-port p)
               (fx= i (string-length s))]
              [(fx= i (string-length s)) (error 'verify "file too short")]
-             [(char= (string-ref s i) x) 
+             [(char= (string-ref s i) x)
               (verify (fxadd1 i) p)]
              [else (error 'verify "mismatch")]))))
      (fill-string! 0 0)

@@ -35,8 +35,8 @@
     (f 2 3)) => "12\n"]
  [(let ([f (lambda (x y) (fx* x (fx+ y y)))])
     (f 2 3 4)) => ""]
-) 
- 
+)
+
 (add-tests-with-string-output "arg-check for var-arg procedures"
  [(let ([f (lambda x x)])
     (f)) => "()\n"]
@@ -48,7 +48,7 @@
     (f 'a 'b 'c)) => "(a b c)\n"]
  [(let ([f (lambda x x)])
     (f 'a 'b 'c 'd)) => "(a b c d)\n"]
- 
+
  [(let ([f (lambda (x . rest) (vector x rest))])
     (f)) => ""]
  [(let ([f (lambda (x . rest) (vector x rest))])
@@ -59,7 +59,7 @@
     (f 'a 'b 'c)) => "#(a (b c))\n"]
  [(let ([f (lambda (x . rest) (vector x rest))])
     (f 'a 'b 'c 'd)) => "#(a (b c d))\n"]
- 
+
  [(let ([f (lambda (x y . rest) (vector x y rest))])
     (f)) => ""]
  [(let ([f (lambda (x y . rest) (vector x y rest))])
@@ -70,10 +70,10 @@
     (f 'a 'b 'c)) => "#(a b (c))\n"]
  [(let ([f (lambda (x y . rest) (vector x y rest))])
     (f 'a 'b 'c 'd)) => "#(a b (c d))\n"]
-) 
+)
 
 
-;;; (add-tests-with-string-output "arg-check for primitives" 
+;;; (add-tests-with-string-output "arg-check for primitives"
 ;;;   [(cons 1 2 3) => ""]
 ;;;   [(cons 1) => ""]
 ;;;   [(vector-ref '#() 1 2 3 4) => ""]

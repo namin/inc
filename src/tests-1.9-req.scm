@@ -8,7 +8,7 @@
     (cons 1 t)
     t) => "(1 . 2)\n"]
  [(let ([t (cons 1 2)])
-    (if (pair? t) 
+    (if (pair? t)
         (begin t)
         12)) => "(1 . 2)\n"]
 )
@@ -120,7 +120,7 @@
     (vector-set! v0 0 1)
     (let ([v1 (make-vector 1)])
       (vector-set! v1 0 13)
-      (vector-set! (if (vector? v0) v0 v1) 
+      (vector-set! (if (vector? v0) v0 v1)
            (fxsub1 (vector-length (if (vector? v0) v0 v1)))
            (fxadd1 (vector-ref
                       (if (vector? v0) v0 v1)
@@ -132,25 +132,25 @@
 (add-tests-with-string-output "strings"
   [(string? (make-string 0)) => "#t\n"]
   [(make-string 0) => "\"\"\n"]
-  [(let ([s (make-string 1)]) 
+  [(let ([s (make-string 1)])
      (string-set! s 0 #\a)
      (string-ref s 0)) => "#\\a\n"]
-  
-  [(let ([s (make-string 2)]) 
+
+  [(let ([s (make-string 2)])
      (string-set! s 0 #\a)
      (string-set! s 1 #\b)
      (cons (string-ref s 0) (string-ref s 1))) => "(#\\a . #\\b)\n"]
   [(let ([i 0])
-    (let ([s (make-string 1)]) 
+    (let ([s (make-string 1)])
      (string-set! s i #\a)
      (string-ref s i))) => "#\\a\n"]
   [(let ([i 0] [j 1])
-    (let ([s (make-string 2)]) 
+    (let ([s (make-string 2)])
      (string-set! s i #\a)
      (string-set! s j #\b)
      (cons (string-ref s i) (string-ref s j)))) => "(#\\a . #\\b)\n"]
   [(let ([i 0] [c #\a])
-    (let ([s (make-string 1)]) 
+    (let ([s (make-string 1)])
      (string-set! s i c)
      (string-ref s i))) => "#\\a\n"]
   [(string-length (make-string 12)) => "12\n"]
@@ -211,10 +211,10 @@
     (string-set! v0 0 #\a)
     (let ([v1 (make-string 1)])
       (string-set! v1 0 #\A)
-      (string-set! (if (string? v0) v0 v1) 
+      (string-set! (if (string? v0) v0 v1)
            (fxsub1 (string-length (if (string? v0) v0 v1)))
            (fixnum->char
-             (fxadd1 
+             (fxadd1
                 (char->fixnum
                   (string-ref
                      (if (string? v0) v0 v1)

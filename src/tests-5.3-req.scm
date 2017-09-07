@@ -26,7 +26,7 @@
      (letrec ([fact
                (lambda (n)
                  (cond
-                   [(fxzero? n) 
+                   [(fxzero? n)
                     (call/cc
                       (lambda (nk)
                         (set! k nk)
@@ -38,7 +38,7 @@
      (letrec ([fact
                (lambda (n)
                  (cond
-                   [(fxzero? n) 
+                   [(fxzero? n)
                     (call/cc
                       (lambda (nk)
                         (set! k nk)

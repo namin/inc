@@ -1,6 +1,3 @@
-
-
-
 (add-tests-with-string-output "fx+"
   [(fx+ 1 2) => "3\n"]
   [(fx+ 1 -2) => "-1\n"]
@@ -30,7 +27,7 @@
   [(fx+ (fx+ (fx+ (fx+ (fx+ (fx+ (fx+ (fx+ 1 2) 3) 4) 5) 6) 7) 8) 9) => "45\n"]
   [(fx+ 1 (fx+ 2 (fx+ 3 (fx+ 4 (fx+ 5 (fx+ 6 (fx+ 7 (fx+ 8 9)))))))) => "45\n"]
 )
- 
+
 (add-tests-with-string-output "fx-"
   [(fx- 1 2) => "-1\n"]
   [(fx- 1 -2) => "3\n"]

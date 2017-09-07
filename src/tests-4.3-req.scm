@@ -1,4 +1,3 @@
-
 #!eof
 
 (add-tests-with-string-output "tokenizer"

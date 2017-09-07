@@ -10,25 +10,25 @@
   [(fxremainder 5 2) => "1\n"]
   [(fxremainder -45 7) => "-3\n"]
   [(fxremainder 10 -3) => "1\n"]
-  [(fxremainder -17 -9) => "-8\n"] 
+  [(fxremainder -17 -9) => "-8\n"]
 
 ;  [(fxmodulo 16 4) => "0\n"]
 ;  [(fxmodulo 5 2) => "1\n"]
 ;  [(fxmodulo -45 7) => "4\n"]
 ;  [(fxmodulo 10 -3) => "-2\n"]
 ;  [(fxmodulo -17 -9) => "-8\n"]
-)   
+)
 
 (add-tests-with-string-output "write-char"
-  [(begin 
+  [(begin
     (write-char #\a)
     (flush-output-port (current-output-port))
     (exit)) => "a"]
-  [(begin 
+  [(begin
     (write-char #\a)
     (close-output-port (current-output-port))
     (exit)) => "a"]
-  [(begin 
+  [(begin
     (write-char #\H)
     (write-char #\e)
     (write-char #\l)

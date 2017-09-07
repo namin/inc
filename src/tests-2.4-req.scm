@@ -109,20 +109,20 @@
 
 (add-tests-with-string-output "when/unless"
   [(let ([x (cons 1 2)])
-     (when (pair? x) 
+     (when (pair? x)
        (set-car! x (fx+ (car x) (cdr x))))
      x) => "(3 . 2)\n"]
   [(let ([x (cons 1 2)])
-     (when (pair? x) 
+     (when (pair? x)
        (set-car! x (fx+ (car x) (cdr x)))
        (set-car! x (fx+ (car x) (cdr x))))
      x) => "(5 . 2)\n"]
   [(let ([x (cons 1 2)])
-     (unless (fixnum? x) 
+     (unless (fixnum? x)
        (set-car! x (fx+ (car x) (cdr x))))
      x) => "(3 . 2)\n"]
   [(let ([x (cons 1 2)])
-     (unless (fixnum? x) 
+     (unless (fixnum? x)
        (set-car! x (fx+ (car x) (cdr x)))
        (set-car! x (fx+ (car x) (cdr x))))
      x) => "(5 . 2)\n"]
@@ -150,7 +150,7 @@
      (cond
       [else => (lambda (x) x)])) => "17\n"]
   [(let ([else #f])
-     (cond 
+     (cond
        [else ((lambda (x) (x x)) (lambda (x) (x x)))])
      else) => "#f\n"]
   [(let ([=> 12])

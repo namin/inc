@@ -1,4 +1,3 @@
-
 (add-tests-with-string-output "cons"
   [(fxadd1 0) => "1\n"]
   [(pair? (cons 1 2)) => "#t\n"]
@@ -40,12 +39,12 @@
            (cons x x)))))
    => "((((()) ()) (()) ()) ((()) ()) (()) ())\n"]
   [(cons (let ([x #t]) (let ([y (cons x x)]) (cons x y)))
-         (cons (let ([x #f]) (let ([y (cons x x)]) (cons y x))) 
-               ())) 
+         (cons (let ([x #f]) (let ([y (cons x x)]) (cons y x)))
+               ()))
    => "((#t #t . #t) ((#f . #f) . #f))\n"]
 )
 
-  
+
 
 #!eof
 (add-tests-with-string-output "procedures"
@@ -59,18 +58,18 @@
   [(letrec ([f (lambda () 5)]) (fx- 20 (f))) => "15\n"]
   [(letrec ([f (lambda () 5)]) (fx+ (f) (f))) => "10\n"]
   [(letrec ([f (lambda () (fx+ 5 7))]
-            [g (lambda () 13)]) 
+            [g (lambda () 13)])
     (fx+ (f) (g))) => "25\n"]
   [(letrec ([f (lambda (x) (fx+ x 12))]) (f 13)) => "25\n"]
   [(letrec ([f (lambda (x) (fx+ x 12))]) (f (f 10))) => "34\n"]
   [(letrec ([f (lambda (x) (fx+ x 12))]) (f (f (f 0)))) => "36\n"]
-  [(letrec ([f (lambda (x y) (fx+ x y))] 
+  [(letrec ([f (lambda (x y) (fx+ x y))]
             [g (lambda (x) (fx+ x 12))])
     (f 16 (f (g 0) (fx+ 1 (g 0))))) => "41\n"]
   [(letrec ([f (lambda (x) (g x x))]
             [g (lambda (x y) (fx+ x y))])
      (f 12)) => "24\n"]
-  [(letrec ([f (lambda (x) 
+  [(letrec ([f (lambda (x)
                  (if (fxzero? x)
                      1
                      (fx* x (f (fxsub1 x)))))])

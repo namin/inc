@@ -1,6 +1,3 @@
-
-
-
 (add-tests-with-string-output "fxadd1"
   [($fxadd1 0) => "1\n"]
   [($fxadd1 -1) => "0\n"]
@@ -114,4 +111,3 @@
  [($fxlognot -536870912) => "536870911\n"]
  [($fxlognot ($fxlognot 237463)) => "237463\n"]
 )
-
