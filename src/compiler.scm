@@ -24,12 +24,6 @@
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
 (define fxupper (sub1 (expt 2 (- fixnum-bits 1))))
 
-(define (fixnum? x)
-  (and (integer? x) (exact? x) (<= fxlower x fxupper)))
-
-(define (immediate? x)
-  (or (fixnum? x) (boolean? x) (char? x) (null? x)))
-
 (define (immediate-rep x)
   (cond
    [(fixnum? x) (ash x fxshift)]
@@ -37,6 +31,34 @@
    [(null? x) list-nil]
    [(char? x) (bitwise-ior (ash (char->integer x) charshift) chartag)]
    [else #f]))
+
+(define (fixnum? x)
+  (and (integer? x) (exact? x) (<= fxlower x fxupper)))
+
+(define (immediate? x)
+  (or (fixnum? x) (boolean? x) (char? x) (null? x)))
+
+;; Primitives with some magic global variables and macros
+(define-syntax define-primitive
+  (syntax-rules ()
+    [(_ (prim-name arg* ...) b b* ...)
+     (begin
+       (putprop 'prim-name '*is-prim* #t)
+       (putprop 'prim-name '*arg-count*
+                 (length '(arg* ...)))
+       (putprop 'prim-name '*emitter*
+                 (lambda (arg* ...) b b* ...)))]))
+
+(define (primitive? x)
+  (and (symbol? x) (getprop x '*is-prim*)))
+
+(define (primcall? expr)
+  (and (pair? expr) (primitive? (car expr))))
+
+(define (primitive-emitter x)
+  (or (getprop x '*emitter*) (error "Primitive Emitter" "Nope")))
+
+;; Codegen helpers
 
 (define (emit-label label)
   (emit "~a:" label))
@@ -50,19 +72,30 @@
 (define (emit-immediate x)
   (emit "    movl $~a, %eax" (immediate-rep x)))
 
-(define (emit-ret)
+(define (emit-primcall expr)
+  (let ([prim (car expr)]
+        [args (cdr expr)])
+    ;; (check-primcall-args prim args)
+    (apply (primitive-emitter prim) args)))
+
+(define (emit-expr expr)
+  (cond
+   [(immediate? expr) (emit-immediate expr)]
+   [(primcall? expr) (emit-primcall expr)]
+   [else (error "Emit expr" "Unknown form")]))
+
+(define (emit-program expr)
+  (emit-function-header "scheme_entry")
+  (emit-expr expr)
   (emit "    ret"))
 
-(define (compile-program x)
-  (emit-function-header "scheme_entry")
+(define compile-program emit-program)
 
-  (cond
-   [(immediate? x) (emit-immediate x)]
-   [(equal? (car x) '$fxadd1)
-      (emit-immediate (cadr x))
-      (emit "    addl $~s, %eax" (immediate-rep 1))]
-   [(equal? (car x) 'fxsub1)
-    (emit-immediate (cadr x))
-    (emit "    subl $~s, %eax" (immediate-rep 1))])
+;; A tiny stdlib
+(define-primitive ($fxadd1 arg)
+  (emit-expr arg)
+  (emit "    addl $~s, %eax" (immediate-rep 1)))
 
-  (emit-ret))
+(define-primitive ($fxsub1 arg)
+  (emit-expr arg)
+  (emit "    subl $~s, %eax" (immediate-rep 1)))
