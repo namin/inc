@@ -8,13 +8,13 @@
 ;; Preamble
 
 (define wordsize            8)
+(define bool-bit            6)
 (define bool-f     #b00101111)
 (define bool-t     #b01101111)
-(define boolshift           7)
-(define booltag    #b00011111)
 (define charmask   #b00111111)
 (define charshift           8)
 (define chartag    #b00001111)
+(define fxmask     #b00000011)
 (define fxshift             2)
 (define fxtag               0)
 (define list-nil   #b00111111)
@@ -99,3 +99,36 @@
 (define-primitive ($fxsub1 arg)
   (emit-expr arg)
   (emit "    subl $~s, %eax" (immediate-rep 1)))
+
+;; The shift arithmetic left (SAL) and shift logical left (SHL) instructions
+;; perform the same operation; they shift the bits in the destination operand to
+;; the left (toward more significant bit locations). For each shift count, the
+;; most significant bit of the destination operand is shifted into the CF flag,
+;; and the least significant bit is cleared
+(define-primitive ($fixnum->char arg)
+  (emit-expr arg)
+  (emit "    shll $~s, %eax" (- charshift fxshift))
+  (emit "    orl $~s, %eax" chartag))
+
+(define-primitive ($char->fixnum arg)
+  (emit-expr arg)
+  (emit "    shrl $~s, %eax" (- charshift fxshift))
+  (emit "    orl $~s, %eax" fxtag))
+
+(define-primitive (fixnum? arg)
+  (emit-expr arg)
+  ;; AL is the low order 8 bits of RAX; AND with fxmask
+  (emit "    and $~s, %al" fxmask)
+  ;; Compare low 8 bits with fxtag
+  (emit "    cmp $~s, %al" fxtag)
+  (emit-cmp-bool))
+
+(define (emit-cmp-bool)
+  ;; SETE sets the destination operand to 0 or 1 depending on the settings of
+  ;; the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
+  (emit "    sete %al")
+  ;; MOVZ copies the contents of the source operand (register or memory
+  ;; location) to the destination operand (register) and zero extends the value.
+  (emit "    movzb %al, %eax")
+  (emit "    sal $~s, %al" bool-bit)
+  (emit "    or $~s, %al" bool-f))

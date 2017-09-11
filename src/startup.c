@@ -5,7 +5,6 @@ extern int scheme_entry();
 #define bool_f     0b00101111
 #define bool_t     0b01101111
 #define boolshift           7
-#define booltag    0b00011111
 #define charmask   0b00111111
 #define fxmask     0b00000011
 #define charshift           8
