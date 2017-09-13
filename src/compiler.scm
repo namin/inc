@@ -8,9 +8,11 @@
 ;; Preamble
 
 (define wordsize            8)
-(define bool-bit            6)
+(define boolshift           6)
 (define bool-f     #b00101111)
 (define bool-t     #b01101111)
+(define boolmask   #b00111111)
+(define booltag    #b00101111)
 (define charmask   #b00111111)
 (define charshift           8)
 (define chartag    #b00001111)
@@ -92,6 +94,41 @@
 (define compile-program emit-program)
 
 ;; A tiny stdlib
+(define-primitive (boolean? arg)
+  (emit-expr arg)
+  (emit "    and $~s, %eax" boolmask)
+  (emit "    cmp $~s, %eax" booltag)
+  (emit-cmp-bool))
+
+(define-primitive (char? arg)
+  (emit-expr arg)
+  (emit "    and $~s, %eax" charmask)
+  (emit "    cmp $~s, %eax" chartag)
+  (emit-cmp-bool))
+
+(define-primitive (fixnum? arg)
+  (emit-expr arg)
+  (emit "    and $~s, %eax" fxmask)
+  (emit "    cmp $~s, %eax" fxtag)
+  (emit-cmp-bool))
+
+(define-primitive ($fxzero? arg)
+  (emit-expr arg)
+  ;; Compare the entire register to fxtag
+  (emit "    cmp $~s, %eax" fxtag)
+  (emit-cmp-bool))
+
+(define-primitive (null? arg)
+  (emit-expr arg)
+  ;; Compare the entire register to list-nil
+  (emit "    cmp $~s, %eax" list-nil)
+  (emit-cmp-bool))
+
+(define-primitive (not arg)
+  (emit-expr arg)
+  (emit "  cmp $~s, %al" bool-f)
+  (emit-cmp-bool))
+
 (define-primitive ($fxadd1 arg)
   (emit-expr arg)
   (emit "    addl $~s, %eax" (immediate-rep 1)))
@@ -115,14 +152,6 @@
   (emit "    shrl $~s, %eax" (- charshift fxshift))
   (emit "    orl $~s, %eax" fxtag))
 
-(define-primitive (fixnum? arg)
-  (emit-expr arg)
-  ;; AL is the low order 8 bits of RAX; AND with fxmask
-  (emit "    and $~s, %al" fxmask)
-  ;; Compare low 8 bits with fxtag
-  (emit "    cmp $~s, %al" fxtag)
-  (emit-cmp-bool))
-
 (define (emit-cmp-bool)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
   ;; the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
@@ -130,5 +159,5 @@
   ;; MOVZ copies the contents of the source operand (register or memory
   ;; location) to the destination operand (register) and zero extends the value.
   (emit "    movzb %al, %eax")
-  (emit "    sal $~s, %al" bool-bit)
+  (emit "    sal $~s, %al" boolshift)
   (emit "    or $~s, %al" bool-f))
