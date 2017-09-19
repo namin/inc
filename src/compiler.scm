@@ -73,70 +73,70 @@
   (emit "    .type ~a, @function" f)
   (emit-label f))
 
-(define (emit-immediate x)
+(define (emit-immediate si x)
   (emit "    mov rax, ~a" (immediate-rep x)))
 
-(define (emit-primcall expr)
+(define (emit-primcall si expr)
   (let ([prim (car expr)]
         [args (cdr expr)])
     ;; (check-primcall-args prim args)
-    (apply (primitive-emitter prim) args)))
+    (apply (primitive-emitter prim) (cons si args))))
 
-(define (emit-expr expr)
+(define (emit-expr si expr)
   (cond
-   [(immediate? expr) (emit-immediate expr)]
-   [(primcall? expr) (emit-primcall expr)]
+   [(immediate? expr) (emit-immediate si expr)]
+   [(primcall? expr) (emit-primcall si expr)]
    [else (error "Emit expr" "Unknown form")]))
 
 (define (emit-program expr)
   (emit-function-header "scheme_entry")
-  (emit-expr expr)
+  (emit-expr -8 expr)
   (emit "    ret"))
 
 (define compile-program emit-program)
 
 ;; A tiny stdlib
-(define-primitive (boolean? arg)
-  (emit-expr arg)
+(define-primitive (boolean? si arg)
+  (emit-expr si arg)
   (emit "    and rax, ~s" boolmask)
   (emit "    cmp rax, ~s" booltag)
   (emit-cmp-bool))
 
-(define-primitive (char? arg)
-  (emit-expr arg)
+(define-primitive (char? si arg)
+  (emit-expr si arg)
   (emit "    and rax, ~s" charmask)
   (emit "    cmp rax, ~s" chartag)
   (emit-cmp-bool))
 
-(define-primitive (fixnum? arg)
-  (emit-expr arg)
+(define-primitive (fixnum? si arg)
+  (emit-expr si arg)
   (emit "    and rax, ~s" fxmask)
   (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
-(define-primitive ($fxzero? arg)
-  (emit-expr arg)
+(define-primitive ($fxzero? si arg)
+  (emit-expr si arg)
   ;; Compare the entire register to fxtag
   (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
-(define-primitive (null? arg)
-  (emit-expr arg)
+(define-primitive (null? si arg)
+  (emit-expr si arg)
   ;; Compare the entire register to list-nil
   (emit "    cmp rax, ~s" list-nil)
   (emit-cmp-bool))
 
-(define-primitive (not arg)
-  (emit-expr arg)
+(define-primitive (not si arg)
+  (emit-expr si arg)
   (emit "  cmp al, ~s" bool-f)
   (emit-cmp-bool))
 
-(define-primitive ($fxadd1 arg)
-  (emit-expr arg)
+(define-primitive ($fxadd1 si arg)
+  (emit-expr si arg)
   (emit "    add rax, ~s" (immediate-rep 1)))
 
-(define-primitive ($fxsub1 arg)
-  (emit-expr arg)
+(define-primitive ($fxsub1 si arg)
+  (emit-expr si arg)
   (emit "    sub rax, ~s" (immediate-rep 1)))
 
 ;; The shift arithmetic left (SAL) and shift logical left (SHL) instructions
@@ -144,21 +144,32 @@
 ;; the left (toward more significant bit locations). For each shift count, the
 ;; most significant bit of the destination operand is shifted into the CF flag,
 ;; and the least significant bit is cleared
-(define-primitive ($fixnum->char arg)
-  (emit-expr arg)
+(define-primitive ($fixnum->char si arg)
+  (emit-expr si arg)
   (emit "    shl rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" chartag))
 
-(define-primitive ($char->fixnum arg)
-  (emit-expr arg)
+(define-primitive ($char->fixnum si arg)
+  (emit-expr si arg)
   (emit "    shr rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" fxtag))
 
-(define-primitive (fx+ a b)
-  (emit-expr a)
-  (emit "    mov [rbp - 8], rax")
-  (emit-expr b)
-  (emit "    add rax, [rbp - 8]"))
+(define-primitive (fx+ si a b)
+  (emit-expr si a)
+  (emit-stack-save si)
+  (emit-expr (next-stack-index si) b)
+  (emit "    add rax, ~a" (get-stack-ea si)))
+
+(define (get-stack-ea si)
+  (assert (< si 0))
+  (format "[rsp - ~s]" (abs si)))
+
+(define (emit-stack-save si)
+  (assert (< si 0))
+  (emit "    mov ~a, rax" (get-stack-ea si)))
+
+(define (next-stack-index si)
+  (- si wordsize))
 
 (define (emit-cmp-bool)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
