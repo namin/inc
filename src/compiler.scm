@@ -155,9 +155,7 @@
   (emit "    or rax, ~s" fxtag))
 
 (define-primitive (fx+ si a b)
-  (emit-expr si a)
-  (emit-stack-save si)
-  (emit-expr (next-stack-index si) b)
+  (emit-binop si a b)
   (emit "    add rax, ~a" (get-stack-ea si)))
 
 (define (get-stack-ea si)
@@ -165,11 +163,15 @@
   (format "[rsp - ~s]" (abs si)))
 
 (define (emit-stack-save si)
-  (assert (< si 0))
   (emit "    mov ~a, rax" (get-stack-ea si)))
 
 (define (next-stack-index si)
   (- si wordsize))
+
+(define (emit-binop si a b)
+  (emit-expr si a)
+  (emit-stack-save si)
+  (emit-expr (next-stack-index si) b))
 
 (define (emit-cmp-bool)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
