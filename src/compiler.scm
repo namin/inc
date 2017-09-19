@@ -4,6 +4,7 @@
 (load "tests-1.1-req.scm")
 (load "tests-1.2-req.scm")
 (load "tests-1.3-req.scm")
+(load "tests-1.5-req.scm")
 
 ;; Preamble
 
@@ -151,6 +152,12 @@
   (emit-expr arg)
   (emit "    shrl $~s, %eax" (- charshift fxshift))
   (emit "    orl $~s, %eax" fxtag))
+
+(define-primitive (fx+ a b)
+  (emit-expr a)
+  (emit "    mov %rax, -8(%rbp)")
+  (emit-expr b)
+  (emit "    add -8(%rbp), %rax"))
 
 (define (emit-cmp-bool)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
