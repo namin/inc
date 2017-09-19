@@ -67,13 +67,14 @@
   (emit "~a:" label))
 
 (define (emit-function-header f)
+  (emit "    .intel_syntax noprefix")
   (emit "    .text")
   (emit "    .globl ~a" f)
   (emit "    .type ~a, @function" f)
   (emit-label f))
 
 (define (emit-immediate x)
-  (emit "    movq $~a, %rax" (immediate-rep x)))
+  (emit "    mov rax, ~a" (immediate-rep x)))
 
 (define (emit-primcall expr)
   (let ([prim (car expr)]
@@ -97,46 +98,46 @@
 ;; A tiny stdlib
 (define-primitive (boolean? arg)
   (emit-expr arg)
-  (emit "    and $~s, %rax" boolmask)
-  (emit "    cmp $~s, %rax" booltag)
+  (emit "    and rax, ~s" boolmask)
+  (emit "    cmp rax, ~s" booltag)
   (emit-cmp-bool))
 
 (define-primitive (char? arg)
   (emit-expr arg)
-  (emit "    and $~s, %rax" charmask)
-  (emit "    cmp $~s, %rax" chartag)
+  (emit "    and rax, ~s" charmask)
+  (emit "    cmp rax, ~s" chartag)
   (emit-cmp-bool))
 
 (define-primitive (fixnum? arg)
   (emit-expr arg)
-  (emit "    and $~s, %rax" fxmask)
-  (emit "    cmp $~s, %rax" fxtag)
+  (emit "    and rax, ~s" fxmask)
+  (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
 (define-primitive ($fxzero? arg)
   (emit-expr arg)
   ;; Compare the entire register to fxtag
-  (emit "    cmp $~s, %rax" fxtag)
+  (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
 (define-primitive (null? arg)
   (emit-expr arg)
   ;; Compare the entire register to list-nil
-  (emit "    cmp $~s, %rax" list-nil)
+  (emit "    cmp rax, ~s" list-nil)
   (emit-cmp-bool))
 
 (define-primitive (not arg)
   (emit-expr arg)
-  (emit "  cmp $~s, %al" bool-f)
+  (emit "  cmp al, ~s" bool-f)
   (emit-cmp-bool))
 
 (define-primitive ($fxadd1 arg)
   (emit-expr arg)
-  (emit "    addq $~s, %rax" (immediate-rep 1)))
+  (emit "    add rax, ~s" (immediate-rep 1)))
 
 (define-primitive ($fxsub1 arg)
   (emit-expr arg)
-  (emit "    subq $~s, %rax" (immediate-rep 1)))
+  (emit "    sub rax, ~s" (immediate-rep 1)))
 
 ;; The shift arithmetic left (SAL) and shift logical left (SHL) instructions
 ;; perform the same operation; they shift the bits in the destination operand to
@@ -145,26 +146,26 @@
 ;; and the least significant bit is cleared
 (define-primitive ($fixnum->char arg)
   (emit-expr arg)
-  (emit "    shlq $~s, %rax" (- charshift fxshift))
-  (emit "    orq $~s, %rax" chartag))
+  (emit "    shl rax, ~s" (- charshift fxshift))
+  (emit "    or rax, ~s" chartag))
 
 (define-primitive ($char->fixnum arg)
   (emit-expr arg)
-  (emit "    shrq $~s, %rax" (- charshift fxshift))
-  (emit "    orq $~s, %rax" fxtag))
+  (emit "    shr rax, ~s" (- charshift fxshift))
+  (emit "    or rax, ~s" fxtag))
 
 (define-primitive (fx+ a b)
   (emit-expr a)
-  (emit "    movq %rax, -8(%rbp)")
+  (emit "    mov [rbp - 8], rax")
   (emit-expr b)
-  (emit "    addq -8(%rbp), %rax"))
+  (emit "    add rax, [rbp - 8]"))
 
 (define (emit-cmp-bool)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
   ;; the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
-  (emit "    sete %al")
-  ;; MOVZ copies the contents of the source operand (register or memory
+  (emit "    sete al")
+  ;; MOVZX copies the contents of the source operand (register or memory
   ;; location) to the destination operand (register) and zero extends the value.
-  (emit "    movzb %al, %rax")
-  (emit "    sal $~s, %al" boolshift)
-  (emit "    or $~s, %al" bool-f))
+  (emit "    movzx rax, al")
+  (emit "    sal al, ~s" boolshift)
+  (emit "    or al, ~s" bool-f))
