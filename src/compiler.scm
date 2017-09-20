@@ -166,6 +166,14 @@
   ;; Reverse the order and fix it up.
   (emit-stack-load si))
 
+(define-primitive (fx* si a b)
+  (emit-binop si a b)
+  (emit "    shr rax, ~s" fxshift)
+  ;; The destination operand is an implied operand located in register AX
+  ;; GCC throws `Error: ambiguous operand size for `mul'` without size
+  ;; quantifier
+  (emit "    mulq ~a" (get-stack-ea si)))
+
 (define (get-stack-ea si)
   (assert (< si 0))
   (format "[rsp - ~s]" (abs si)))
