@@ -23,6 +23,7 @@
 (define list-nil   #b00111111)
 
 ;; Range for fixnums
+
 (define fixnum-bits (- (* wordsize 8) fxshift))
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
 (define fxupper (sub1 (expt 2 (- fixnum-bits 1))))
@@ -86,12 +87,13 @@
   (cond
    [(immediate? expr) (emit-immediate si expr)]
    [(primcall? expr) (emit-primcall si expr)]
-   [else (error "Emit expr" "Unknown form")]))
+   [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
 (define (emit-program expr)
-  (emit-function-header "scheme_entry")
-  (emit-expr -8 expr)
-  (emit "    ret"))
+  (let ([default-stack-index -8])
+    (emit-function-header "scheme_entry")
+    (emit-expr default-stack-index expr)
+    (emit "    ret")))
 
 (define compile-program emit-program)
 
@@ -154,6 +156,38 @@
   (emit "    shr rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" fxtag))
 
+(define-primitive (fxlognot si arg)
+  (emit-expr si arg)
+  (emit "  shr rax, ~s" fxshift)
+  (emit "  not rax")
+  (emit "  shl rax, ~s" fxshift))
+
+(define-primitive (fxlogor si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  or rax, ~a" (get-stack-ea si)))
+
+(define-primitive (fxlogand si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "  and rax, ~a" (get-stack-ea si)))
+
+(define (get-stack-ea si)
+  (assert (< si 0))
+  (format "[rsp - ~s]" (abs si)))
+
+(define (emit-stack-save si)
+  (emit "    mov ~a, rax" (get-stack-ea si)))
+
+(define (emit-stack-load si)
+  (emit "    mov rax, ~a" (get-stack-ea si)))
+
+(define (next-stack-index si)
+  (- si wordsize))
+
+(define (emit-binop si a b)
+  (emit-expr si a)
+  (emit-stack-save si)
+  (emit-expr (next-stack-index si) b))
+
 (define-primitive (fx+ si a b)
   (emit-binop si a b)
   (emit "    add rax, ~a" (get-stack-ea si)))
@@ -174,30 +208,50 @@
   ;; quantifier
   (emit "    mulq ~a" (get-stack-ea si)))
 
-(define (get-stack-ea si)
-  (assert (< si 0))
-  (format "[rsp - ~s]" (abs si)))
-
-(define (emit-stack-save si)
-  (emit "    mov ~a, rax" (get-stack-ea si)))
-
-(define (emit-stack-load si)
-  (emit "    mov rax, ~a" (get-stack-ea si)))
-
-(define (next-stack-index si)
-  (- si wordsize))
-
-(define (emit-binop si a b)
-  (emit-expr si a)
+(define (emit-div si arg1 arg2)
+  (emit-expr si arg2)
+  (emit "  shr rax, ~s" fxshift)
   (emit-stack-save si)
-  (emit-expr (next-stack-index si) b))
+  (emit-expr (next-stack-index si) arg1)
+  (emit "  mov rdx, 0")
+  (emit "  shr rax, ~s" fxshift)
+  (emit "  divl ~a" (get-stack-ea si)))
 
-(define (emit-cmp-bool)
+(define-primitive ($fxquotient si arg1 arg2)
+  (emit-div si arg1 arg2)
+  (emit "  shl rax, ~s" fxshift))
+
+(define-primitive ($fxremainder si arg1 arg2)
+  (emit-div si arg1 arg2)
+  (emit "  mov %edx, %eax")
+  (emit "  shl rax, ~s" fxshift))
+
+(define (emit-cmp-bool . args)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
   ;; the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
-  (emit "    sete al")
+  (emit "    ~s al" (if (null? args) 'sete (car args)))
   ;; MOVZX copies the contents of the source operand (register or memory
   ;; location) to the destination operand (register) and zero extends the value.
   (emit "    movzx rax, al")
   (emit "    sal al, ~s" boolshift)
   (emit "    or al, ~s" bool-f))
+
+(define (emit-cmp-binop setx si arg1 arg2)
+  (emit-binop si arg1 arg2)
+  (emit "    cmp ~a, rax" (get-stack-ea si))
+  (emit-cmp-bool setx))
+
+(define-primitive (fx= si arg1 arg2)
+  (emit-cmp-binop 'sete si arg1 arg2))
+
+(define-primitive (fx< si arg1 arg2)
+  (emit-cmp-binop 'setl si arg1 arg2))
+
+(define-primitive (fx<= si arg1 arg2)
+  (emit-cmp-binop 'setle si arg1 arg2))
+
+(define-primitive (fx> si arg1 arg2)
+  (emit-cmp-binop 'setg si arg1 arg2))
+
+(define-primitive (fx>= si arg1 arg2)
+  (emit-cmp-binop 'setge si arg1 arg2))
