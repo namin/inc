@@ -158,12 +158,23 @@
   (emit-binop si a b)
   (emit "    add rax, ~a" (get-stack-ea si)))
 
+(define-primitive (fx- si a b)
+  (emit-binop si a b)
+  ;; Subtracts the 2nd op from the first and stores the result in the 1st
+  (emit "    sub ~a, rax" (get-stack-ea si))
+  ;; This is pretty inefficient to update result in stack and load it back.
+  ;; Reverse the order and fix it up.
+  (emit-stack-load si))
+
 (define (get-stack-ea si)
   (assert (< si 0))
   (format "[rsp - ~s]" (abs si)))
 
 (define (emit-stack-save si)
   (emit "    mov ~a, rax" (get-stack-ea si)))
+
+(define (emit-stack-load si)
+  (emit "    mov rax, ~a" (get-stack-ea si)))
 
 (define (next-stack-index si)
   (- si wordsize))
