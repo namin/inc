@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-extern int scheme_entry();
+extern int init();
 
 #define bool_f     0b00101111
 #define bool_t     0b01101111
@@ -14,7 +14,7 @@ extern int scheme_entry();
 #define list_nil   0b00111111
 
 int main() {
-    int val = scheme_entry();
+    int val = init();
 
     if ((val & fxmask) == fxtag) {
         printf("%d\n", val >> fxshift);

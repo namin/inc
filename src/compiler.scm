@@ -91,7 +91,7 @@
 
 (define (emit-program expr)
   (let ([default-stack-index -8])
-    (emit-function-header "scheme_entry")
+    (emit-function-header "init")
     (emit-expr default-stack-index expr)
     (emit "    ret")))
 
