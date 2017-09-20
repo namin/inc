@@ -60,7 +60,18 @@
   (and (pair? expr) (primitive? (car expr))))
 
 (define (primitive-emitter x)
-  (or (getprop x '*emitter*) (error "Primitive Emitter" "Nope")))
+  (or (getprop x '*emitter*) (error 'primitive-emitter "Nope")))
+
+(define (let? expr)
+  (eq? 'let (car expr)))
+
+(define (bindings expr)
+  (assert (let? expr))
+  (cadr expr))
+
+(define (body expr)
+  (assert (let? expr))
+  (cddr expr))
 
 ;; Codegen helpers
 
@@ -74,71 +85,73 @@
   (emit "    .type ~a, @function" f)
   (emit-label f))
 
-(define (emit-immediate si x)
+(define (emit-immediate si env x)
   (emit "    mov rax, ~a" (immediate-rep x)))
 
-(define (emit-primcall si expr)
+(define (emit-primcall si env expr)
   (let ([prim (car expr)]
         [args (cdr expr)])
     ;; (check-primcall-args prim args)
-    (apply (primitive-emitter prim) (cons si args))))
+    (apply (primitive-emitter prim) (cons si (cons env args)))))
 
-(define (emit-expr si expr)
+(define (emit-expr si env expr)
   (cond
-   [(immediate? expr) (emit-immediate si expr)]
-   [(primcall? expr) (emit-primcall si expr)]
+   [(immediate? expr) (emit-immediate si env expr)]
+   [(primcall? expr) (emit-primcall si env expr)]
+   [(let? expr) (emit-let (bindings expr) (body x) si env expr)]
    [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
 (define (emit-program expr)
-  (let ([default-stack-index -8])
+  (let ([default-stack-index -8]
+        [default-env '()])
     (emit-function-header "init")
-    (emit-expr default-stack-index expr)
+    (emit-expr default-stack-index default-env expr)
     (emit "    ret")))
 
 (define compile-program emit-program)
 
 ;; A tiny stdlib
-(define-primitive (boolean? si arg)
-  (emit-expr si arg)
+(define-primitive (boolean? si env expr)
+  (emit-expr si env expr)
   (emit "    and rax, ~s" boolmask)
   (emit "    cmp rax, ~s" booltag)
   (emit-cmp-bool))
 
-(define-primitive (char? si arg)
-  (emit-expr si arg)
+(define-primitive (char? si env expr)
+  (emit-expr si env expr)
   (emit "    and rax, ~s" charmask)
   (emit "    cmp rax, ~s" chartag)
   (emit-cmp-bool))
 
-(define-primitive (fixnum? si arg)
-  (emit-expr si arg)
+(define-primitive (fixnum? si env expr)
+  (emit-expr si env expr)
   (emit "    and rax, ~s" fxmask)
   (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
-(define-primitive ($fxzero? si arg)
-  (emit-expr si arg)
+(define-primitive ($fxzero? si env expr)
+  (emit-expr si env expr)
   ;; Compare the entire register to fxtag
   (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
-(define-primitive (null? si arg)
-  (emit-expr si arg)
+(define-primitive (null? si env expr)
+  (emit-expr si env expr)
   ;; Compare the entire register to list-nil
   (emit "    cmp rax, ~s" list-nil)
   (emit-cmp-bool))
 
-(define-primitive (not si arg)
-  (emit-expr si arg)
+(define-primitive (not si env expr)
+  (emit-expr si env expr)
   (emit "  cmp al, ~s" bool-f)
   (emit-cmp-bool))
 
-(define-primitive ($fxadd1 si arg)
-  (emit-expr si arg)
+(define-primitive ($fxadd1 si env expr)
+  (emit-expr si env expr)
   (emit "    add rax, ~s" (immediate-rep 1)))
 
-(define-primitive ($fxsub1 si arg)
-  (emit-expr si arg)
+(define-primitive ($fxsub1 si env expr)
+  (emit-expr si env expr)
   (emit "    sub rax, ~s" (immediate-rep 1)))
 
 ;; The shift arithmetic left (SAL) and shift logical left (SHL) instructions
@@ -146,28 +159,28 @@
 ;; the left (toward more significant bit locations). For each shift count, the
 ;; most significant bit of the destination operand is shifted into the CF flag,
 ;; and the least significant bit is cleared
-(define-primitive ($fixnum->char si arg)
-  (emit-expr si arg)
+(define-primitive ($fixnum->char si env expr)
+  (emit-expr si env expr)
   (emit "    shl rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" chartag))
 
-(define-primitive ($char->fixnum si arg)
-  (emit-expr si arg)
+(define-primitive ($char->fixnum si env expr)
+  (emit-expr si env expr)
   (emit "    shr rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" fxtag))
 
-(define-primitive (fxlognot si arg)
-  (emit-expr si arg)
+(define-primitive (fxlognot si env expr)
+  (emit-expr si env expr)
   (emit "  shr rax, ~s" fxshift)
   (emit "  not rax")
   (emit "  shl rax, ~s" fxshift))
 
-(define-primitive (fxlogor si arg1 arg2)
-  (emit-binop si arg1 arg2)
+(define-primitive (fxlogor si env expr1 arg2)
+  (emit-binop si env expr1 arg2)
   (emit "  or rax, ~a" (get-stack-ea si)))
 
-(define-primitive (fxlogand si arg1 arg2)
-  (emit-binop si arg1 arg2)
+(define-primitive (fxlogand si env expr1 arg2)
+  (emit-binop si env expr1 arg2)
   (emit "  and rax, ~a" (get-stack-ea si)))
 
 (define (get-stack-ea si)
@@ -183,46 +196,46 @@
 (define (next-stack-index si)
   (- si wordsize))
 
-(define (emit-binop si a b)
-  (emit-expr si a)
+(define (emit-binop si env a b)
+  (emit-expr si env a)
   (emit-stack-save si)
-  (emit-expr (next-stack-index si) b))
+  (emit-expr (next-stack-index si) env b))
 
-(define-primitive (fx+ si a b)
-  (emit-binop si a b)
+(define-primitive (fx+ si env a b)
+  (emit-binop si env a b)
   (emit "    add rax, ~a" (get-stack-ea si)))
 
-(define-primitive (fx- si a b)
-  (emit-binop si a b)
+(define-primitive (fx- si env a b)
+  (emit-binop si env a b)
   ;; Subtracts the 2nd op from the first and stores the result in the 1st
   (emit "    sub ~a, rax" (get-stack-ea si))
   ;; This is pretty inefficient to update result in stack and load it back.
   ;; Reverse the order and fix it up.
   (emit-stack-load si))
 
-(define-primitive (fx* si a b)
-  (emit-binop si a b)
+(define-primitive (fx* si env a b)
+  (emit-binop si env a b)
   (emit "    shr rax, ~s" fxshift)
   ;; The destination operand is an implied operand located in register AX
   ;; GCC throws `Error: ambiguous operand size for `mul'` without size
   ;; quantifier
   (emit "    mulq ~a" (get-stack-ea si)))
 
-(define (emit-div si arg1 arg2)
-  (emit-expr si arg2)
+(define (emit-div si env a b)
+  (emit-expr si env a)
   (emit "  shr rax, ~s" fxshift)
   (emit-stack-save si)
-  (emit-expr (next-stack-index si) arg1)
+  (emit-expr (next-stack-index si) b)
   (emit "  mov rdx, 0")
   (emit "  shr rax, ~s" fxshift)
   (emit "  divl ~a" (get-stack-ea si)))
 
-(define-primitive ($fxquotient si arg1 arg2)
-  (emit-div si arg1 arg2)
+(define-primitive ($fxquotient si env a b)
+  (emit-div si env a b)
   (emit "  shl rax, ~s" fxshift))
 
-(define-primitive ($fxremainder si arg1 arg2)
-  (emit-div si arg1 arg2)
+(define-primitive ($fxremainder si env a b)
+  (emit-div si env a b)
   (emit "  mov %edx, %eax")
   (emit "  shl rax, ~s" fxshift))
 
@@ -236,22 +249,22 @@
   (emit "    sal al, ~s" boolshift)
   (emit "    or al, ~s" bool-f))
 
-(define (emit-cmp-binop setx si arg1 arg2)
-  (emit-binop si arg1 arg2)
+(define (emit-cmp-binop setx si env a b)
+  (emit-binop si env a b)
   (emit "    cmp ~a, rax" (get-stack-ea si))
   (emit-cmp-bool setx))
 
-(define-primitive (fx= si arg1 arg2)
-  (emit-cmp-binop 'sete si arg1 arg2))
+(define-primitive (fx= si env a b)
+  (emit-cmp-binop 'sete si env a b))
 
-(define-primitive (fx< si arg1 arg2)
-  (emit-cmp-binop 'setl si arg1 arg2))
+(define-primitive (fx< si env a b)
+  (emit-cmp-binop 'setl si env a b))
 
-(define-primitive (fx<= si arg1 arg2)
-  (emit-cmp-binop 'setle si arg1 arg2))
+(define-primitive (fx<= si env a b)
+  (emit-cmp-binop 'setle si env a b))
 
-(define-primitive (fx> si arg1 arg2)
-  (emit-cmp-binop 'setg si arg1 arg2))
+(define-primitive (fx> si env a b)
+  (emit-cmp-binop 'setg si env a b))
 
-(define-primitive (fx>= si arg1 arg2)
-  (emit-cmp-binop 'setge si arg1 arg2))
+(define-primitive (fx>= si env a b)
+  (emit-cmp-binop 'setge si env a b))
