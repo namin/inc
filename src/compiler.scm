@@ -4,8 +4,9 @@
 (load "tests-1.1-req.scm")
 (load "tests-1.2-req.scm")
 (load "tests-1.3-req.scm")
-(load "tests-1.6-req.scm")
+(load "tests-1.4-req.scm")
 (load "tests-1.5-req.scm")
+(load "tests-1.6-req.scm")
 
 ;; Preamble
 
@@ -74,6 +75,9 @@
   (assert (let? expr))
   (cddr expr))
 
+(define (if? expr)
+  (eq? 'if (car expr)))
+
 ;; Env with alist. It's shitty that we use both alist and plist
 (define (extend var si env)
   (cons (list var si) env))
@@ -101,6 +105,16 @@
 (define (emit-immediate si env x)
   (emit "    mov rax, ~a" (immediate-rep x)))
 
+;; TODO: Replace all compares with this function
+(define (emit-cmp with)
+  (emit "    cmp rax, ~a" with))
+
+(define (emit-je label)
+  (emit "    je ~a" label))
+
+(define (emit-jmp label)
+  (emit "    jmp ~a" label))
+
 (define (emit-primcall si env expr)
   (let ([prim (car expr)]
         [args (cdr expr)])
@@ -123,12 +137,32 @@
            (extend (car b) si new-env)
            (cdr b*)))])))
 
+(define unique-label
+  (let ([count 0])
+    (lambda ()
+      (let ([L (string->symbol (format "L_~s" count))])
+        (set! count (add1 count))
+        L))))
+
+(define (emit-if si env test conseq alt)
+  (let ([alt-label (unique-label)]
+        [final-label (unique-label)])
+    (emit-expr si env test)
+    (emit-cmp (immediate-rep #f))
+    (emit-je alt-label)
+    (emit-expr si env conseq)
+    (emit-jmp final-label)
+    (emit-label alt-label)
+    (emit-expr si env alt)
+    (emit-label final-label)))
+
 (define (emit-expr si env expr)
   (cond
    [(immediate? expr) (emit-immediate si env expr)]
    [(primcall? expr) (emit-primcall si env expr)]
    [(variable? expr env) (emit-variable si env expr)]
    [(let? expr) (emit-let si env (bindings expr) (body expr))]
+   [(if? expr) (emit-if si env (cadr expr) (caddr expr) (cadddr expr))]
    [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
 (define (emit-program expr)
