@@ -73,6 +73,18 @@
   (assert (let? expr))
   (cddr expr))
 
+;; Env with alist. It's shitty that we use both alist and plist
+(define (extend var si env)
+  (cons (list var si) env))
+
+(define (lookup var env)
+  (cond
+   [(assv var env) => cadr]
+   [else #f]))
+
+(define (variable? x env)
+  (and (symbol? x) (lookup x env)))
+
 ;; Codegen helpers
 
 (define (emit-label label)
@@ -94,11 +106,28 @@
     ;; (check-primcall-args prim args)
     (apply (primitive-emitter prim) (cons si (cons env args)))))
 
+(define (emit-variable si env expr)
+  (emit-stack-load (lookup expr env)))
+
+(define (emit-let si env bindings body)
+  (let f ((si si) (new-env env) (b* bindings))
+    (cond
+     ;; XXX: (car body) is wrong
+     [(null? b*) (emit-expr si new-env (car body))]
+     [else
+      (let ([b (car b*)])
+        (emit-expr si new-env (cadr b))
+        (emit-stack-save si)
+        (f (next-stack-index si)
+           (extend (car b) si new-env)
+           (cdr b*)))])))
+
 (define (emit-expr si env expr)
   (cond
    [(immediate? expr) (emit-immediate si env expr)]
    [(primcall? expr) (emit-primcall si env expr)]
-   [(let? expr) (emit-let (bindings expr) (body x) si env expr)]
+   [(variable? expr env) (emit-variable si env expr)]
+   [(let? expr) (emit-let si env (bindings expr) (body expr))]
    [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
 (define (emit-program expr)
