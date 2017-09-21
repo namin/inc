@@ -4,6 +4,7 @@
 (load "tests-1.1-req.scm")
 (load "tests-1.2-req.scm")
 (load "tests-1.3-req.scm")
+(load "tests-1.6-req.scm")
 (load "tests-1.5-req.scm")
 
 ;; Preamble
