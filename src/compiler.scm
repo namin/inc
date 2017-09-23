@@ -105,6 +105,14 @@
 (define (emit-immediate si env x)
   (emit "    mov rax, ~a" (immediate-rep x)))
 
+(define (emit-preamble)
+  (emit "    push rbp")
+  (emit "    mov rbp, rsp"))
+
+(define (emit-ret)
+  (emit "    pop rbp")
+  (emit "    ret"))
+
 ;; TODO: Replace all compares with this function
 (define (emit-cmp with)
   (emit "    cmp rax, ~a" with))
@@ -169,8 +177,9 @@
   (let ([default-stack-index -8]
         [default-env '()])
     (emit-function-header "init")
+    (emit-preamble)
     (emit-expr default-stack-index default-env expr)
-    (emit "    ret")))
+    (emit-ret)))
 
 (define compile-program emit-program)
 
