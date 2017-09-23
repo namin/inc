@@ -15,7 +15,7 @@
     (close-output-port p)))
 
 (define (build)
-  (unless (zero? (system "gcc -m64 -g3 -ggdb3 -O0 -o stst startup.c stst.s"))
+  (unless (zero? (system "make --quiet"))
     (error 'make "could not build target")))
 
 (define (execute)
