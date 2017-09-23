@@ -1,4 +1,6 @@
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 extern int init();
 
@@ -14,7 +16,10 @@ extern int init();
 #define list_nil   0b00111111
 
 int main() {
-    int val = init();
+
+    int64_t *heap =  calloc(1024, 8);
+
+    int val = init(&heap);
 
     if ((val & fxmask) == fxtag) {
         printf("%d\n", val >> fxshift);
