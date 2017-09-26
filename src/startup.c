@@ -1,8 +1,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
-extern int init();
+// The default calling convention used by GCC on x86-64 seems to be System V
+// AMD64 ABI, in which arguments are passed in the registers RDI, RSI, RDX, RCX,
+// R8, R9 and the return value is passed back in RAX.
+extern int init(int64_t*) __attribute__((noinline));
 
 #define bool_f     0b00101111
 #define bool_t     0b01101111
@@ -17,12 +21,15 @@ extern int init();
 
 int main() {
 
-    int64_t *heap =  calloc(1024, 8);
+    int64_t *heap = calloc(1024, 8);
 
-    int val = init(&heap);
+
+    int64_t val = init(heap);
+
+    free(heap);
 
     if ((val & fxmask) == fxtag) {
-        printf("%d\n", val >> fxshift);
+        printf("%" PRId64 "\n", val >> fxshift);
 
     } else if ((val & charmask) == chartag) {
         char c = val >> charshift;

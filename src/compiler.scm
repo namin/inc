@@ -178,6 +178,7 @@
         [default-env '()])
     (emit-function-header "init")
     (emit-preamble)
+    (emit-heap-init)
     (emit-expr default-stack-index default-env expr)
     (emit-ret)))
 
@@ -257,14 +258,20 @@
   (emit "  and rax, ~a" (get-stack-ea si)))
 
 (define (get-stack-ea si)
-  (assert (< si 0))
-  (format "[rsp - ~s]" (abs si)))
+  (assert (not (= si 0)))
+  (cond
+   [(> si 0) (emit "[rsp + ~s]" si)]
+   [(< si 0) (emit "[rsp - ~s]" (- si))]))
 
 (define (emit-stack-save si)
   (emit "    mov ~a, rax" (get-stack-ea si)))
 
 (define (emit-stack-load si)
   (emit "    mov rax, ~a" (get-stack-ea si)))
+
+;; The base address of the heap is passed in RDI and we reserve reg RSI for it.
+(define (emit-heap-init)
+  (emit "    mov rsi, rdi    # Store heap index to RSI"))
 
 (define (next-stack-index si)
   (- si wordsize))
