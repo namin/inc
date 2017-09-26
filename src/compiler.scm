@@ -260,8 +260,8 @@
 (define (get-stack-ea si)
   (assert (not (= si 0)))
   (cond
-   [(> si 0) (emit "[rsp + ~s]" si)]
-   [(< si 0) (emit "[rsp - ~s]" (- si))]))
+   [(> si 0) (format "[rsp + ~s]" si)]
+   [(< si 0) (format "[rsp - ~s]" (- si))]))
 
 (define (emit-stack-save si)
   (emit "    mov ~a, rax" (get-stack-ea si)))
