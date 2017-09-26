@@ -19,14 +19,7 @@ extern int init(int64_t*) __attribute__((noinline));
 #define fxtag               0
 #define list_nil   0b00111111
 
-int main() {
-
-    int64_t *heap = calloc(1024, 8);
-
-
-    int64_t val = init(heap);
-
-    free(heap);
+void print(int64_t val) {
 
     if ((val & fxmask) == fxtag) {
         printf("%" PRId64 "\n", val >> fxshift);
@@ -52,4 +45,13 @@ int main() {
     } else {
         printf("ERROR\n");
     }
+}
+
+int main() {
+
+    int64_t *heap = calloc(1024, 8);
+    int64_t val = init(heap);
+
+    print(val);
+    free(heap);
 }
