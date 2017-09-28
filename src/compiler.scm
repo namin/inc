@@ -11,10 +11,10 @@
 ;; Preamble
 
 (define wordsize            8)
-(define boolshift           6)
 (define bool-f     #b00101111)
 (define bool-t     #b01101111)
 (define boolmask   #b00111111)
+(define boolshift           6)
 (define booltag    #b00101111)
 (define charmask   #b00111111)
 (define charshift           8)
@@ -23,6 +23,7 @@
 (define fxshift             2)
 (define fxtag               0)
 (define list-nil   #b00111111)
+(define pairtag    #b00000001)
 
 ;; Range for fixnums
 
@@ -36,7 +37,7 @@
    [(boolean? x) (if x bool-t bool-f)]
    [(null? x) list-nil]
    [(char? x) (bitwise-ior (ash (char->integer x) charshift) chartag)]
-   [else #f]))
+   [else (error 'immediate-rep (format "Unknown form ~a" x))]))
 
 (define (fixnum? x)
   (and (integer? x) (exact? x) (<= fxlower x fxupper)))
@@ -163,6 +164,32 @@
     (emit-label alt-label)
     (emit-expr si env alt)
     (emit-label final-label)))
+
+;; This feels horribly inefficient to write to ram and back
+(define-primitive (cons si env a b)
+  ;; Evaluate the arguments, push to stack for temp storage
+  (emit-expr si env a)
+  (emit-stack-save si)
+  (emit-expr (next-stack-index si) env b)
+  (emit-stack-save (next-stack-index si))
+
+  (emit "    mov rax, ~a" (get-stack-ea si))
+  (emit "    movq [rsi + 0], rax    # '(~a ...) "  a)
+  (emit "    mov rax, ~a" (get-stack-ea (next-stack-index si)))
+  (emit "    movq [rsi + 8], rax    # '(... ~a) "  b)
+  (emit "    mov rax, rsi")
+  (emit "    or rax, ~a" pairtag)
+  (emit "    add rsi, ~a" (* 2 wordsize)))
+
+(define-primitive (car si env pair)
+  ;; assert destination is really a pair ?
+  (emit-expr si env pair)
+  (emit "    mov rax, [rax - 1]         # (car ~a) " pair))
+
+(define-primitive (cdr si env pair)
+  ;; assert destination is really a pair ?
+  (emit-expr si env pair)
+  (emit "    mov rax, [rax + 7]         # (car ~a) " pair))
 
 (define (emit-expr si env expr)
   (cond

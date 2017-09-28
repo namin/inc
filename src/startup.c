@@ -6,44 +6,57 @@
 // The default calling convention used by GCC on x86-64 seems to be System V
 // AMD64 ABI, in which arguments are passed in the registers RDI, RSI, RDX, RCX,
 // R8, R9 and the return value is passed back in RAX.
-extern int init(int64_t*) __attribute__((noinline));
+extern int64_t init(int64_t*) __attribute__((noinline));
 
 #define bool_f     0b00101111
 #define bool_t     0b01101111
 #define boolshift           7
 #define charmask   0b00111111
-#define fxmask     0b00000011
 #define charshift           8
 #define chartag    0b00001111
+#define fxmask     0b00000011
 #define fxshift             2
 #define fxtag               0
 #define list_nil   0b00111111
+#define pairtag    0b00000001
+#define pairmask   0b00000001
 
 void print(int64_t val) {
 
     if ((val & fxmask) == fxtag) {
-        printf("%" PRId64 "\n", val >> fxshift);
+        printf("%" PRId64, val >> fxshift);
 
     } else if ((val & charmask) == chartag) {
         char c = val >> charshift;
 
-        if      (c == '\t') printf("#\\tab\n");
-        else if (c == '\n') printf("#\\newline\n");
-        else if (c == '\r') printf("#\\return\n");
-        else if (c == ' ')  printf("#\\space\n");
-        else                printf("#\\%c\n", c);
+        if      (c == '\t') printf("#\\tab");
+        else if (c == '\n') printf("#\\newline");
+        else if (c == '\r') printf("#\\return");
+        else if (c == ' ')  printf("#\\space");
+        else                printf("#\\%c", c);
 
     } else if (val == bool_t) {
-        printf("#t\n");
+        printf("#t");
 
     } else if (val == bool_f) {
-        printf("#f\n");
+        printf("#f");
 
     } else if (val == list_nil) {
-        printf("()\n");
+        printf("()");
+
+    } else if ((val & pairmask) == pairtag) {
+        int64_t *p = (int64_t *)(val - 1);
+        int64_t car = *p;
+        int64_t cdr = *(p + 1);
+
+        printf("(");
+        print(car);
+        printf(" ");
+        print(cdr);
+        printf(")");
 
     } else {
-        printf("ERROR\n");
+        printf("ERROR");
     }
 }
 
@@ -52,6 +65,10 @@ int main() {
     int64_t *heap = calloc(1024, 8);
     int64_t val = init(heap);
 
+    // printf("HEAP %p  \n", heap);
+
     print(val);
+    printf("\n");
+
     free(heap);
 }
