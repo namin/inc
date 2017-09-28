@@ -139,7 +139,7 @@
 (define (emit-let si env bindings body)
   (let f ((si si) (new-env env) (b* bindings))
     (cond
-     ;; XXX: (car body) is wrong
+     ;; TODO: (car body) is wrong, should support multiple expressions in body
      [(null? b*) (emit-expr si new-env (car body))]
      [else
       (let ([b (car b*)])
