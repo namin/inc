@@ -253,7 +253,7 @@
 
 (define-primitive (not si env expr)
   (emit-expr si env expr)
-  (emit "  cmp al, ~s" bool-f)
+  (emit "    cmp al, ~s" bool-f)
   (emit-cmp-bool))
 
 (define-primitive (fx+1 si env expr)
