@@ -24,6 +24,7 @@
 (define fxmask     #b00000011)
 (define fxshift             2)
 (define fxtag               0)
+(define heapmask   #b00000111)
 (define list-nil   #b00111111)
 (define pairtag    #b00000001)
 
@@ -230,6 +231,12 @@
   (emit-expr si env expr)
   (emit "    and rax, ~s" fxmask)
   (emit "    cmp rax, ~s" fxtag)
+  (emit-cmp-bool))
+
+(define-primitive (pair? si env expr)
+  (emit-expr si env expr)
+  (emit "    and rax, ~s" heapmask)
+  (emit "    cmp rax, ~s" pairtag)
   (emit-cmp-bool))
 
 (define-primitive (fxzero? si env expr)
