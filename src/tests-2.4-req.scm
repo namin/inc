@@ -8,7 +8,7 @@
              (lambda (n)
                (if (fxzero? n)
                    1
-                   (fx* n (fact (fxsub1 n)))))])
+                   (fx* n (fact (fx-1 n)))))])
     (fact 5)) => "120\n"]
   [(letrec ([f 12] [g (lambda () f)])
      (g)) => "12\n"]
@@ -28,13 +28,13 @@
   [(letrec ([f (lambda (f n)
                   (if (fxzero? n)
                       1
-                      (fx* n (f f (fxsub1 n)))))])
+                      (fx* n (f f (fx-1 n)))))])
       (f f 5)) => "120\n"]
   [(let ([f (lambda (f)
               (lambda (n)
                  (if (fxzero? n)
                      1
-                     (fx* n (f (fxsub1 n))))))])
+                     (fx* n (f (fx-1 n))))))])
      (letrec ([fix
                (lambda (f)
                  (f (lambda (n) ((fix f) n))))])
@@ -49,7 +49,7 @@
              (lambda (n)
                (if (fxzero? n)
                    1
-                   (fx* n (fact (fxsub1 n)))))])
+                   (fx* n (fact (fx-1 n)))))])
     (fact 5)) => "120\n"]
   [(letrec* ([f 12] [g (lambda () f)])
      (g)) => "12\n"]
@@ -69,13 +69,13 @@
   [(letrec* ([f (lambda (f n)
                    (if (fxzero? n)
                        1
-                       (fx* n (f f (fxsub1 n)))))])
+                       (fx* n (f f (fx-1 n)))))])
       (f f 5)) => "120\n"]
   [(let ([f (lambda (f)
               (lambda (n)
                  (if (fxzero? n)
                      1
-                     (fx* n (f (fxsub1 n))))))])
+                     (fx* n (f (fx-1 n))))))])
      (letrec* ([fix
                 (lambda (f)
                   (f (lambda (n) ((fix f) n))))])
@@ -101,9 +101,9 @@
   [(let ([let 8]) (or let 18)) => "8\n"]
   [(let ([let 8]) (and let 18)) => "18\n"]
   [(let ([t 1])
-     (and (begin (set! t (fxadd1 t)) t) t)) => "2\n"]
+     (and (begin (set! t (fx+1 t)) t) t)) => "2\n"]
   [(let ([t 1])
-     (or (begin (set! t (fxadd1 t)) t) t)) => "2\n"]
+     (or (begin (set! t (fx+1 t)) t) t)) => "2\n"]
 )
 
 

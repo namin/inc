@@ -1,5 +1,5 @@
 (add-tests-with-string-output "cons"
-  [(fxadd1 0) => "1\n"]
+  [(fx+1 0) => "1\n"]
   [(pair? (cons 1 2)) => "#t\n"]
   [(pair? 12) => "#f\n"]
   [(pair? #t) => "#f\n"]
@@ -72,10 +72,10 @@
   [(letrec ([f (lambda (x)
                  (if (fxzero? x)
                      1
-                     (fx* x (f (fxsub1 x)))))])
+                     (fx* x (f (fx-1 x)))))])
       (f 5)) => "120\n"]
-  [(letrec ([e (lambda (x) (if (fxzero? x) #t (o (fxsub1 x))))]
-            [o (lambda (x) (if (fxzero? x) #f (e (fxsub1 x))))])
+  [(letrec ([e (lambda (x) (if (fxzero? x) #t (o (fx-1 x))))]
+            [o (lambda (x) (if (fxzero? x) #f (e (fx-1 x))))])
      (e 25)) => "#f\n"]
 )
 
@@ -83,9 +83,9 @@
   [(letrec ([sum (lambda (n ac)
                    (if (fxzero? n)
                         ac
-                        (app sum (fxsub1 n) (fx+ n ac))))])
+                        (app sum (fx-1 n) (fx+ n ac))))])
     (app sum 10000 0)) => "50005000\n"]
-  [(letrec ([e (lambda (x) (if (fxzero? x) #t (app o (fxsub1 x))))]
-            [o (lambda (x) (if (fxzero? x) #f (app e (fxsub1 x))))])
+  [(letrec ([e (lambda (x) (if (fxzero? x) #t (app o (fx-1 x))))]
+            [o (lambda (x) (if (fxzero? x) #f (app e (fx-1 x))))])
      (app e 5000000)) => "#t\n"]
 )

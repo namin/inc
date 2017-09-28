@@ -110,21 +110,21 @@
        (vector-set! v1 (fx- (vector-length v1) 1) 350)
        (cons v0 v1)))) => "(#(100 200 150) . #(300 400 350))\n"]
   [(let ([n 1])
-     (vector-set! (make-vector n) (fxsub1 n) (fx* n n))
+     (vector-set! (make-vector n) (fx-1 n) (fx* n n))
      n) => "1\n"]
   [(let ([n 1])
      (let ([v (make-vector 1)])
-       (vector-set! v (fxsub1 n) n)
-       (vector-ref v (fxsub1 n)))) => "1\n"]
+       (vector-set! v (fx-1 n) n)
+       (vector-ref v (fx-1 n)))) => "1\n"]
  [(let ([v0 (make-vector 1)])
     (vector-set! v0 0 1)
     (let ([v1 (make-vector 1)])
       (vector-set! v1 0 13)
       (vector-set! (if (vector? v0) v0 v1)
-           (fxsub1 (vector-length (if (vector? v0) v0 v1)))
-           (fxadd1 (vector-ref
+           (fx-1 (vector-length (if (vector? v0) v0 v1)))
+           (fx+1 (vector-ref
                       (if (vector? v0) v0 v1)
-                      (fxsub1 (vector-length (if (vector? v0) v0 v1))))))
+                      (fx-1 (vector-length (if (vector? v0) v0 v1))))))
       (cons v0 v1))) => "(#(2) . #(13))\n"]
 )
 
@@ -201,24 +201,24 @@
        (string-set! v1 (fx- (string-length v1) 1) #\X)
        (cons v0 v1)))) =>  "(\"abc\" . \"ZYX\")\n"]
   [(let ([n 1])
-     (string-set! (make-string n) (fxsub1 n) (fixnum->char 34))
+     (string-set! (make-string n) (fx-1 n) (fixnum->char 34))
      n) => "1\n"]
   [(let ([n 1])
      (let ([v (make-string 1)])
-       (string-set! v (fxsub1 n) (fixnum->char n))
-       (char->fixnum (string-ref v (fxsub1 n))))) => "1\n"]
+       (string-set! v (fx-1 n) (fixnum->char n))
+       (char->fixnum (string-ref v (fx-1 n))))) => "1\n"]
  [(let ([v0 (make-string 1)])
     (string-set! v0 0 #\a)
     (let ([v1 (make-string 1)])
       (string-set! v1 0 #\A)
       (string-set! (if (string? v0) v0 v1)
-           (fxsub1 (string-length (if (string? v0) v0 v1)))
+           (fx-1 (string-length (if (string? v0) v0 v1)))
            (fixnum->char
-             (fxadd1
+             (fx+1
                 (char->fixnum
                   (string-ref
                      (if (string? v0) v0 v1)
-                     (fxsub1 (string-length (if (string? v0) v0 v1))))))))
+                     (fx-1 (string-length (if (string? v0) v0 v1))))))))
       (cons v0 v1))) => "(\"b\" . \"A\")\n"]
  [(let ([s (make-string 1)])
      (string-set! s 0 #\")

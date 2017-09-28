@@ -112,12 +112,12 @@
  [(let ([f (lambda (f n m)
              (if (fxzero? n)
                  m
-                 (f f (fxsub1 n) (fx* n m))))])
+                 (f f (fx-1 n) (fx* n m))))])
    (f f 5 1)) => "120\n"]
  [(let ([f (lambda (f n)
              (if (fxzero? n)
                  1
-                 (fx* n (f f (fxsub1 n)))))])
+                 (fx* n (f f (fx-1 n)))))])
    (f f 5)) => "120\n"]
 )
 
@@ -132,13 +132,13 @@
  [(let ([f (lambda (f n m)
              (if (fxzero? n)
                  m
-                 (f (fxsub1 n) (fx* n m))))])
+                 (f (fx-1 n) (fx* n m))))])
    (let ([g (lambda (g n m) (f (lambda (n m) (g g n m)) n m))])
      (g g 5 1))) => "120\n"]
  [(let ([f (lambda (f n)
              (if (fxzero? n)
                  1
-                 (fx* n (f (fxsub1 n)))))])
+                 (fx* n (f (fx-1 n)))))])
    (let ([g (lambda (g n) (f (lambda (n) (g g n)) n))])
      (g g 5))) => "120\n"]
 )

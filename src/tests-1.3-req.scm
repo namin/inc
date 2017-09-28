@@ -1,30 +1,30 @@
-(add-tests-with-string-output "fxadd1"
-  [($fxadd1 0) => "1\n"]
-  [($fxadd1 -1) => "0\n"]
-  [($fxadd1 1) => "2\n"]
-  [($fxadd1 -100) => "-99\n"]
-  [($fxadd1 1000) => "1001\n"]
-  [($fxadd1 536870910) => "536870911\n"]
-  [($fxadd1 -536870912) => "-536870911\n"]
-  [($fxadd1 ($fxadd1 0)) => "2\n"]
-  [($fxadd1 ($fxadd1 ($fxadd1 ($fxadd1 ($fxadd1 ($fxadd1 12)))))) => "18\n"]
+(add-tests-with-string-output "fx+1"
+  [(fx+1 0) => "1\n"]
+  [(fx+1 -1) => "0\n"]
+  [(fx+1 1) => "2\n"]
+  [(fx+1 -100) => "-99\n"]
+  [(fx+1 1000) => "1001\n"]
+  [(fx+1 536870910) => "536870911\n"]
+  [(fx+1 -536870912) => "-536870911\n"]
+  [(fx+1 (fx+1 0)) => "2\n"]
+  [(fx+1 (fx+1 (fx+1 (fx+1 (fx+1 (fx+1 12)))))) => "18\n"]
   )
 
 (add-tests-with-string-output "fixnum->char and char->fixnum"
-   [($fixnum->char 65) => "#\\A\n"]
-   [($fixnum->char 97) => "#\\a\n"]
-   [($fixnum->char 122) => "#\\z\n"]
-   [($fixnum->char 90) => "#\\Z\n"]
-   [($fixnum->char 48) => "#\\0\n"]
-   [($fixnum->char 57) => "#\\9\n"]
-   [($char->fixnum #\A) => "65\n"]
-   [($char->fixnum #\a) => "97\n"]
-   [($char->fixnum #\z) => "122\n"]
-   [($char->fixnum #\Z) => "90\n"]
-   [($char->fixnum #\0) => "48\n"]
-   [($char->fixnum #\9) => "57\n"]
-   [($char->fixnum ($fixnum->char 12)) => "12\n"]
-   [($fixnum->char ($char->fixnum #\x)) => "#\\x\n"]
+   [(fixnum->char 65) => "#\\A\n"]
+   [(fixnum->char 97) => "#\\a\n"]
+   [(fixnum->char 122) => "#\\z\n"]
+   [(fixnum->char 90) => "#\\Z\n"]
+   [(fixnum->char 48) => "#\\0\n"]
+   [(fixnum->char 57) => "#\\9\n"]
+   [(char->fixnum #\A) => "65\n"]
+   [(char->fixnum #\a) => "97\n"]
+   [(char->fixnum #\z) => "122\n"]
+   [(char->fixnum #\Z) => "90\n"]
+   [(char->fixnum #\0) => "48\n"]
+   [(char->fixnum #\9) => "57\n"]
+   [(char->fixnum (fixnum->char 12)) => "12\n"]
+   [(fixnum->char (char->fixnum #\x)) => "#\\x\n"]
 )
 
 (add-tests-with-string-output "fixnum?"
@@ -42,15 +42,15 @@
    [(fixnum? (fixnum? 12)) => "#f\n"]
    [(fixnum? (fixnum? #f)) => "#f\n"]
    [(fixnum? (fixnum? #\A)) => "#f\n"]
-   [(fixnum? ($char->fixnum #\r)) => "#t\n"]
-   [(fixnum? ($fixnum->char 12)) => "#f\n"]
+   [(fixnum? (char->fixnum #\r)) => "#t\n"]
+   [(fixnum? (fixnum->char 12)) => "#f\n"]
 )
 
 
 (add-tests-with-string-output "fxzero?"
-   [($fxzero? 0) => "#t\n"]
-   [($fxzero? 1) => "#f\n"]
-   [($fxzero? -1) => "#f\n"]
+   [(fxzero? 0) => "#t\n"]
+   [(fxzero? 1) => "#f\n"]
+   [(fxzero? -1) => "#f\n"]
 )
 
 (add-tests-with-string-output "null?"
@@ -103,11 +103,11 @@
 )
 
 ;; (add-tests-with-string-output "fxlognot"
-;;  [($fxlognot 0) => "-1\n"]
-;;  [($fxlognot -1) => "0\n"]
-;;  [($fxlognot 1) => "-2\n"]
-;;  [($fxlognot -2) => "1\n"]
-;;  [($fxlognot 536870911) => "-536870912\n"]
-;;  [($fxlognot -536870912) => "536870911\n"]
-;;  [($fxlognot ($fxlognot 237463)) => "237463\n"]
+;;  [(fxlognot 0) => "-1\n"]
+;;  [(fxlognot -1) => "0\n"]
+;;  [(fxlognot 1) => "-2\n"]
+;;  [(fxlognot -2) => "1\n"]
+;;  [(fxlognot 536870911) => "-536870912\n"]
+;;  [(fxlognot -536870912) => "536870911\n"]
+;;  [(fxlognot (fxlognot 237463)) => "237463\n"]
 ;; )

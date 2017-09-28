@@ -51,14 +51,14 @@
                (fill-string! i (fx- j (string-length t)))
                (begin
                  (string-set! s i (string-ref t j))
-                 (fill-string! (fxadd1 i) (fx+ j 17)))))))
+                 (fill-string! (fx+1 i) (fx+ j 17)))))))
      (define write-string!
        (lambda (i p)
          (cond
            [(fx= i (string-length s)) (close-output-port p)]
            [else
             (write-char (string-ref s i) p)
-            (write-string! (fxadd1 i) p)])))
+            (write-string! (fx+1 i) p)])))
      (define verify
        (lambda (i p)
          (let ([x (read-char p)])
@@ -68,7 +68,7 @@
               (fx= i (string-length s))]
              [(fx= i (string-length s)) (error 'verify "file too short")]
              [(char= (string-ref s i) x)
-              (verify (fxadd1 i) p)]
+              (verify (fx+1 i) p)]
              [else (error 'verify "mismatch")]))))
      (fill-string! 0 0)
      (write-string! 0 (open-output-file "stst.tmp" 'replace))

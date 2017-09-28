@@ -10,7 +10,7 @@
              (lambda (n k)
                (cond
                  [(fxzero? n) (k 1)]
-                 [else (fx* n (fact (fxsub1 n) k))]))])
+                 [else (fx* n (fact (fx-1 n) k))]))])
      (call/cc
        (lambda (k)
          (fact 5 k)))) => "1\n"]
@@ -20,7 +20,7 @@
                 (lambda (n)
                   (cond
                     [(fxzero? n) (k 1)]
-                    [else (fx* n (fact (fxsub1 n)))]))])
+                    [else (fx* n (fact (fx-1 n)))]))])
         (fact 5)))) => "1\n"]
   [(let ([k #f])
      (letrec ([fact
@@ -31,7 +31,7 @@
                       (lambda (nk)
                         (set! k nk)
                         (k 1)))]
-                   [else (fx* n (fact (fxsub1 n)))]))])
+                   [else (fx* n (fact (fx-1 n)))]))])
         (let ([v (fact 5)])
           v))) => "120\n"]
   [(let ([k #f])
@@ -43,7 +43,7 @@
                       (lambda (nk)
                         (set! k nk)
                         (k 1)))]
-                   [else (fx* n (fact (fxsub1 n)))]))])
+                   [else (fx* n (fact (fx-1 n)))]))])
         (let ([v (fact 5)])
           (let ([nk k])
             (set! k (lambda (x) (cons v x)))

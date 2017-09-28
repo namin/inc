@@ -4,7 +4,7 @@
      (set! x 13)
      x) => "13\n"]
   [(let ([x 12])
-     (set! x (fxadd1 x))
+     (set! x (fx+1 x))
      x) => "13\n"]
   [(let ([x 12])
      (let ([x #f]) (set! x 14))
@@ -17,12 +17,12 @@
        (set! f 10)
        (g))) => "10\n"]
   [(let ([f (lambda (x)
-              (set! x (fxadd1 x))
+              (set! x (fx+1 x))
               x)])
      (f 12)) => "13\n"]
   [(let ([x 10])
      (let ([f (lambda (x)
-                (set! x (fxadd1 x))
+                (set! x (fx+1 x))
                 x)])
        (cons x (f x)))) => "(10 . 11)\n"]
   [(let ([t #f])
@@ -43,7 +43,7 @@
           (lambda ()
             (let ([counter -1])
               (lambda ()
-                (set! counter (fxadd1 counter))
+                (set! counter (fx+1 counter))
                 counter)))])
      (let ([c0 (make-counter)]
            [c1 (make-counter)])
@@ -53,14 +53,14 @@
      (set! fact (lambda (n)
                   (if (fxzero? n)
                       1
-                      (fx* n (fact (fxsub1 n))))))
+                      (fx* n (fact (fx-1 n))))))
      (fact 5)) => "120\n"]
   [(let ([fact #f])
      ((begin
          (set! fact (lambda (n)
                       (if (fxzero? n)
                           1
-                          (fx* n (fact (fxsub1 n))))))
+                          (fx* n (fact (fx-1 n))))))
          fact)
       5)) => "120\n"]
 

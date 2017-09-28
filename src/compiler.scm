@@ -232,7 +232,7 @@
   (emit "    cmp rax, ~s" fxtag)
   (emit-cmp-bool))
 
-(define-primitive ($fxzero? si env expr)
+(define-primitive (fxzero? si env expr)
   (emit-expr si env expr)
   ;; Compare the entire register to fxtag
   (emit "    cmp rax, ~s" fxtag)
@@ -249,11 +249,11 @@
   (emit "  cmp al, ~s" bool-f)
   (emit-cmp-bool))
 
-(define-primitive ($fxadd1 si env expr)
+(define-primitive (fx+1 si env expr)
   (emit-expr si env expr)
   (emit "    add rax, ~s" (immediate-rep 1)))
 
-(define-primitive ($fxsub1 si env expr)
+(define-primitive (fx-1 si env expr)
   (emit-expr si env expr)
   (emit "    sub rax, ~s" (immediate-rep 1)))
 
@@ -262,12 +262,12 @@
 ;; the left (toward more significant bit locations). For each shift count, the
 ;; most significant bit of the destination operand is shifted into the CF flag,
 ;; and the least significant bit is cleared
-(define-primitive ($fixnum->char si env expr)
+(define-primitive (fixnum->char si env expr)
   (emit-expr si env expr)
   (emit "    shl rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" chartag))
 
-(define-primitive ($char->fixnum si env expr)
+(define-primitive (char->fixnum si env expr)
   (emit-expr si env expr)
   (emit "    shr rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" fxtag))
@@ -339,11 +339,11 @@
   (emit "  shr rax, ~s" fxshift)
   (emit "  divl ~a" (get-stack-ea si)))
 
-(define-primitive ($fxquotient si env a b)
+(define-primitive (fxquotient si env a b)
   (emit-div si env a b)
   (emit "  shl rax, ~s" fxshift))
 
-(define-primitive ($fxremainder si env a b)
+(define-primitive (fxremainder si env a b)
   (emit-div si env a b)
   (emit "  mov %edx, %eax")
   (emit "  shl rax, ~s" fxshift))
