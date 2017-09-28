@@ -6,3 +6,5 @@ Stack index is handled with a scheme variable but heap index is stored in a
 dedicated register `RSI`. This is kind of ugly.
 
 2. Share constants b/w C and Scheme code. Move to a .h file
+
+3. Generate asm with comments for readability
