@@ -344,14 +344,16 @@
 ;; for negative numbers. I also had to use the CQO instruction to Sign-Extend
 ;; RAX which the 32 bit version is obviously not concerned with. I got the idea
 ;; from GCC disassembly.
+;;
+;; Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
+;; argument. the quotient is stored in RAX and the remainder in RDX.
 (define (emit-div si env a b)
   (emit-expr si env b)
   (emit "    sar rax, ~s" fxshift)
   (emit "    mov rcx, rax")
   (emit-expr si env a)
   (emit "    sar rax, ~s" fxshift)
-  (emit "    mov rdx, 0") ;; Why do I have to clear this?
-  ;; Divide rax by op & store the quotient in rax, the remainder in rdx
+  (emit "    mov rdx, 0")
   (emit "    cqo")
   (emit "    idivq rcx    # ~a/~a" a b))
 
