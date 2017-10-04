@@ -118,7 +118,6 @@
   (emit "    pop rbp")
   (emit "    ret"))
 
-;; TODO: Replace all compares with this function
 (define (emit-cmp with)
   (emit "    cmp rax, ~a" with))
 
@@ -219,37 +218,35 @@
 (define-primitive (boolean? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" boolmask)
-  (emit "    cmp rax, ~s" booltag)
+  (emit-cmp booltag)
   (emit-cmp-bool))
 
 (define-primitive (char? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" charmask)
-  (emit "    cmp rax, ~s" chartag)
+  (emit-cmp chartag)
   (emit-cmp-bool))
 
 (define-primitive (fixnum? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" fxmask)
-  (emit "    cmp rax, ~s" fxtag)
+  (emit-cmp fxtag)
   (emit-cmp-bool))
 
 (define-primitive (pair? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" heapmask)
-  (emit "    cmp rax, ~s" pairtag)
+  (emit-cmp pairtag)
   (emit-cmp-bool))
 
 (define-primitive (fxzero? si env expr)
   (emit-expr si env expr)
-  ;; Compare the entire register to fxtag
-  (emit "    cmp rax, ~s" fxtag)
+  (emit-cmp fxtag)
   (emit-cmp-bool))
 
 (define-primitive (null? si env expr)
   (emit-expr si env expr)
-  ;; Compare the entire register to list-nil
-  (emit "    cmp rax, ~s" list-nil)
+  (emit-cmp list-nil)
   (emit-cmp-bool))
 
 (define-primitive (not si env expr)
