@@ -110,32 +110,28 @@
 (define (emit-immediate si env x)
   (emit "    mov rax, ~a" (immediate-rep x)))
 
+;; The function preamble, emitted before every function entry
 (define (emit-preamble)
   (emit "    push rbp")
   (emit "    mov rbp, rsp"))
 
+;; Function exit
 (define (emit-ret)
   (emit "    pop rbp")
   (emit "    ret"))
 
-(define (emit-cmp with)
-  (emit "    cmp rax, ~a" with))
-
-(define (emit-je label)
-  (emit "    je ~a" label))
-
-(define (emit-jmp label)
-  (emit "    jmp ~a" label))
-
+;; Extract the function body from primitive definition and call it
 (define (emit-primcall si env expr)
   (let ([prim (car expr)]
         [args (cdr expr)])
     ;; (check-primcall-args prim args)
     (apply (primitive-emitter prim) (cons si (cons env args)))))
 
+;; Fetch a variable from stack and load it into RAX
 (define (emit-variable si env expr)
   (emit-stack-load (lookup expr env)))
 
+;; Emit code for a let expression
 (define (emit-let si env bindings body)
   (let f ((si si) (new-env env) (b* bindings))
     (cond
@@ -168,32 +164,6 @@
     (emit-expr si env alt)
     (emit-label final-label)))
 
-;; This feels horribly inefficient to write to ram and back
-(define-primitive (cons si env a b)
-  ;; Evaluate the arguments, push to stack for temp storage
-  (emit-expr si env a)
-  (emit-stack-save si)
-  (emit-expr (next-stack-index si) env b)
-  (emit-stack-save (next-stack-index si))
-
-  (emit "    mov rax, ~a" (get-stack-ea si))
-  (emit "    movq [rsi + 0], rax    # '(~a ...) "  a)
-  (emit "    mov rax, ~a" (get-stack-ea (next-stack-index si)))
-  (emit "    movq [rsi + 8], rax    # '(... ~a) "  b)
-  (emit "    mov rax, rsi")
-  (emit "    or rax, ~a" pairtag)
-  (emit "    add rsi, ~a" (* 2 wordsize)))
-
-(define-primitive (car si env pair)
-  ;; assert destination is really a pair ?
-  (emit-expr si env pair)
-  (emit "    mov rax, [rax - 1]         # (car ~a) " pair))
-
-(define-primitive (cdr si env pair)
-  ;; assert destination is really a pair ?
-  (emit-expr si env pair)
-  (emit "    mov rax, [rax + 7]         # (car ~a) " pair))
-
 (define (emit-expr si env expr)
   (cond
    [(immediate? expr) (emit-immediate si env expr)]
@@ -214,7 +184,21 @@
 
 (define compile-program emit-program)
 
-;; A tiny stdlib
+;; ASM wrappers
+
+;; Compare the value to register RAX
+(define (emit-cmp with)
+  (emit "    cmp rax, ~a" with))
+
+;; Jump to the specified label if last comparison resulted in equality
+(define (emit-je label)
+  (emit "    je ~a" label))
+
+;; Unconditionally jump to the specified label
+(define (emit-jmp label)
+  (emit "    jmp ~a" label))
+
+;; All the primitives; functions defined in asm
 (define-primitive (boolean? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" boolmask)
@@ -297,9 +281,11 @@
    [(> si 0) (format "[rsp + ~s]" si)]
    [(< si 0) (format "[rsp - ~s]" (- si))]))
 
+;; Save the variable in register RAX to stack index SI
 (define (emit-stack-save si)
   (emit "    mov ~a, rax" (get-stack-ea si)))
 
+;; Load variable from stack into register RAX
 (define (emit-stack-load si)
   (emit "    mov rax, ~a" (get-stack-ea si)))
 
@@ -392,3 +378,30 @@
 
 (define-primitive (fx>= si env a b)
   (emit-cmp-binop 'setge si env a b))
+
+;; Allocate a pair in the heap
+(define-primitive (cons si env a b)
+  ;; Evaluate the arguments, push to stack for temp storage. This feels horribly
+  ;; inefficient to write to ram and back.
+  (emit-expr si env a)
+  (emit-stack-save si)
+  (emit-expr (next-stack-index si) env b)
+  (emit-stack-save (next-stack-index si))
+
+  (emit "    mov rax, ~a" (get-stack-ea si))
+  (emit "    movq [rsi + 0], rax    # '(~a ...) "  a)
+  (emit "    mov rax, ~a" (get-stack-ea (next-stack-index si)))
+  (emit "    movq [rsi + 8], rax    # '(... ~a) "  b)
+  (emit "    mov rax, rsi")
+  (emit "    or rax, ~a" pairtag)
+  (emit "    add rsi, ~a" (* 2 wordsize)))
+
+(define-primitive (car si env pair)
+  ;; assert destination is really a pair ?
+  (emit-expr si env pair)
+  (emit "    mov rax, [rax - 1]         # (car ~a) " pair))
+
+(define-primitive (cdr si env pair)
+  ;; assert destination is really a pair ?
+  (emit-expr si env pair)
+  (emit "    mov rax, [rax + 7]         # (car ~a) " pair))
