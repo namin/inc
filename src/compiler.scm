@@ -337,23 +337,31 @@
   ;; quantifier
   (emit "    mulq ~a" (get-stack-ea si)))
 
+;; Division turned out to be much more trickier than I expected it to be. Unlike
+;; @namin's code, I'm using a shift arithmetic right (SAR) instead of shift
+;; logical right (SHR) and I don't know how the original examples worked at all
+;; for negative numbers. I also had to use the CQO instruction to Sign-Extend
+;; RAX which the 32 bit version is obviously not concerned with. I got the idea
+;; from GCC disassembly.
 (define (emit-div si env a b)
+  (emit-expr si env b)
+  (emit "    sar rax, ~s" fxshift)
+  (emit "    mov rcx, rax")
   (emit-expr si env a)
-  (emit "  shr rax, ~s" fxshift)
-  (emit-stack-save si)
-  (emit-expr (next-stack-index si) b)
-  (emit "  mov rdx, 0")
-  (emit "  shr rax, ~s" fxshift)
-  (emit "  divl ~a" (get-stack-ea si)))
+  (emit "    sar rax, ~s" fxshift)
+  (emit "    mov rdx, 0") ;; Why do I have to clear this?
+  ;; Divide rax by op & store the quotient in rax, the remainder in rdx
+  (emit "    cqo")
+  (emit "    idivq rcx    # ~a/~a" a b))
 
 (define-primitive (fxquotient si env a b)
   (emit-div si env a b)
-  (emit "  shl rax, ~s" fxshift))
+  (emit "    shl rax, ~s" fxshift))
 
 (define-primitive (fxremainder si env a b)
   (emit-div si env a b)
-  (emit "  mov %edx, %eax")
-  (emit "  shl rax, ~s" fxshift))
+  (emit "   mov rax, rdx")
+  (emit "   shl rax, ~s" fxshift))
 
 (define (emit-cmp-bool . args)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
