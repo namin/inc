@@ -6,8 +6,6 @@ Ghuloum.
 
 The code is tested with Chez Scheme 9.4.
 
-    > (load  "compiler.asm")
-    > (test-all)
-
+    > make test
 
 [1]: https://github.com/namin/inc/blob/master/docs/paper.pdf?raw=true
