@@ -21,6 +21,10 @@ stst: stst.s startup.c
 		-O0 startup.c stst.s \
 		-o stst
 
+.PHONY: test
+test:
+	scheme --script test.scm
+
 .PHONY: clean
 clean:
 	rm -f stst.s stst stst.out
