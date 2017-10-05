@@ -1,36 +1,47 @@
+;; Test runner for the incremental compiler
 
-(define all-tests '())
-
-(define-syntax add-tests-with-string-output
-  (syntax-rules (=>)
-    [(_ test-name [expr => output-string] ...)
-     (set! all-tests
-        (cons
-           '(test-name [expr string  output-string] ...)
-            all-tests))]))
-
-(define (run-compile expr)
-  (let ([p (open-output-file "stst.s" 'replace)])
-    (compile-program expr p)
-    (close-output-port p)))
+(define file-asm "stst.s")
+(define file-bin "stst")
+(define file-out "stst.out")
 
 (define (build)
   (unless (zero? (system "make --quiet"))
-    (error 'make "could not build target")))
+    (error 'make "Could not build target")))
 
 (define (execute)
-  (unless (zero? (system "./stst > stst.out"))
-    (error 'make "produced program exited abnormally")))
+  (let ([command (format "./~a > ~a" file-bin file-out)])
+    (unless (zero? (system command))
+      (error 'make "Produced program exited abnormally"))))
 
+;; Compile port is a parameter that returns a port to write the generated asm
+;; to. This can be a file or stdout.
+(define compile-port
+  (make-parameter
+   (current-output-port)
+   (lambda (p)
+     (unless (output-port? p)
+       (error 'compile-port "Not an output port ~s" p))
+     p)))
 
-(define (build-program expr)
-   (run-compile expr)
-   (build))
+;; Run the compiler but send the output to a file instead
+(define (compile-program expr)
+  (let ([p (open-output-file file-asm 'replace)])
+    (parameterize ([compile-port p])
+      (emit-program expr))
+    (close-output-port p)))
 
+(define (emit . args)
+  (let ([out (compile-port)])
+    (apply fprintf out args)
+    (newline out)))
+
+;; This seems like a very creepy and odd way to read everything from the output
+;; file character by character and print it out. Unless I'm missing something
+;; else here ¯\_(ツ)_/¯
 (define (get-string)
   (with-output-to-string
     (lambda ()
-      (with-input-from-file "stst.out"
+      (with-input-from-file file-out
         (lambda ()
           (let f ()
             (let ([c (read-char)])
@@ -38,29 +49,41 @@
                [(eof-object? c) (void)]
                [else (display c) (f)]))))))))
 
+;; Compile, build, execute and assert output with expectation
 (define (test-with-string-output test-id expr expected-output)
-   (run-compile expr)
-   (build)
-   (execute)
-   (unless (string=? expected-output (get-string))
-     (error 'test (format "output mismatch for test ~s, expected ~s, got ~s"
-                          test-id expected-output (get-string)))))
+  (compile-program expr)
+  (build)
+  (execute)
+  (unless (string=? expected-output (get-string))
+    (error 'test (format "Output mismatch for test ~s, expected ~s, got ~s"
+                         test-id expected-output (get-string)))))
+
+;; Collect all tests in a global variable
+(define all-tests '())
+
+(define-syntax add-tests-with-string-output
+  (syntax-rules (=>)
+    [(_ test-name [expr => output-string] ...)
+     (set! all-tests
+           (cons
+            '(test-name [expr string output-string] ...)
+            all-tests))]))
 
 (define (test-one test-id test)
   (let ([expr (car test)]
         [type (cadr test)]
-        [out  (caddr test)])
-    (printf "test ~s:~s ..." test-id expr)
+        [expected-output (caddr test)])
+    (printf "Test ~s: ~s ..." test-id expr)
     (flush-output-port)
     (case type
-     [(string) (test-with-string-output test-id expr out)]
-     [else (error 'test "invalid test type ~s" type)])
+      [(string) (test-with-string-output test-id expr expected-output)]
+      [else (error 'test "invalid test type ~s" type)])
     (printf " ok\n")))
 
 (define (test-all)
   (let f ([i 0] [ls (reverse all-tests)])
     (if (null? ls)
-        (printf "passed all ~s tests\n" i)
+        (printf "Passed all ~s tests\n" i)
         (let ([x (car ls)] [ls (cdr ls)])
           (let* ([test-name (car x)]
                  [tests (cdr x)]
@@ -72,63 +95,3 @@
                 [else
                  (test-one i (car tests))
                  (g (add1 i) (cdr tests))])))))))
-
-
-(define input-filter
-  (make-parameter (lambda (x) x)
-    (lambda (x)
-      (unless (procedure? x)
-        (error 'input-filter "not a procedure ~s" x))
-      x)))
-
-(define runtime-file
-  (make-parameter
-    "runtime.c"
-    (lambda (fname)
-      (unless (string? fname) (error 'runtime-file "not a string" fname))
-      fname)))
-
-
-(define compile-port
-  (make-parameter
-    (current-output-port)
-    (lambda (p)
-       (unless (output-port? p)
-         (error 'compile-port "not an output port ~s" p))
-       p)))
-
-(define show-compiler-output (make-parameter #f))
-
-(define (run-compile expr)
-  (let ([p (open-output-file "stst.s" 'replace)])
-    (parameterize ([compile-port p])
-       (compile-program expr))
-    (close-output-port p)))
-
-
-(define (execute)
-  (unless (fxzero? (system "./stst > stst.out"))
-    (error 'execute "produced program exited abnormally")))
-
-(define (get-string)
-  (with-output-to-string
-    (lambda ()
-      (with-input-from-file "stst.out"
-        (lambda ()
-          (let f ()
-            (let ([c (read-char)])
-              (cond
-               [(eof-object? c) (void)]
-               [else (display c) (f)]))))))))
-
-(define (test-with-string-output test-id expr expected-output)
-   (run-compile expr)
-   (build)
-   (execute)
-   (unless (string=? expected-output (get-string))
-     (error 'test (format "output mismatch for test ~s, expected ~s, got ~s"
-        test-id expected-output (get-string)))))
-
-(define (emit . args)
-  (apply fprintf (compile-port) args)
-  (newline (compile-port)))

@@ -182,8 +182,6 @@
     (emit-expr default-stack-index default-env expr)
     (emit-ret)))
 
-(define compile-program emit-program)
-
 ;; ASM wrappers
 
 ;; Compare the value to register RAX
