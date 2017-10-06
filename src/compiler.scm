@@ -11,10 +11,11 @@
 (load "tests-1.2-req.scm")
 (load "tests-1.1-req.scm")
 
-;; Preamble
+;; Constants
+(define wordsize             8)
+(define default-stack-index -8)
 
 ;; Constants for runtime representation
-(define wordsize            8)
 (define bool-f     #b00101111)
 (define bool-t     #b01101111)
 (define boolmask   #b00111111)
@@ -27,12 +28,10 @@
 (define fxshift             2)
 (define fxtag               0)
 (define heapmask   #b00000111)
+(define lammask    #b00000111)
+(define lamtag     #b00000110)
 (define list-nil   #b00111111)
 (define pairtag    #b00000001)
-
-;; Other constants
-(define default-stack-index -8)
-(define default-env '())
 
 ;; Range for fixnums
 (define fixnum-bits (- (* wordsize 8) fxshift))
@@ -73,6 +72,26 @@
 (define (primitive-emitter x)
   (or (getprop x '*emitter*) (error 'primitive-emitter "Nope")))
 
+;; Environment with alist
+
+;; An environment is an alist - list of pairs where car is the variable name and
+;; cdr is the offset from the base pointer. Arguments to a function will be
+;; positive and above the base pointer while local variables will be below. RBP
+;; itself should point to the address to jump back to.
+;;
+;; Example: `((arg1 8) (b -24) (a -16))`
+(define default-env '())
+
+;; Add a single variable and stack index to the specific environment
+(define (extend var si env)
+  (cons (list var si) env))
+
+(define (lookup var env)
+  (cond
+   [(assv var env) => cadr]
+   [else #f]))
+
+;; TODO: Define all conditionals with tagged list primitive
 (define (let? expr)
   (eq? 'let (car expr)))
 
@@ -87,28 +106,27 @@
 (define (if? expr)
   (eq? 'if (car expr)))
 
-;; Env with alist. It's shitty that we use both alist and plist
-(define (extend var si env)
-  (cons (list var si) env))
-
-(define (lookup var env)
-  (cond
-   [(assv var env) => cadr]
-   [else #f]))
+(define (letrec? expr)
+  (and (pair? expr) (eq? 'letrec (car expr))))
 
 (define (variable? x env)
   (and (symbol? x) (lookup x env)))
+
+;; Lambda; arguments at cadr, body at cddr
+(define (lambda? expr)
+  (eq? 'lambda (car expr)))
+
+(define (app? env expr)
+  (and (list? expr) (not (null? expr)) (lookup (car expr) env)))
 
 ;; Codegen helpers
 
 (define (emit-label label)
   (emit "~a:" label))
 
-(define (emit-program-header f)
+(define (emit-program-header)
   (emit "    .intel_syntax noprefix")
-  (emit "    .text")
-  (emit "    .globl ~a" f)
-  (emit-function-header f))
+  (emit "    .text"))
 
 (define (emit-function-header f)
   (emit "    .type ~a, @function" f)
@@ -126,6 +144,10 @@
 (define (emit-ret)
   (emit "    pop rbp")
   (emit "    ret"))
+
+;; Claim or reclaim stack space by adjusting the stack pointer.
+(define (emit-adjust-base si)
+  (unless (= si 0) (emit "    add rsp, ~s" si)))
 
 ;; Extract the function body from primitive definition and call it
 (define (emit-primcall si env expr)
@@ -172,6 +194,72 @@
     (emit-expr si env alt)
     (emit-label final-label)))
 
+;; Top level definitions
+(define (emit-letrec si env expr)
+  (letrec ([first car]
+           [second cadr]
+           [make-env (lambda (lvars labels)
+                       (map list lvars labels))]
+           ;; TODO: Allow multiple expressions in letrec body
+           [letrec-body caddr])
+    (let* ([bindings (cadr expr)]
+           [lvars (map first bindings)]
+           [lambdas (map second bindings)]
+           ;; [labels (map unique-label lvars)]
+           [env (append env (make-env lvars lvars))])
+      (for-each (emit-lambda env) lambdas lvars)
+      (emit-entry si env (letrec-body expr)))))
+
+;; Function body for the simplest C style functions
+;;
+;; A lot of required sanity and safety checks are missing.
+;;
+;; The calling convention expected by the function is kind of odd and needs to
+;; be standardized. Arguments are pushed to stack in order (unlike cdecl, which
+;; pushes in reverse order).
+;;
+;; `si` points to the last thing pushed on the stack. Considering the function
+;; preamble and call instruction; the default value should be `(* 2 wordsize)`
+;; such that the first argument can be accessed at `RBP + 16`, the next one at
+;; `RBP + 24` etc. Indexes for arguments should be positive and locals negative
+;; since arguments will be on top of the base pointer and locals below (between
+;; RBP and RSP to be precise).
+;;
+(define (emit-lambda env)
+  (lambda (expr label)
+    (emit-function-header label)
+    (emit-preamble)
+    (let ([formals (cadr expr)]
+          ;; TODO: Emit code for all expressions, not just car
+          [body (car (cddr expr))])
+      (let f ([formals formals]
+              ;; One for the instruction pointer, one for base pointer
+              [si (* 2 wordsize)]
+              [env env])
+        (if (null? formals)
+            (emit-expr si env body)
+            (f (cdr formals)
+               (+ si wordsize)
+               (extend (car formals) si env)))))
+    (emit-ret)))
+
+(define (emit-app si env expr)
+  (define (emit-arguments si args)
+    (unless (null? args)
+      (emit-expr si env (car args))
+      (emit-push 'rax)
+      (emit-arguments (- si wordsize) (cdr args))))
+
+  (let* ([name (lookup (car expr) env)]
+         [args (cdr expr)]
+         [arity (length args)])
+
+    ;; Evaluate and push the arguments into stack
+    (emit-arguments (- si wordsize) args)
+    (emit-call name)
+    ;; Reclaim space used for function arguments
+    (emit-adjust-base (* arity wordsize))))
+
 (define (emit-expr si env expr)
   (cond
    [(immediate? expr) (emit-immediate si env expr)]
@@ -179,16 +267,33 @@
    [(variable? expr env) (emit-variable si env expr)]
    [(let? expr) (emit-let si env (bindings expr) (body expr))]
    [(if? expr) (emit-if si env (cadr expr) (caddr expr) (cadddr expr))]
+   [(lambda? expr) (emit-lambda si env (cadr expr) (caddr expr))]
+   [(app? env expr) (emit-app si env expr)]
    [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
-(define (emit-program expr)
-  (emit-program-header "init")
+;; Emit the program entry point, this should be called just once
+(define (emit-entry si env expr)
+  (emit "    .globl init")
+  (emit-function-header "init")
   (emit-preamble)
   (emit-heap-init)
-  (emit-expr default-stack-index default-env expr)
+  (emit-expr si env expr)
   (emit-ret))
 
+;; Entry point of the compiler - principal API
+(define (emit-program expr)
+  (emit-program-header)
+  (let ([si default-stack-index]
+        [env default-env])
+    (cond
+     [(letrec? expr) (emit-letrec si env expr)]
+     [else (emit-entry si env expr)])))
+
 ;; ASM wrappers
+
+;; Unconditional function call
+(define (emit-call label)
+  (emit "    call ~a" label))
 
 ;; Compare the value to register RAX
 (define (emit-cmp with)
@@ -282,8 +387,8 @@
 (define (get-stack-ea si)
   (assert (not (= si 0)))
   (cond
-   [(> si 0) (format "[rsp + ~s]" si)]
-   [(< si 0) (format "[rsp - ~s]" (- si))]))
+   [(> si 0) (format "[rbp + ~s]" si)]
+   [(< si 0) (format "[rbp - ~s]" (- si))]))
 
 ;; Save the variable in register RAX to stack index SI
 (define (emit-stack-save si)
@@ -292,6 +397,10 @@
 ;; Load variable from stack into register RAX
 (define (emit-stack-load si)
   (emit "    mov rax, ~a" (get-stack-ea si)))
+
+;; Contradicts with `emit-stack-save`; both in the same program feels inelegant.
+(define (emit-push value)
+  (emit "    push ~a" value))
 
 ;; The base address of the heap is passed in RDI and we reserve reg RSI for it.
 (define (emit-heap-init)

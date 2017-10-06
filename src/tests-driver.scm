@@ -50,11 +50,15 @@
                [else (display c) (f)]))))))))
 
 ;; Compile, build, execute and assert output with expectation
-(define (test-with-string-output test-id expr expected-output)
+(define (run expr)
   (compile-program expr)
   (build)
   (execute)
-  (unless (string=? expected-output (get-string))
+  (get-string))
+
+;; Compile, build, execute and show the result in shell. Great for devel
+(define (test-with-string-output test-id expr expected-output)
+  (unless (string=? expected-output (run expr))
     (error 'test (format "Output mismatch for test ~s, expected ~s, got ~s"
                          test-id expected-output (get-string)))))
 
