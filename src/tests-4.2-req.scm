@@ -25,10 +25,10 @@
 
 (add-tests-with-string-output "read-char"
   [(begin
-     (let ([p (open-output-file "stst.tmp" 'replace)])
+     (let ([p (open-output-file "inc.tmp" 'replace)])
        (display "Hello World!" p)
        (close-output-port p))
-     (let ([p (open-input-file "stst.tmp")])
+     (let ([p (open-input-file "inc.tmp")])
        (define loop
          (lambda ()
            (let ([x (read-char p)])
@@ -71,6 +71,6 @@
               (verify (fx+1 i) p)]
              [else (error 'verify "mismatch")]))))
      (fill-string! 0 0)
-     (write-string! 0 (open-output-file "stst.tmp" 'replace))
-     (verify 0 (open-input-file "stst.tmp"))) => "#t\n"]
+     (write-string! 0 (open-output-file "inc.tmp" 'replace))
+     (verify 0 (open-input-file "inc.tmp"))) => "#t\n"]
 )

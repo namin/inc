@@ -1,4 +1,4 @@
-# Generate the testable executable stst
+# Generate the testable executable inc
 #
 # -m64 forces to compile for 64bit target, this prevents accidental surprises.
 #
@@ -13,13 +13,13 @@
 # `-fno-asynchronous-unwind-tables` gets rid of all the '.cfi' directives from
 # the generated asm.
 
-stst: stst.s startup.c
+inc: inc.s runtime.c
 	gcc	-m64 \
 		-g3 -ggdb3 \
 		-fomit-frame-pointer \
 		-fno-asynchronous-unwind-tables \
-		-O0 startup.c stst.s \
-		-o stst
+		-O0 runtime.c inc.s \
+		-o inc
 
 .PHONY: test
 test:
@@ -27,4 +27,4 @@ test:
 
 .PHONY: clean
 clean:
-	rm -f stst.s stst stst.out
+	rm -f inc.s inc inc.out

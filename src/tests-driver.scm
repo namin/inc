@@ -1,8 +1,8 @@
 ;; Test runner for the incremental compiler
 
-(define file-asm "stst.s")
-(define file-bin "stst")
-(define file-out "stst.out")
+(define file-asm "inc.s")
+(define file-bin "inc")
+(define file-out "inc.out")
 
 (define (build)
   (unless (zero? (system "make --quiet"))
