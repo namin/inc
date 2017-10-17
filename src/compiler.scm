@@ -104,10 +104,13 @@
 (define (emit-label label)
   (emit "~a:" label))
 
-(define (emit-function-header f)
+(define (emit-program-header f)
   (emit "    .intel_syntax noprefix")
   (emit "    .text")
   (emit "    .globl ~a" f)
+  (emit-function-header f))
+
+(define (emit-function-header f)
   (emit "    .type ~a, @function" f)
   (emit-label f))
 
@@ -179,7 +182,7 @@
    [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
 (define (emit-program expr)
-  (emit-function-header "init")
+  (emit-program-header "init")
   (emit-preamble)
   (emit-heap-init)
   (emit-expr default-stack-index default-env expr)
