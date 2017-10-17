@@ -151,7 +151,8 @@
 
 (define unique-label
   (let ([count 0])
-    (lambda ()
+    ;; TODO: Generate labels similar to prefix
+    (lambda prefix
       (let ([L (string->symbol (format "L_~s" count))])
         (set! count (add1 count))
         L))))
