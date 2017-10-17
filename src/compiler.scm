@@ -13,6 +13,7 @@
 
 ;; Preamble
 
+;; Constants for runtime representation
 (define wordsize            8)
 (define bool-f     #b00101111)
 (define bool-t     #b01101111)
@@ -29,8 +30,11 @@
 (define list-nil   #b00111111)
 (define pairtag    #b00000001)
 
-;; Range for fixnums
+;; Other constants
+(define default-stack-index -8)
+(define default-env '())
 
+;; Range for fixnums
 (define fixnum-bits (- (* wordsize 8) fxshift))
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
 (define fxupper (sub1 (expt 2 (- fixnum-bits 1))))
@@ -174,13 +178,11 @@
    [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
 
 (define (emit-program expr)
-  (let ([default-stack-index -8]
-        [default-env '()])
-    (emit-function-header "init")
-    (emit-preamble)
-    (emit-heap-init)
-    (emit-expr default-stack-index default-env expr)
-    (emit-ret)))
+  (emit-function-header "init")
+  (emit-preamble)
+  (emit-heap-init)
+  (emit-expr default-stack-index default-env expr)
+  (emit-ret))
 
 ;; ASM wrappers
 
