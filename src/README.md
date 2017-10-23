@@ -13,6 +13,11 @@ Quick instructions to run all tests
       > (compile-lib)     ;; just once
       > (test-all)        ;; run all the tests
 
+or just
+
+    $ make test
+
+
 Full original instructions
 --------------------------
 

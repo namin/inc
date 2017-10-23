@@ -3,10 +3,8 @@
 (define (emit-library) #f) ;; (optionally) implemented by compiler.scm
 
 (define (build)
-  (unless (zero? (system (format "gcc -m32 -Wall -o stst ~a ~a stst.s"
-                                 (runtime-file)
-                                 (lib-file))))
-    (error 'make "could not build target")))
+  (unless (zero? (system "make stst --quiet"))
+    (error 'make "Could not build target")))
 
 (define (execute)
   (unless (zero? (system "./stst > stst.out"))
