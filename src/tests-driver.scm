@@ -4,18 +4,18 @@
 
 (define (build)
   (unless (zero? (system "make stst --quiet"))
-    (error 'make "Could not build target")))
+    (error 'make "Could not build target.")))
 
 (define (execute)
   (unless (zero? (system "./stst > stst.out"))
-    (error 'make "Produced program exited abnormally")))
+    (error 'make "Produced program exited abnormally.")))
 
 (define compile-port
   (make-parameter
    (current-output-port)
    (lambda (p)
      (unless (output-port? p)
-       (error 'compile-port (format "not an output port ~s" p)))
+       (error 'compile-port (format "Not an output port ~s." p)))
      p)))
 
 (define (emit . args)
@@ -27,7 +27,7 @@
    "startup.c"
    (lambda (fname)
      (unless (string? fname)
-       (error 'runtime-file (format "not a string ~s" fname)))
+       (error 'runtime-file (format "Not a string ~s." fname)))
      fname)))
 
 (define lib-file
@@ -35,7 +35,7 @@
    "lib.s"
    (lambda (fname)
      (unless (string? fname)
-       (error 'lib-file (format "not a string ~s" fname)))
+       (error 'lib-file (format "Not a string ~s." fname)))
      fname)))
 
 (define (compile-lib)
@@ -81,7 +81,7 @@
 
 (define (test-with-string-output test-id expr expected-output)
   (unless (string=? expected-output (run expr))
-    (error 'test (format "Output mismatch for test ~s, expected ~s, got ~s"
+    (error 'test (format "Output mismatch for test ~s, expected ~s, got ~s."
                          test-id expected-output (get-string)))))
 
 (define (test-one test-id test)
@@ -92,13 +92,13 @@
     (flush-output-port)
     (case type
      [(string) (test-with-string-output test-id expr out)]
-     [else (error 'test (format "invalid test type ~s" type))])
-    (printf " ok\n")))
+     [else (error 'test (format "Invalid test type ~s." type))])
+    (printf " Ok.\n")))
 
 (define (test-all)
   (let f ([i 0] [ls (reverse all-tests)])
     (if (null? ls)
-        (printf "Passed all ~s tests\n" i)
+        (printf "Passed all ~s tests.\n" i)
         (let ([x (car ls)] [ls (cdr ls)])
           (let* ([test-name (car x)]
                  [tests (cdr x)]
