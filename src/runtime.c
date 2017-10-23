@@ -66,7 +66,7 @@ void print(int64_t val, bool nested) {
         }
         if (!nested) printf(")");
     } else {
-        printf("ERROR");
+        printf("ERROR %" PRId64, val);
     }
 }
 
