@@ -23,7 +23,7 @@ inc: inc.s runtime.c
 
 .PHONY: test
 test:
-	scheme --script test.scm
+	echo '(test-all)' | scheme compiler.scm --quiet
 
 .PHONY: clean
 clean:
