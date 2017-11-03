@@ -27,7 +27,7 @@
 
 
 (add-tests-with-string-output "write/display"
-  [(fx+ -536870911 -1) => "-536870912\n"]
+  [(fx+ -536870911 -1) => "-536870912"]
   [(begin
      (write '(1 2 3))
      (exit)) => "(1 2 3)"]

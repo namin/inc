@@ -1,24 +1,24 @@
 (add-tests-with-string-output "eof-object"
-  [(eof-object? (eof-object)) => "#t\n"]
+  [(eof-object? (eof-object)) => "#t"]
 
-  [(null? (eof-object)) => "#f\n"]
-  [(boolean? (eof-object)) => "#f\n"]
-  [(string? (eof-object)) => "#f\n"]
-  [(char? (eof-object)) => "#f\n"]
-  [(pair? (eof-object)) => "#f\n"]
-  [(symbol? (eof-object)) => "#f\n"]
-  [(procedure? (eof-object)) => "#f\n"]
-  [(vector? (eof-object)) => "#f\n"]
-  [(not (eof-object)) => "#f\n"]
+  [(null? (eof-object)) => "#f"]
+  [(boolean? (eof-object)) => "#f"]
+  [(string? (eof-object)) => "#f"]
+  [(char? (eof-object)) => "#f"]
+  [(pair? (eof-object)) => "#f"]
+  [(symbol? (eof-object)) => "#f"]
+  [(procedure? (eof-object)) => "#f"]
+  [(vector? (eof-object)) => "#f"]
+  [(not (eof-object)) => "#f"]
 
-  [(eof-object? #\a) => "#f\n"]
-  [(eof-object? #t) => "#f\n"]
-  [(eof-object? 12) => "#f\n"]
-  [(eof-object? '(1 2 3)) => "#f\n"]
-  [(eof-object? '()) => "#f\n"]
-  [(eof-object? '#(foo)) => "#f\n"]
-  [(eof-object? (lambda (x) x)) => "#f\n"]
-  [(eof-object? 'baz) => "#f\n"]
+  [(eof-object? #\a) => "#f"]
+  [(eof-object? #t) => "#f"]
+  [(eof-object? 12) => "#f"]
+  [(eof-object? '(1 2 3)) => "#f"]
+  [(eof-object? '()) => "#f"]
+  [(eof-object? '#(foo)) => "#f"]
+  [(eof-object? (lambda (x) x)) => "#f"]
+  [(eof-object? 'baz) => "#f"]
   )
 
 
@@ -72,5 +72,5 @@
              [else (error 'verify "mismatch")]))))
      (fill-string! 0 0)
      (write-string! 0 (open-output-file "inc.tmp" 'replace))
-     (verify 0 (open-input-file "inc.tmp"))) => "#t\n"]
+     (verify 0 (open-input-file "inc.tmp"))) => "#t"]
 )

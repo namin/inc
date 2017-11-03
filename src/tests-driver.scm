@@ -8,6 +8,7 @@
   (unless (zero? (system "make --quiet"))
     (error 'make "Could not build target")))
 
+;; Execute the binary and return the output as a string
 (define (execute)
   ;; Delete previous output file if any; existence of this file fails the test
   ;; consistently on docker.
@@ -15,7 +16,7 @@
   (let ([command (format "./~a > ~a" file-bin file-out)])
     (unless (zero? (system command))
       (error 'make "Produced program exited abnormally"))
-    (get-string-all (open-input-file file-out))))
+    (read (open-input-file file-out))))
 
 ;; Compile port is a parameter that returns a port to write the generated asm
 ;; to. This can be a file or stdout.
@@ -48,7 +49,7 @@
 ;; Compile, build, execute and show the result in shell. Great for devel
 (define (test-with-string-output test-id expr expected-output)
   (let ([actual-output (run expr)])
-    (unless (string=? expected-output actual-output)
+    (unless (equal? expected-output actual-output)
       (error 'test (format "Output mismatch for test ~s: expected ~s, got ~s"
                            test-id expected-output actual-output)))))
 

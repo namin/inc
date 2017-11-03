@@ -62,83 +62,83 @@
 ;;;    The returned value is still in %eax.
 
 (add-tests-with-string-output "procedure?"
-  [(procedure? (lambda (x) x)) => "#t\n"]
-  [(let ([f (lambda (x) x)]) (procedure? f)) => "#t\n"]
-  [(procedure? (make-vector 0)) => "#f\n"]
-  [(procedure? (make-string 0)) => "#f\n"]
-  [(procedure? (cons 1 2)) => "#f\n"]
-  [(procedure? #\S) => "#f\n"]
-  [(procedure? ()) => "#f\n"]
-  [(procedure? #t) => "#f\n"]
-  [(procedure? #f) => "#f\n"]
-  [(string? (lambda (x) x)) => "#f\n"]
-  [(vector? (lambda (x) x)) => "#f\n"]
-  [(boolean? (lambda (x) x)) => "#f\n"]
-  [(null? (lambda (x) x)) => "#f\n"]
-  [(not (lambda (x) x)) => "#f\n"]
+  [(procedure? (lambda (x) x)) => "#t"]
+  [(let ([f (lambda (x) x)]) (procedure? f)) => "#t"]
+  [(procedure? (make-vector 0)) => "#f"]
+  [(procedure? (make-string 0)) => "#f"]
+  [(procedure? (cons 1 2)) => "#f"]
+  [(procedure? #\S) => "#f"]
+  [(procedure? ()) => "#f"]
+  [(procedure? #t) => "#f"]
+  [(procedure? #f) => "#f"]
+  [(string? (lambda (x) x)) => "#f"]
+  [(vector? (lambda (x) x)) => "#f"]
+  [(boolean? (lambda (x) x)) => "#f"]
+  [(null? (lambda (x) x)) => "#f"]
+  [(not (lambda (x) x)) => "#f"]
 )
 
 
 (add-tests-with-string-output "applying thunks"
-  [(let ([f (lambda () 12)]) (f)) => "12\n"]
-  [(let ([f (lambda () (fx+ 12 13))]) (f)) => "25\n"]
-  [(let ([f (lambda () 13)]) (fx+ (f) (f))) => "26\n"]
+  [(let ([f (lambda () 12)]) (f)) => "12"]
+  [(let ([f (lambda () (fx+ 12 13))]) (f)) => "25"]
+  [(let ([f (lambda () 13)]) (fx+ (f) (f))) => "26"]
   [(let ([f (lambda ()
               (let ([g (lambda () (fx+ 2 3))])
                 (fx* (g) (g))))])
-    (fx+ (f) (f))) => "50\n"]
+    (fx+ (f) (f))) => "50"]
   [(let ([f (lambda ()
               (let ([f (lambda () (fx+ 2 3))])
                 (fx* (f) (f))))])
-    (fx+ (f) (f))) => "50\n"]
+    (fx+ (f) (f))) => "50"]
   [(let ([f (if (boolean? (lambda () 12))
                 (lambda () 13)
                 (lambda () 14))])
-     (f)) => "14\n"]
+     (f)) => "14"]
 )
 
 
 (add-tests-with-string-output "parameter passing"
- [(let ([f (lambda (x) x)]) (f 12)) => "12\n"]
- [(let ([f (lambda (x y) (fx+ x y))]) (f 12 13)) => "25\n"]
+ [(let ([f (lambda (x) x)]) (f 12)) => "12"]
+ [(let ([f (lambda (x y) (fx+ x y))]) (f 12 13)) => "25"]
  [(let ([f (lambda (x)
              (let ([g (lambda (x y) (fx+ x y))])
                (g x 100)))])
-   (f 1000)) => "1100\n"]
+   (f 1000)) => "1100"]
  [(let ([f (lambda (g) (g 2 13))])
-    (f (lambda (n m) (fx* n m)))) => "26\n"]
+    (f (lambda (n m) (fx* n m)))) => "26"]
  [(let ([f (lambda (g) (fx+ (g 10) (g 100)))])
-   (f (lambda (x) (fx* x x)))) => "10100\n"]
+   (f (lambda (x) (fx* x x)))) => "10100"]
  [(let ([f (lambda (f n m)
              (if (fxzero? n)
                  m
                  (f f (fx-1 n) (fx* n m))))])
-   (f f 5 1)) => "120\n"]
+   (f f 5 1)) => "120"]
  [(let ([f (lambda (f n)
              (if (fxzero? n)
                  1
                  (fx* n (f f (fx-1 n)))))])
-   (f f 5)) => "120\n"]
+   (f f 5)) => "120"]
 )
 
 
 (add-tests-with-string-output "closures"
  [(let ([n 12])
     (let ([f (lambda () n)])
-      (f))) => "12\n"]
+      (f))) => "12"]
  [(let ([n 12])
     (let ([f (lambda (m) (fx+ n m))])
-      (f 100))) => "112\n"]
+      (f 100))) => "112"]
  [(let ([f (lambda (f n m)
              (if (fxzero? n)
                  m
                  (f (fx-1 n) (fx* n m))))])
    (let ([g (lambda (g n m) (f (lambda (n m) (g g n m)) n m))])
-     (g g 5 1))) => "120\n"]
+     (g g 5 1))) => "120"]
  [(let ([f (lambda (f n)
              (if (fxzero? n)
                  1
                  (fx* n (f (fx-1 n)))))])
    (let ([g (lambda (g n) (f (lambda (n) (g g n)) n))])
-     (g g 5))) => "120\n"]
+     (g g 5))) => "120"]
 )

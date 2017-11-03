@@ -45,7 +45,7 @@
      (when (null? filenames)
        (error 'no-files-provided-in-test "add them"))
      (test-files filenames)
-     'ok) => "ok\n"]
+     'ok) => "ok"]
 
 )
 
@@ -81,6 +81,6 @@
      (when (null? filenames)
        (error 'no-files-provided-in-test "add them"))
      (test-files filenames)
-     'ok) => "ok\n"]
+     'ok) => "ok"]
 
 )

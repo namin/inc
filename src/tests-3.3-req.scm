@@ -3,24 +3,24 @@
 ;
  [(let ((t 1))
     (and (begin (set! t (fx+1 t)) t)
-         t)) => "2\n"]
+         t)) => "2"]
 
  [(let ((f (if (boolean? (lambda () 12))
                (lambda () 13)
                (lambda () 14))))
-    (f)) => "14\n"]
+    (f)) => "14"]
 
   [(let ([f 12])
      (let ([g (lambda () f)])
-       (g))) => "12\n"]
-  [(fx< 1 2) => "#t\n"]
+       (g))) => "12"]
+  [(fx< 1 2) => "#t"]
   [(let ([f (lambda (x y) (fx< x y))])
-     (f 10 10)) => "#f\n"]
-  [(fx< 10 10) => "#f\n"]
-  [(fx< 10 2) => "#f\n"]
-  [(fx<= 1 2) => "#t\n"]
-  [(fx<= 10 10) => "#t\n"]
-  [(fx<= 10 2) => "#f\n"]
+     (f 10 10)) => "#f"]
+  [(fx< 10 10) => "#f"]
+  [(fx< 10 2) => "#f"]
+  [(fx<= 1 2) => "#t"]
+  [(fx<= 10 10) => "#t"]
+  [(fx<= 10 2) => "#f"]
   #;[(let ([f
       (lambda (s i c)
     (unless (string? s)
@@ -71,16 +71,16 @@
  ;;;  we have: 2x5x3 = 30 tests.
 
  [(let ([s (string #\a #\b #\c)] [i 1] [c #\X]) (string-set! s i c) s)
-  => "\"aXc\"\n"]
+  => "\"aXc\""]
  [(let ([s (string #\a #\b #\c)] [i 1]) (string-set! s i #\X) s)
-  => "\"aXc\"\n"]
+  => "\"aXc\""]
  [(let ([s (string #\a #\b #\c)] [i 1] [c 'X]) (string-set! s i c) s)
   => ""]
 
  [(let ([s (string #\a #\b #\c)] [i 1] [c #\X]) (string-set! s 1 c) s)
-  => "\"aXc\"\n"]
+  => "\"aXc\""]
  [(let ([s (string #\a #\b #\c)] [i 1]) (string-set! s 1 #\X) s)
-  => "\"aXc\"\n"]
+  => "\"aXc\""]
  [(let ([s (string #\a #\b #\c)] [i 1] [c 'X]) (string-set! s 1 c) s)
   => ""]
 
@@ -147,13 +147,13 @@
 
 (add-tests-with-string-output "string errors"
   [(let ([f (lambda (a b c) (string a b c))])
-     (f #\a #\b #\c)) => "\"abc\"\n"]
+     (f #\a #\b #\c)) => "\"abc\""]
   [(let ([f (lambda (a b c) (string a b c))])
      (f #\a 12 #\c)) => ""]
   [(let ([f string])
-     (f #\a #\b #\c)) => "\"abc\"\n"]
+     (f #\a #\b #\c)) => "\"abc\""]
   [(let ([f string])
      (f #\a #\b 'x)) =>  ""]
-  [(string #\a #\b #\c) => "\"abc\"\n"]
+  [(string #\a #\b #\c) => "\"abc\""]
   [(string #\a #\b #t) => ""]
 )

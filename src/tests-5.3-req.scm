@@ -1,11 +1,11 @@
 
 
 (add-tests-with-string-output "call/cc"
-  [(call/cc (lambda (k) 12)) => "12\n"]
-  [(call/cc (lambda (k) (k 12))) => "12\n"]
-  [(call/cc (lambda (k) (fx+ 1 (k 12)))) => "12\n"]
+  [(call/cc (lambda (k) 12)) => "12"]
+  [(call/cc (lambda (k) (k 12))) => "12"]
+  [(call/cc (lambda (k) (fx+ 1 (k 12)))) => "12"]
   [(fx+ (call/cc (lambda (k) (k 12)))
-        (call/cc (lambda (k) 13))) => "25\n"]
+        (call/cc (lambda (k) 13))) => "25"]
   [(letrec ([fact
              (lambda (n k)
                (cond
@@ -13,7 +13,7 @@
                  [else (fx* n (fact (fx-1 n) k))]))])
      (call/cc
        (lambda (k)
-         (fact 5 k)))) => "1\n"]
+         (fact 5 k)))) => "1"]
   [(call/cc
     (lambda (k)
       (letrec ([fact
@@ -21,7 +21,7 @@
                   (cond
                     [(fxzero? n) (k 1)]
                     [else (fx* n (fact (fx-1 n)))]))])
-        (fact 5)))) => "1\n"]
+        (fact 5)))) => "1"]
   [(let ([k #f])
      (letrec ([fact
                (lambda (n)
@@ -33,7 +33,7 @@
                         (k 1)))]
                    [else (fx* n (fact (fx-1 n)))]))])
         (let ([v (fact 5)])
-          v))) => "120\n"]
+          v))) => "120"]
   [(let ([k #f])
      (letrec ([fact
                (lambda (n)
@@ -47,6 +47,5 @@
         (let ([v (fact 5)])
           (let ([nk k])
             (set! k (lambda (x) (cons v x)))
-            (nk v))))) => "(120 . 14400)\n"]
+            (nk v))))) => "(120 . 14400)"]
   )
-
