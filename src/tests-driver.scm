@@ -58,9 +58,10 @@
 
 ;; Compile, build, execute and show the result in shell. Great for devel
 (define (test-with-string-output test-id expr expected-output)
-  (unless (string=? expected-output (run expr))
-    (error 'test (format "Output mismatch for test ~s, expected ~s, got ~s"
-                         test-id expected-output (get-string)))))
+  (let ([actual-output (run expr)])
+    (unless (string=? expected-output actual-output)
+      (error 'test (format "Output mismatch for test ~s: expected ~s, got ~s"
+                           test-id expected-output actual-output)))))
 
 ;; Collect all tests in a global variable
 (define all-tests '())
