@@ -11,7 +11,8 @@
 (define (execute)
   (let ([command (format "./~a > ~a" file-bin file-out)])
     (unless (zero? (system command))
-      (error 'make "Produced program exited abnormally"))))
+      (error 'make "Produced program exited abnormally"))
+    (get-string-all (open-input-file file-out))))
 
 ;; Compile port is a parameter that returns a port to write the generated asm
 ;; to. This can be a file or stdout.
@@ -35,26 +36,11 @@
     (apply fprintf out args)
     (newline out)))
 
-;; This seems like a very creepy and odd way to read everything from the output
-;; file character by character and print it out. Unless I'm missing something
-;; else here ¯\_(ツ)_/¯
-(define (get-string)
-  (with-output-to-string
-    (lambda ()
-      (with-input-from-file file-out
-        (lambda ()
-          (let f ()
-            (let ([c (read-char)])
-              (cond
-               [(eof-object? c) (void)]
-               [else (display c) (f)]))))))))
-
 ;; Compile, build, execute and assert output with expectation
 (define (run expr)
   (compile-program expr)
   (build)
-  (execute)
-  (get-string))
+  (execute))
 
 ;; Compile, build, execute and show the result in shell. Great for devel
 (define (test-with-string-output test-id expr expected-output)
