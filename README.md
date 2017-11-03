@@ -6,6 +6,8 @@ Ghuloum.
 
 The code is tested with Chez Scheme 9.4.
 
-    > make test
+    $ make test
+
+The Dockerfile should make it easier to get started.
 
 [1]: https://github.com/namin/inc/blob/master/docs/paper.pdf?raw=true
