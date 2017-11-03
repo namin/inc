@@ -1,6 +1,5 @@
 FROM ubuntu:latest
 WORKDIR /inc
-ADD . /inc
 
 # Setup base image deps
 RUN apt-get update && apt-get install -y \
@@ -19,3 +18,5 @@ RUN cd /tmp \
     && make install \
     && cd - \
     && rm -rf csv9.5.tar.gz csv9.5
+
+ADD . /inc
