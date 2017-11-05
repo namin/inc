@@ -13,6 +13,9 @@
 
 ;; Constants
 (define wordsize             8)
+
+;; Stack index points to the current available empty slot. Use and then
+;; decrement the index to add a new variable.
 (define default-stack-index -8)
 
 ;; Constants for runtime representation
@@ -161,6 +164,11 @@
   (emit-stack-load (lookup expr env)))
 
 ;; Emit code for a let expression
+;;
+;; NOTE: All the space allocated by the let expression for local variables can
+;; be freed at the end of the body. This implies the `si` stays the same before
+;; and after a let expression. There is no need to keep track of the amount of
+;; space allocated inside the let expression and free it afterwards.
 (define (emit-let si env bindings body)
   (let f ((si si) (new-env env) (b* bindings))
     (cond
@@ -218,12 +226,10 @@
 ;; be standardized. Arguments are pushed to stack in order (unlike cdecl, which
 ;; pushes in reverse order).
 ;;
-;; `si` points to the last thing pushed on the stack. Considering the function
-;; preamble and call instruction; the default value should be `(* 2 wordsize)`
-;; such that the first argument can be accessed at `RBP + 16`, the next one at
-;; `RBP + 24` etc. Indexes for arguments should be positive and locals negative
-;; since arguments will be on top of the base pointer and locals below (between
-;; RBP and RSP to be precise).
+;; The caller of the function emits arguments at `RSP - 24`, then `RSP - 32`
+;; etc. The function preamble effectively decrements the base pointer by 0x10
+;; such that the such that the first argument can be accessed at `RBP - 8`, the
+;; next one at `RBP - 16` etc.
 ;;
 (define (emit-lambda env)
   (lambda (expr label)
@@ -233,13 +239,13 @@
           ;; TODO: Emit code for all expressions, not just car
           [body (car (cddr expr))])
       (let f ([formals formals]
-              ;; One for the instruction pointer, one for base pointer
-              [si (* 2 wordsize)]
+              ;; The first argument to the function is available at `RSP - 8`
+              [si (- wordsize)]
               [env env])
         (if (null? formals)
             (emit-expr si env body)
             (f (cdr formals)
-               (+ si wordsize)
+               (- si wordsize)
                (extend (car formals) si env)))))
     (emit-ret)))
 
@@ -247,18 +253,33 @@
   (define (emit-arguments si args)
     (unless (null? args)
       (emit-expr si env (car args))
-      (emit-push 'rax)
+      (emit-stack-save si)
       (emit-arguments (- si wordsize) (cdr args))))
 
   (let* ([name (lookup (car expr) env)]
          [args (cdr expr)]
          [arity (length args)])
 
-    ;; Evaluate and push the arguments into stack
-    (emit-arguments (- si wordsize) args)
+    ;; Evaluate and push the arguments into stack; 2 words below SI. See
+    ;; `emit-lambda` docs for a detailed description of how this works.
+    ;;
+    ;; si  832 -> ...
+    ;;     816 -> ...
+    ;;     808 -> arg 1
+    ;;     800 -> arg 2
+    (emit-arguments (- si (* 2 wordsize)) args)
+
+    ;; Extend stack to hold the current local variables before creating a new
+    ;; frame for the function call.
+    (emit-adjust-base (+ si wordsize))
+
     (emit-call name)
-    ;; Reclaim space used for function arguments
-    (emit-adjust-base (* arity wordsize))))
+
+    ;; NOTE: This is one of those big aha moments. There is no need to reclaim
+    ;; space used for function arguments because the memory would just get
+    ;; overridden by next variable allocation. This makes keeping track of that
+    ;; stack index unnecessary and life so much simpler.
+    (emit-adjust-base (- (+ si wordsize)))))
 
 (define (emit-expr si env expr)
   (cond
