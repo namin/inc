@@ -94,9 +94,11 @@
    [(assv var env) => cadr]
    [else #f]))
 
-;; TODO: Define all conditionals with tagged list primitive
+(define (tagged-list expr name)
+  (and (list? expr) (eq? name (car expr)) #t))
+
 (define (let? expr)
-  (eq? 'let (car expr)))
+  (tagged-list expr 'let))
 
 (define (bindings expr)
   (assert (let? expr))
@@ -107,7 +109,7 @@
   (cddr expr))
 
 (define (if? expr)
-  (eq? 'if (car expr)))
+  (tagged-list expr 'if))
 
 (define (letrec? expr)
   (and (pair? expr) (eq? 'letrec (car expr))))
@@ -117,7 +119,7 @@
 
 ;; Lambda; arguments at cadr, body at cddr
 (define (lambda? expr)
-  (eq? 'lambda (car expr)))
+  (tagged-list expr 'lambda ))
 
 (define (app? env expr)
   (and (list? expr) (not (null? expr)) (lookup (car expr) env)))
