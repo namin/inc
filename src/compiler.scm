@@ -55,25 +55,41 @@
 (define (immediate? x)
   (or (fixnum? x) (boolean? x) (char? x) (null? x)))
 
-;; Primitives with some magic global variables and macros
+;; Operations on alists
+
+;; Add a key value pair to an alist; check if this exists in stdlib
+(define (extend key value alist)
+  (cons (list key value) alist))
+
+;; Get a value from an alist; check if this exists in stdlib
+(define (lookup key alist)
+  (cond
+   [(assv key alist) => cadr]
+   [else #f]))
+
+;; Primitives with some magic global variables and macros.
+
+;; Top level environment
+(define prim-env '())
+
+(define-record-type primitive (fields name arity body))
+
 (define-syntax define-primitive
   (syntax-rules ()
     [(_ (prim-name arg* ...) b b* ...)
-     (begin
-       (putprop 'prim-name '*is-prim* #t)
-       (putprop 'prim-name '*arg-count*
-                 (length '(arg* ...)))
-       (putprop 'prim-name '*emitter*
-                 (lambda (arg* ...) b b* ...)))]))
-
-(define (primitive? x)
-  (and (symbol? x) (getprop x '*is-prim*)))
+     (let ([p (make-primitive 'prim-name
+                              (length '(arg* ...))
+                              (lambda (arg* ...) b b* ...))])
+       (set! prim-env (extend 'prim-name p prim-env)))]))
 
 (define (primcall? expr)
-  (and (pair? expr) (primitive? (car expr))))
+  (and (pair? expr) (lookup (car expr) prim-env) #t))
 
-(define (primitive-emitter x)
-  (or (getprop x '*emitter*) (error 'primitive-emitter "Nope")))
+(define (primitive-emitter name)
+  (define (compose f g) (lambda (x) (f (g x))))
+  (cond
+   [(assv name prim-env) => (compose primitive-body cadr)]
+   [else (error 'primitive-emitter (format "~a is not a primitive" name))]))
 
 ;; Environment with alist
 
@@ -84,15 +100,6 @@
 ;;
 ;; Example: `((arg1 8) (b -24) (a -16))`
 (define default-env '())
-
-;; Add a single variable and stack index to the specific environment
-(define (extend var si env)
-  (cons (list var si) env))
-
-(define (lookup var env)
-  (cond
-   [(assv var env) => cadr]
-   [else #f]))
 
 (define (tagged-list expr name)
   (and (list? expr) (eq? name (car expr)) #t))
@@ -156,10 +163,10 @@
 
 ;; Extract the function body from primitive definition and call it
 (define (emit-primcall si env expr)
-  (let ([prim (car expr)]
+  (let ([name (car expr)]
         [args (cdr expr)])
     ;; (check-primcall-args prim args)
-    (apply (primitive-emitter prim) (cons si (cons env args)))))
+    (apply (primitive-emitter name) (cons si (cons env args)))))
 
 ;; Fetch a variable from stack and load it into RAX
 (define (emit-variable si env expr)
