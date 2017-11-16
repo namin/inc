@@ -76,15 +76,13 @@
      (e 25)) => #f]
 )
 
-
-#!eof
-(add-tests-with-string-output "deeply nested procedures"
-  [(letrec ([sum (lambda (n ac)
-                   (if (fxzero? n)
-                        ac
-                        (app sum (fx-1 n) (fx+ n ac))))])
-    (app sum 10000 0)) => "50005000"]
-  [(letrec ([e (lambda (x) (if (fxzero? x) #t (app o (fx-1 x))))]
-            [o (lambda (x) (if (fxzero? x) #f (app e (fx-1 x))))])
-     (app e 5000000)) => "#t"]
-)
+;; (add-tests-with-string-output "deeply nested procedures"
+;;   [(letrec ([sum (lambda (n ac)
+;;                    (if (fxzero? n)
+;;                         ac
+;;                         (app sum (fx-1 n) (fx+ n ac))))])
+;;     (app sum 10000 0)) => "50005000"]
+;;   [(letrec ([e (lambda (x) (if (fxzero? x) #t (app o (fx-1 x))))]
+;;             [o (lambda (x) (if (fxzero? x) #f (app e (fx-1 x))))])
+;;      (app e 5000000)) => "#t"]
+;; )

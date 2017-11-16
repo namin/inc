@@ -1,5 +1,3 @@
-#!eof
-
 (add-tests-with-string-output "tokenizer"
   [(let ()
      (define test-tokenizer
