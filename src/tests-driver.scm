@@ -5,7 +5,7 @@
 (define file-out "inc.out")
 
 (define (build)
-  (unless (zero? (system "make --quiet"))
+  (unless (zero? (system "make -C .. --quiet"))
     (error 'make "Could not build target")))
 
 ;; Execute the binary and return the output as a string

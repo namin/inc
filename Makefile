@@ -13,7 +13,8 @@
 # `-fno-asynchronous-unwind-tables` gets rid of all the '.cfi' directives from
 # the generated asm.
 
-inc: inc.s runtime.c
+src/inc: src/inc.s src/runtime.c
+	cd src && \
 	gcc	-m64 \
 		-g3 -ggdb3 \
 		-fomit-frame-pointer \
@@ -21,10 +22,13 @@ inc: inc.s runtime.c
 		-O0 runtime.c inc.s \
 		-o inc
 
+.PHONY: inc
+inc: src/inc
+
 .PHONY: test
 test:
-	echo '(test-all)' | scheme compiler.scm --quiet
+	cd src && echo '(test-all)' | scheme compiler.scm --quiet
 
 .PHONY: clean
 clean:
-	rm -f inc.s inc inc.out
+	cd src && rm -f inc.s inc inc.out

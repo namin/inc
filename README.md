@@ -10,4 +10,8 @@ The code is tested with Chez Scheme 9.4.
 
 The Dockerfile should make it easier to get started.
 
+    $ docker build . -t inc
+    $ docker run -it inc
+    /inc $ make test
+
 [1]: https://github.com/namin/inc/blob/master/docs/paper.pdf?raw=true
