@@ -1,4 +1,4 @@
-# An incremental scheme compiler
+# An incremental scheme compiler [![Build Status](https://travis-ci.org/jaseemabid/inc.svg?branch=master)](https://travis-ci.org/jaseemabid/inc)
 
 A tiny scheme to x86 asm compiler developed incrementally as described in the
 paper [An Incremental Approach to Compiler Construction][1] by Abdulaziz
