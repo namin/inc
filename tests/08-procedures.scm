@@ -1,4 +1,4 @@
-(add-tests-with-string-output "procedures"
+(add-tests "procedures"
   [(letrec () 12) => 12]
   [(letrec () (let ([x 5]) (fx+ x x))) => 10]
   [(letrec ([f (lambda () 5)]) 7) => 7]
@@ -29,7 +29,7 @@
             [o (lambda (x) (if (fxzero? x) #f (e (fx-1 x))))])
      (e 25)) => #f])
 
-;; (add-tests-with-string-output "deeply nested procedures"
+;; (add-tests "deeply nested procedures"
 ;;   [(letrec ([sum (lambda (n ac)
 ;;                    (if (fxzero? n)
 ;;                         ac

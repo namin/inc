@@ -1,4 +1,4 @@
-(add-tests-with-string-output "if"
+(add-tests "if"
   [(if #t 12 13) => 12]
   [(if #f 12 13) => 13]
   [(if 0 12 13)  => 12]
@@ -15,7 +15,7 @@
   [(if (char? #\a) 13 14) => 13]
   [(fx+1 (if (fx-1 1) (fx-1 13) 14)) => 13])
 
-(add-tests-with-string-output "if"
+(add-tests "if"
   [(if (fx= 12 13) 12 13) => 13]
   [(if (fx= 12 12) 13 14) => 13]
   [(if (fx< 12 13) 12 13) => 12]

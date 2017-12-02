@@ -1,4 +1,4 @@
-(add-tests-with-string-output "immediate constants"
+(add-tests "immediate constants"
    [#f => #f]
    [#t => #t]
    [() => ()]

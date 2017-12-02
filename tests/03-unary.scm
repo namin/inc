@@ -1,4 +1,4 @@
-(add-tests-with-string-output "fx+1"
+(add-tests "fx+1"
   [(fx+1 0) => 1]
   [(fx+1 -1) => 0]
   [(fx+1 1) => 2]
@@ -9,7 +9,7 @@
   [(fx+1 (fx+1 0)) => 2]
   [(fx+1 (fx+1 (fx+1 (fx+1 (fx+1 (fx+1 12)))))) => 18])
 
-(add-tests-with-string-output "fixnum->char and char->fixnum"
+(add-tests "fixnum->char and char->fixnum"
    [(fixnum->char 65) => #\A]
    [(fixnum->char 97) => #\a]
    [(fixnum->char 122) => #\z]
@@ -25,7 +25,7 @@
    [(char->fixnum (fixnum->char 12)) => 12]
    [(fixnum->char (char->fixnum #\x)) => #\x])
 
-(add-tests-with-string-output "fixnum?"
+(add-tests "fixnum?"
    [(fixnum? 0) => #t]
    [(fixnum? 1) => #t]
    [(fixnum? -1) => #t]
@@ -43,12 +43,12 @@
    [(fixnum? (char->fixnum #\r)) => #t]
    [(fixnum? (fixnum->char 12)) => #f])
 
-(add-tests-with-string-output "fxzero?"
+(add-tests "fxzero?"
    [(fxzero? 0) => #t]
    [(fxzero? 1) => #f]
    [(fxzero? -1) => #f])
 
-(add-tests-with-string-output "null?"
+(add-tests "null?"
    [(null? ()) => #t]
    [(null? #f) => #f]
    [(null? #t) => #f]
@@ -58,7 +58,7 @@
    [(null? -10) => #f]
    [(null? 10) => #f])
 
-(add-tests-with-string-output "boolean?"
+(add-tests "boolean?"
    [(boolean? #t) => #t]
    [(boolean? #f) => #t]
    [(boolean? 0) => #f]
@@ -69,7 +69,7 @@
    [(boolean? (boolean? 0)) => #t]
    [(boolean? (fixnum? (boolean? 0))) => #t])
 
-(add-tests-with-string-output "char?"
+(add-tests "char?"
    [(char? #\a) => #t]
    [(char? #\Z) => #t]
    [(char? #\newline) => #t]
@@ -81,7 +81,7 @@
    [(char? 23870) => #f]
    [(char? -23789) => #f])
 
-(add-tests-with-string-output "not"
+(add-tests "not"
   [(not #t) => #f]
   [(not #f) => #t]
   [(not 15) => #f]
@@ -93,7 +93,7 @@
   [(not (fixnum? 15)) => #f]
   [(not (fixnum? #f)) => #t])
 
-(add-tests-with-string-output "fxlognot"
+(add-tests "fxlognot"
   [(fxlognot (fxlogor (fxlognot 7) (fxlognot 2))) => 2]
   [(fxlognot (fxlogor (fxlognot 7) (fxlognot 2))) => 2]
   [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]

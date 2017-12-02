@@ -3,7 +3,7 @@
 ;; I ended up with this file after cleaning up the tests and grouping them
 ;; together sanely. This is obviously a lot of redundant crap and needs to be
 ;; trimmed down.
-(add-tests-with-string-output "fx+"
+(add-tests "fx+"
   [(fx+ 1 2) => 3]
   [(fx+ 1 -2) => -1]
   [(fx+ -1 2) => 1]
@@ -53,7 +53,7 @@
         (fx+ (fx+ (fx+ 9 10) (fx+ 11 12)) (fx+ (fx+ 13 14) (fx+ 15 16))))
    => 136])
 
-(add-tests-with-string-output "fx-"
+(add-tests "fx-"
   [(fx- 1 2) => -1]
   [(fx- 1 -2) => 3]
   [(fx- -1 2) => -3]
@@ -109,7 +109,7 @@
         (fx- (fx- (fx- 9 10) (fx- 11 12)) (fx- (fx- 13 14) (fx- 15 16))))
    => 0])
 
-(add-tests-with-string-output "fx*"
+(add-tests "fx*"
   [(fx* 2 3) => 6]
   [(fx* 2 -3) => -6]
   [(fx* -2 3) => -6]
@@ -123,7 +123,7 @@
   [(fx* (fx* (fx* (fx* (fx* 2 3) 4) 5) 6) 7) => 5040]
   [(fx* 2 (fx* 3 (fx* 4 (fx* 5 (fx* 6 7))))) => 5040])
 
-(add-tests-with-string-output "fx="
+(add-tests "fx="
   [(fx= 12 13) => #f]
   [(fx= 12 12) => #t]
   [(fx= 16 (fx+ 13 3)) => #t]
@@ -131,7 +131,7 @@
   [(fx= (fx+ 13 3) 16) => #t]
   [(fx= (fx+ 13 13) 16) => #f])
 
-(add-tests-with-string-output "fx<"
+(add-tests "fx<"
   [(fx< 12 13) => #t]
   [(fx< 12 12) => #f]
   [(fx< 13 12) => #f]
@@ -142,7 +142,7 @@
   [(fx< (fx+ 13 3) 16) => #f]
   [(fx< (fx+ 13 13) 16) => #f])
 
-(add-tests-with-string-output "fx<="
+(add-tests "fx<="
   [(fx<= 12 13) => #t]
   [(fx<= 12 12) => #t]
   [(fx<= 13 12) => #f]
@@ -153,7 +153,7 @@
   [(fx<= (fx+ 13 3) 16) => #t]
   [(fx<= (fx+ 13 13) 16) => #f])
 
-(add-tests-with-string-output "fx>"
+(add-tests "fx>"
   [(fx> 12 13) => #f]
   [(fx> 12 12) => #f]
   [(fx> 13 12) => #t]
@@ -164,7 +164,7 @@
   [(fx> (fx+ 13 3) 16) => #f]
   [(fx> (fx+ 13 13) 16) => #t])
 
-(add-tests-with-string-output "fx>="
+(add-tests "fx>="
   [(fx>= 12 13) => #f]
   [(fx>= 12 12) => #t]
   [(fx>= 13 12) => #t]
@@ -175,7 +175,7 @@
   [(fx>= (fx+ 13 3) 16) => #t]
   [(fx>= (fx+ 13 13) 16) => #t])
 
-(add-tests-with-string-output "fxlog {and, or, not}"
+(add-tests "fxlog {and, or, not}"
   [(fxlogand 3 7) => 3]
   [(fxlogand 3 5) => 1]
   [(fxlogand 2376 2376) => 2376]
@@ -189,7 +189,7 @@
   [(fxlogor 3 5)  => 7]
   [(fxlogor 3 7)  => 7])
 
-(add-tests-with-string-output "remainder/modulo/quotient"
+(add-tests "remainder/modulo/quotient"
   [(fxquotient 16 4) => 4]
   [(fxquotient 5 2) => 2]
   [(fxquotient -45 7) => -6]

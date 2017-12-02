@@ -56,7 +56,7 @@
 ;; Collect all tests in a global variable
 (define all-tests '())
 
-(define-syntax add-tests-with-string-output
+(define-syntax add-tests
   (syntax-rules (=>)
     [(_ test-name [expr => output-string] ...)
      (set! all-tests

@@ -1,4 +1,4 @@
-(add-tests-with-string-output "cons"
+(add-tests "cons"
   [(pair? (cons 1 2)) => #t]
   [(pair? 12) => #f]
   [(pair? #t) => #f]

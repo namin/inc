@@ -1,4 +1,4 @@
-(add-tests-with-string-output "integers"
+(add-tests "integers"
   [0  => 0]
   [1  => 1]
   [-1 => -1]

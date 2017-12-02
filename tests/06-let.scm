@@ -1,4 +1,4 @@
-(add-tests-with-string-output "let"
+(add-tests "let"
   [(let ([x 5]) x) => 5]
   [(let ([x (fx+ 1 2)]) x) => 3]
   [(let ([x (fx+ 1 2)])
