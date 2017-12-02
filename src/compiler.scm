@@ -299,7 +299,7 @@
    [(if? expr) (emit-if si env (cadr expr) (caddr expr) (cadddr expr))]
    [(lambda? expr) (emit-lambda si env (cadr expr) (caddr expr))]
    [(app? env expr) (emit-app si env expr)]
-   [else (error 'emit-expr (format "Unknown form ~a" (car expr)))]))
+   [else (error 'emit-expr (format "Unknown form ~a" expr))]))
 
 ;; Emit the program entry point, this should be called just once
 (define (emit-entry si env expr)
