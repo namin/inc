@@ -10,9 +10,6 @@
 
 ;; Execute the binary and return the output as a string
 (define (execute)
-  ;; Delete previous output file if any; existence of this file fails the test
-  ;; consistently on docker.
-  (system (format "rm -f ~a"  file-out))
   (let ([command (format "./~a > ~a" file-bin file-out)])
     (unless (zero? (system command))
       (error 'make "Produced program exited abnormally"))
@@ -30,6 +27,9 @@
 
 ;; Run the compiler but send the output to a file instead
 (define (compile-program expr)
+  ;; Delete previous output file if any; existence of this file fails the test
+  ;; consistently on docker.
+  (system (format "rm -f ~a ~a" file-out file-bin))
   (let ([p (open-output-file file-asm 'replace)])
     (parameterize ([compile-port p])
       (emit-program expr))
