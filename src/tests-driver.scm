@@ -12,7 +12,7 @@
 (define (execute)
   ;; Delete previous output file if any; existence of this file fails the test
   ;; consistently on docker.
-  (system (format "rm ~a"  file-out))
+  (system (format "rm -f ~a"  file-out))
   (let ([command (format "./~a > ~a" file-bin file-out)])
     (unless (zero? (system command))
       (error 'make "Produced program exited abnormally"))
