@@ -4,9 +4,9 @@ A tiny scheme to x86 asm compiler developed incrementally as described in the
 paper [An Incremental Approach to Compiler Construction][1] by Abdulaziz
 Ghuloum.
 
-The code is tested with Chez Scheme 9.5. You can install chez on mac with `brew
-install chezscheme`
+The code is tested with Chez Scheme 9.5.
 
+NOTE: Mac users should stick with Docker for now.
 
     $ make test
 
