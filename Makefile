@@ -33,7 +33,7 @@ test:
 clean:
 	cd src && rm -f inc.s inc inc.out
 
-.PHONY: build
+.PHONY: container
 container:
 	docker build -t inc:latest .
 
