@@ -2,14 +2,14 @@
 
 (load "tests-driver.scm")
 
-(load "../tests/tests-1.8-req.scm")
-(load "../tests/tests-1.7-req.scm")
-(load "../tests/tests-1.6-req.scm")
-(load "../tests/tests-1.5-req.scm")
-(load "../tests/tests-1.4-req.scm")
-(load "../tests/tests-1.3-req.scm")
-(load "../tests/tests-1.2-req.scm")
-(load "../tests/tests-1.1-req.scm")
+(load "../tests/01-integers.scm")
+(load "../tests/02-immediate.scm")
+(load "../tests/03-unary.scm")
+(load "../tests/04-binop.scm")
+(load "../tests/05-if.scm")
+(load "../tests/06-let.scm")
+(load "../tests/07-cons.scm")
+(load "../tests/08-procedures.scm")
 
 ;; Constants
 (define wordsize             8)

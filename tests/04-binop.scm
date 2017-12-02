@@ -1,3 +1,8 @@
+;; WOW! I've never seem something that is more quickcheck friendly than this.
+;;
+;; I ended up with this file after cleaning up the tests and grouping them
+;; together sanely. This is obviously a lot of redundant crap and needs to be
+;; trimmed down.
 (add-tests-with-string-output "fx+"
   [(fx+ 1 2) => 3]
   [(fx+ 1 -2) => -1]
@@ -26,7 +31,27 @@
   [(fx+ (fx+ -1 -2) -3) => -6]
   [(fx+ (fx+ (fx+ (fx+ (fx+ (fx+ (fx+ (fx+ 1 2) 3) 4) 5) 6) 7) 8) 9) => 45]
   [(fx+ 1 (fx+ 2 (fx+ 3 (fx+ 4 (fx+ 5 (fx+ 6 (fx+ 7 (fx+ 8 9)))))))) => 45]
-)
+  [(fx+ (fx+ 1 2) (fx+ 3 4)) => 10]
+  [(fx+ (fx+ 1 2) (fx+ 3 -4)) => 2]
+  [(fx+ (fx+ 1 2) (fx+ -3 4)) => 4]
+  [(fx+ (fx+ 1 2) (fx+ -3 -4)) => -4]
+  [(fx+ (fx+ 1 -2) (fx+ 3 4)) => 6]
+  [(fx+ (fx+ 1 -2) (fx+ 3 -4)) => -2]
+  [(fx+ (fx+ 1 -2) (fx+ -3 4)) => 0]
+  [(fx+ (fx+ 1 -2) (fx+ -3 -4)) => -8]
+  [(fx+ (fx+ -1 2) (fx+ 3 4)) => 8]
+  [(fx+ (fx+ -1 2) (fx+ 3 -4)) => 0]
+  [(fx+ (fx+ -1 2) (fx+ -3 4)) => 2]
+  [(fx+ (fx+ -1 2) (fx+ -3 -4)) => -6]
+  [(fx+ (fx+ -1 -2) (fx+ 3 4)) => 4]
+  [(fx+ (fx+ -1 -2) (fx+ 3 -4)) => -4]
+  [(fx+ (fx+ -1 -2) (fx+ -3 4)) => -2]
+  [(fx+ (fx+ -1 -2) (fx+ -3 -4)) => -10]
+  [(fx+ (fx+ (fx+ (fx+ (fx+ (fx+ (fx+ (fx+ 1 2) 3) 4) 5) 6) 7) 8) 9) => 45]
+  [(fx+ 1 (fx+ 2 (fx+ 3 (fx+ 4 (fx+ 5 (fx+ 6 (fx+ 7 (fx+ 8 9)))))))) => 45]
+  [(fx+ (fx+ (fx+ (fx+ 1 2) (fx+ 3 4)) (fx+ (fx+ 5 6) (fx+ 7 8)))
+        (fx+ (fx+ (fx+ 9 10) (fx+ 11 12)) (fx+ (fx+ 13 14) (fx+ 15 16))))
+   => 136])
 
 (add-tests-with-string-output "fx-"
   [(fx- 1 2) => -1]
@@ -63,7 +88,27 @@
   [(fx- (fx- -1 -2) -3) => 4]
   [(fx- (fx- (fx- (fx- (fx- (fx- (fx- (fx- 1 2) 3) 4) 5) 6) 7) 8) 9) => -43]
   [(fx- 1 (fx- 2 (fx- 3 (fx- 4 (fx- 5 (fx- 6 (fx- 7 (fx- 8 9)))))))) => 5]
-)
+  [(fx- (fx- 1 2) (fx- 3 4)) => 0]
+  [(fx- (fx- 1 2) (fx- 3 -4)) => -8]
+  [(fx- (fx- 1 2) (fx- -3 4)) => 6]
+  [(fx- (fx- 1 2) (fx- -3 -4)) => -2]
+  [(fx- (fx- 1 -2) (fx- 3 4)) => 4]
+  [(fx- (fx- 1 -2) (fx- 3 -4)) => -4]
+  [(fx- (fx- 1 -2) (fx- -3 4)) => 10]
+  [(fx- (fx- 1 -2) (fx- -3 -4)) => 2]
+  [(fx- (fx- -1 2) (fx- 3 4)) => -2]
+  [(fx- (fx- -1 2) (fx- 3 -4)) => -10]
+  [(fx- (fx- -1 2) (fx- -3 4)) => 4]
+  [(fx- (fx- -1 2) (fx- -3 -4)) => -4]
+  [(fx- (fx- -1 -2) (fx- 3 4)) => 2]
+  [(fx- (fx- -1 -2) (fx- 3 -4)) => -6]
+  [(fx- (fx- -1 -2) (fx- -3 4)) => 8]
+  [(fx- (fx- -1 -2) (fx- -3 -4)) => 0]
+  [(fx- (fx- (fx- (fx- (fx- (fx- (fx- (fx- 1 2) 3) 4) 5) 6) 7) 8) 9) => -43]
+  [(fx- 1 (fx- 2 (fx- 3 (fx- 4 (fx- 5 (fx- 6 (fx- 7 (fx- 8 9)))))))) => 5]
+  [(fx- (fx- (fx- (fx- 1 2) (fx- 3 4)) (fx- (fx- 5 6) (fx- 7 8)))
+        (fx- (fx- (fx- 9 10) (fx- 11 12)) (fx- (fx- 13 14) (fx- 15 16))))
+   => 0])
 
 (add-tests-with-string-output "fx*"
   [(fx* 2 3) => 6]
@@ -77,21 +122,7 @@
   [(fx* 2 (fx* 3 4)) => 24]
   [(fx* (fx* 2 3) 4) => 24]
   [(fx* (fx* (fx* (fx* (fx* 2 3) 4) 5) 6) 7) => 5040]
-  [(fx* 2 (fx* 3 (fx* 4 (fx* 5 (fx* 6 7))))) => 5040]
-)
-
-(add-tests-with-string-output "fxlogand and fxlogor"
-  [(fxlogor 3 16) => 19]
-  [(fxlogor 3 5)  => 7]
-  [(fxlogor 3 7)  => 7]
-  [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]
-  [(fxlognot (fxlogor 1 (fxlognot 7))) => 6]
-  [(fxlogand 3 7) => 3]
-  [(fxlogand 3 5) => 1]
-  [(fxlogand 2346 (fxlognot 2346)) => 0]
-  [(fxlogand (fxlognot 2346) 2346) => 0]
-  [(fxlogand 2376 2376) => 2376]
-)
+  [(fx* 2 (fx* 3 (fx* 4 (fx* 5 (fx* 6 7))))) => 5040])
 
 (add-tests-with-string-output "fx="
   [(fx= 12 13) => #f]
@@ -99,8 +130,7 @@
   [(fx= 16 (fx+ 13 3)) => #t]
   [(fx= 16 (fx+ 13 13)) => #f]
   [(fx= (fx+ 13 3) 16) => #t]
-  [(fx= (fx+ 13 13) 16) => #f]
-)
+  [(fx= (fx+ 13 13) 16) => #f])
 
 (add-tests-with-string-output "fx<"
   [(fx< 12 13) => #t]
@@ -111,8 +141,7 @@
   [(fx< 16 (fx+ 13 13)) => #t]
   [(fx< (fx+ 13 1) 16) => #t]
   [(fx< (fx+ 13 3) 16) => #f]
-  [(fx< (fx+ 13 13) 16) => #f]
-)
+  [(fx< (fx+ 13 13) 16) => #f])
 
 (add-tests-with-string-output "fx<="
   [(fx<= 12 13) => #t]
@@ -123,8 +152,7 @@
   [(fx<= 16 (fx+ 13 13)) => #t]
   [(fx<= (fx+ 13 1) 16) => #t]
   [(fx<= (fx+ 13 3) 16) => #t]
-  [(fx<= (fx+ 13 13) 16) => #f]
-)
+  [(fx<= (fx+ 13 13) 16) => #f])
 
 (add-tests-with-string-output "fx>"
   [(fx> 12 13) => #f]
@@ -135,8 +163,7 @@
   [(fx> 16 (fx+ 13 13)) => #f]
   [(fx> (fx+ 13 1) 16) => #f]
   [(fx> (fx+ 13 3) 16) => #f]
-  [(fx> (fx+ 13 13) 16) => #t]
-)
+  [(fx> (fx+ 13 13) 16) => #t])
 
 (add-tests-with-string-output "fx>="
   [(fx>= 12 13) => #f]
@@ -147,25 +174,21 @@
   [(fx>= 16 (fx+ 13 13)) => #f]
   [(fx>= (fx+ 13 1) 16) => #f]
   [(fx>= (fx+ 13 3) 16) => #t]
-  [(fx>= (fx+ 13 13) 16) => #t]
-)
+  [(fx>= (fx+ 13 13) 16) => #t])
 
-
-(add-tests-with-string-output "if"
-  [(if (fx= 12 13) 12 13) => 13]
-  [(if (fx= 12 12) 13 14) => 13]
-  [(if (fx< 12 13) 12 13) => 12]
-  [(if (fx< 12 12) 13 14) => 14]
-  [(if (fx< 13 12) 13 14) => 14]
-  [(if (fx<= 12 13) 12 13) => 12]
-  [(if (fx<= 12 12) 12 13) => 12]
-  [(if (fx<= 13 12) 13 14) => 14]
-  [(if (fx> 12 13) 12 13) => 13]
-  [(if (fx> 12 12) 12 13) => 13]
-  [(if (fx> 13 12) 13 14) => 13]
-  [(if (fx>= 12 13) 12 13) => 13]
-  [(if (fx>= 12 12) 12 13) => 12]
-  [(if (fx>= 13 12) 13 14) => 13])
+(add-tests-with-string-output "fxlog {and, or, not}"
+  [(fxlogand 3 7) => 3]
+  [(fxlogand 3 5) => 1]
+  [(fxlogand 2376 2376) => 2376]
+  [(fxlogand 2346 (fxlognot 2346)) => 0]
+  [(fxlogand (fxlognot 2346) 2346) => 0]
+  [(fxlogand (fxlognot (fxlognot 12)) (fxlognot (fxlognot 12))) => 12]
+  [(fxlogand (fxlognot (fxlognot 12)) (fxlognot (fxlognot 12))) => 12]
+  [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]
+  [(fxlognot (fxlogor 1 (fxlognot 7))) => 6]
+  [(fxlogor 3 16) => 19]
+  [(fxlogor 3 5)  => 7]
+  [(fxlogor 3 7)  => 7])
 
 (add-tests-with-string-output "remainder/modulo/quotient"
   [(fxquotient 16 4) => 4]

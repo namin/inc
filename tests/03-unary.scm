@@ -92,3 +92,10 @@
   [(not (not 15)) => #t]
   [(not (fixnum? 15)) => #f]
   [(not (fixnum? #f)) => #t])
+
+(add-tests-with-string-output "fxlognot"
+  [(fxlognot (fxlogor (fxlognot 7) (fxlognot 2))) => 2]
+  [(fxlognot (fxlogor (fxlognot 7) (fxlognot 2))) => 2]
+  [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]
+  [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]
+  [(fxlognot -7) => 6])
