@@ -258,6 +258,7 @@
                (extend (car formals) si env)))))
     (emit-ret)))
 
+;; Emit code for a function application. See `emit-lambda` for details.
 (define (emit-app si env expr)
   (define (emit-arguments si args)
     (unless (null? args)
@@ -279,7 +280,11 @@
     (emit-arguments (- si (* 2 wordsize)) args)
 
     ;; Extend stack to hold the current local variables before creating a new
-    ;; frame for the function call.
+    ;; frame for the function call. `si` is the next available empty slot, `(+
+    ;; si wordsize)` is the current usage. Add this to `RSP` to reserve this
+    ;; space before the function gets called. Not doing this will result in the
+    ;; called function to override this space with its local variables and
+    ;; corrupt the stack.
     (emit-adjust-base (+ si wordsize))
 
     (emit-call name)
