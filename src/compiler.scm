@@ -19,34 +19,43 @@
 (define default-stack-index -8)
 
 ;; Constants for runtime representation
-(define bool-f     #b00101111)
-(define bool-t     #b01101111)
-(define boolmask   #b00111111)
-(define boolshift           6)
-(define booltag    #b00101111)
-(define charmask   #b00111111)
-(define charshift           8)
-(define chartag    #b00001111)
-(define fxmask     #b00000011)
-(define fxshift             2)
-(define fxtag               0)
-(define heapmask   #b00000111)
-(define lammask    #b00000111)
-(define lamtag     #b00000110)
-(define list-nil   #b00111111)
-(define pairtag    #b00000001)
+;;
+;; Immediate values (values that can be fit in one machine word) are tagged for
+;; distinguising them from heap allocated pointers. The last 3 bits effectively
+;; serve as the runtime type of the value. Always using 3 bits is a simpler
+;; approach than the multi bit technique the paper uses. This is a very
+;; efficient and low overhead technique at the cost of losing precision -
+;; completely acceptable for types like characters and booleans but having to
+;; live with 61bit numerics instead of native 64 and some overhead for
+;; operations like multiplication & division.
+;;
+(define fxtag   0) ;; 0 makes most arithmetic quite efficient
+(define booltag 1)
+(define chartag 2)
+(define pairtag 3)
+(define niltag  4)
+(define heaptag 7)
+
+;; Value to bitwise or with a word to get the tag
+(define mask #b111)
+;; Number of bits a word must be shifted right to get its true value.
+(define shift 3)
+
+;; Boolean values can be computed just once upfront
+(define bool-f (bitwise-ior (ash 0 shift) booltag))
+(define bool-t (bitwise-ior (ash 1 shift) booltag))
 
 ;; Range for fixnums
-(define fixnum-bits (- (* wordsize 8) fxshift))
+(define fixnum-bits (- (* wordsize 8) shift))
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
 (define fxupper (sub1 (expt 2 (- fixnum-bits 1))))
 
 (define (immediate-rep x)
   (cond
-   [(fixnum? x) (ash x fxshift)]
+   [(fixnum? x) (ash x shift)]
    [(boolean? x) (if x bool-t bool-f)]
-   [(null? x) list-nil]
-   [(char? x) (bitwise-ior (ash (char->integer x) charshift) chartag)]
+   [(null? x) niltag]
+   [(char? x) (bitwise-ior (ash (char->integer x) shift) chartag)]
    [else (error 'immediate-rep (format "Unknown form ~a" x))]))
 
 (define (fixnum? x)
@@ -345,25 +354,25 @@
 ;; All the primitives; functions defined in asm
 (define-primitive (boolean? si env expr)
   (emit-expr si env expr)
-  (emit "    and rax, ~s" boolmask)
+  (emit "    and rax, ~s" mask)
   (emit-cmp booltag)
   (emit-cmp-bool))
 
 (define-primitive (char? si env expr)
   (emit-expr si env expr)
-  (emit "    and rax, ~s" charmask)
+  (emit "    and rax, ~s" mask)
   (emit-cmp chartag)
   (emit-cmp-bool))
 
 (define-primitive (fixnum? si env expr)
   (emit-expr si env expr)
-  (emit "    and rax, ~s" fxmask)
+  (emit "    and rax, ~s" mask)
   (emit-cmp fxtag)
   (emit-cmp-bool))
 
 (define-primitive (pair? si env expr)
   (emit-expr si env expr)
-  (emit "    and rax, ~s" heapmask)
+  (emit "    and rax, ~s" mask)
   (emit-cmp pairtag)
   (emit-cmp-bool))
 
@@ -374,7 +383,7 @@
 
 (define-primitive (null? si env expr)
   (emit-expr si env expr)
-  (emit-cmp list-nil)
+  (emit-cmp niltag)
   (emit-cmp-bool))
 
 (define-primitive (not si env expr)
@@ -397,19 +406,18 @@
 ;; and the least significant bit is cleared
 (define-primitive (fixnum->char si env expr)
   (emit-expr si env expr)
-  (emit "    shl rax, ~s" (- charshift fxshift))
   (emit "    or rax, ~s" chartag))
 
 (define-primitive (char->fixnum si env expr)
   (emit-expr si env expr)
-  (emit "    shr rax, ~s" (- charshift fxshift))
+  (emit "    sub rax, ~s" chartag)
   (emit "    or rax, ~s" fxtag))
 
 (define-primitive (fxlognot si env expr)
   (emit-expr si env expr)
-  (emit "  shr rax, ~s" fxshift)
+  (emit "  shr rax, ~s" shift)
   (emit "  not rax")
-  (emit "  shl rax, ~s" fxshift))
+  (emit "  shl rax, ~s" shift))
 
 (define-primitive (fxlogor si env expr1 arg2)
   (emit-binop si env expr1 arg2)
@@ -463,7 +471,7 @@
 
 (define-primitive (fx* si env a b)
   (emit-binop si env a b)
-  (emit "    shr rax, ~s" fxshift)
+  (emit "    shr rax, ~s" shift)
   ;; The destination operand is an implied operand located in register AX
   ;; GCC throws `Error: ambiguous operand size for `mul'` without size
   ;; quantifier
@@ -480,22 +488,22 @@
 ;; argument. the quotient is stored in RAX and the remainder in RDX.
 (define (emit-div si env a b)
   (emit-expr si env b)
-  (emit "    sar rax, ~s" fxshift)
+  (emit "    sar rax, ~s" shift)
   (emit "    mov rcx, rax")
   (emit-expr si env a)
-  (emit "    sar rax, ~s" fxshift)
+  (emit "    sar rax, ~s" shift)
   (emit "    mov rdx, 0")
   (emit "    cqo")
   (emit "    idivq rcx    # ~a/~a" a b))
 
 (define-primitive (fxquotient si env a b)
   (emit-div si env a b)
-  (emit "    shl rax, ~s" fxshift))
+  (emit "    shl rax, ~s" shift))
 
 (define-primitive (fxremainder si env a b)
   (emit-div si env a b)
   (emit "   mov rax, rdx")
-  (emit "   shl rax, ~s" fxshift))
+  (emit "   shl rax, ~s" shift))
 
 (define (emit-cmp-bool . args)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
@@ -504,7 +512,7 @@
   ;; MOVZX copies the contents of the source operand (register or memory
   ;; location) to the destination operand (register) and zero extends the value.
   (emit "    movzx rax, al")
-  (emit "    sal al, ~s" boolshift)
+  (emit "    sal al, ~s" shift)
   (emit "    or al, ~s" bool-f))
 
 (define (emit-cmp-binop setx si env a b)
@@ -537,9 +545,9 @@
   (emit-stack-save (next-stack-index si))
 
   (emit "    mov rax, ~a" (get-stack-ea si))
-  (emit "    movq [rsi + 0], rax    # '(~a ...) "  a)
+  (emit "    movq [rsi + 0], rax    # '(~a ...)"  a)
   (emit "    mov rax, ~a" (get-stack-ea (next-stack-index si)))
-  (emit "    movq [rsi + 8], rax    # '(... ~a) "  b)
+  (emit "    movq [rsi + 8], rax    # '(... ~a)"  b)
   (emit "    mov rax, rsi")
   (emit "    or rax, ~a" pairtag)
   (emit "    add rsi, ~a" (* 2 wordsize)))
@@ -547,9 +555,11 @@
 (define-primitive (car si env pair)
   ;; assert destination is really a pair ?
   (emit-expr si env pair)
-  (emit "    mov rax, [rax - 1]         # (car ~a) " pair))
+  ;; Subtracting the tag from the heap pointer gets us back the real address.
+  (emit "    mov rax, [rax - ~s]         # (car ~a) " pairtag pair))
 
 (define-primitive (cdr si env pair)
   ;; assert destination is really a pair ?
   (emit-expr si env pair)
-  (emit "    mov rax, [rax + 7]         # (car ~a) " pair))
+  ;; Offset for cdr is (address - pairtag + 8) = 5
+  (emit "    mov rax, [rax + ~s]         # (cdr ~a) " (- 8 pairtag) pair))

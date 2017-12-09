@@ -9,27 +9,26 @@
 // R8, R9 and the return value is passed back in RAX.
 extern int64_t init(int64_t*) __attribute__((noinline));
 
-#define bool_f     0b00101111
-#define bool_t     0b01101111
-#define boolshift           7
-#define charmask   0b00111111
-#define charshift           8
-#define chartag    0b00001111
-#define fxmask     0b00000011
-#define fxshift             2
-#define fxtag               0
-#define list_nil   0b00111111
-#define pairtag    0b00000001
-#define heapmask   0b00000111
+#define fxtag    0
+#define booltag  1
+#define chartag  2
+#define pairtag  3
+#define niltag   4
+#define heaptag  7
 
+#define shift    3
+#define mask     0b00000111
+
+int64_t bool_f = (0 << shift) | booltag;
+int64_t bool_t = (1 << shift) | booltag;
 
 void print(int64_t val, bool nested) {
 
-    if ((val & fxmask) == fxtag) {
-        printf("%" PRId64, val >> fxshift);
+    if ((val & mask) == fxtag) {
+        printf("%" PRId64, val >> shift);
 
-    } else if ((val & charmask) == chartag) {
-        char c = val >> charshift;
+    } else if ((val & mask) == chartag) {
+        char c = val >> shift;
 
         if      (c == '\t') printf("#\\tab");
         else if (c == '\n') printf("#\\newline");
@@ -43,11 +42,11 @@ void print(int64_t val, bool nested) {
     } else if (val == bool_f) {
         printf("#f");
 
-    } else if (val == list_nil) {
+    } else if (val == niltag) {
         printf("()");
 
-    } else if ((val & heapmask) == pairtag) {
-        int64_t *p = (int64_t *)(val - 1);
+    } else if ((val & mask) == pairtag) {
+        int64_t *p = (int64_t *)(val - pairtag);
         int64_t car = *p;
         int64_t cdr = *(p + 1);
 
@@ -55,8 +54,8 @@ void print(int64_t val, bool nested) {
 
         print(car, false);
 
-        if (cdr != list_nil) {
-            if ((cdr & heapmask) != pairtag) {
+        if (cdr != niltag) {
+            if ((cdr & mask) != pairtag) {
                 printf(" . ");
                 print(cdr, false);
             } else {
