@@ -15,6 +15,7 @@ extern int64_t init(int64_t*) __attribute__((noinline));
 #define chartag  2
 #define pairtag  3
 #define niltag   4
+#define strtag   5
 #define heaptag  7
 
 #define shift    3
@@ -65,6 +66,17 @@ void print(int64_t val, bool nested) {
             }
         }
         if (!nested) printf(")");
+    } else if ((val & mask) == strtag) {
+        // This is why C is unsafe, but that is exactly what is letting me do
+        // this sort of custom memory management.
+        int64_t *len = (int64_t *)(val - strtag);
+        int64_t *str = (int64_t *)(val - strtag + 8);
+
+        printf("\"");
+        for(int i = 0; i < *len; i++) {
+            printf("%c", (char)((*(str + i) - chartag) >> shift));
+        }
+        printf("\"");
     } else {
         printf("ERROR %" PRId64, val);
     }

@@ -34,6 +34,7 @@
 (define chartag 2)
 (define pairtag 3)
 (define niltag  4)
+(define strtag  5)
 (define heaptag 7)
 
 ;; Value to bitwise or with a word to get the tag
@@ -304,11 +305,42 @@
     ;; stack index unnecessary and life so much simpler.
     (emit-adjust-base (- (+ si wordsize)))))
 
+;; Allocate a string in heap
+;;
+;; Unlike null terminated C strings, we use length prefixed range of bytes. Each
+;; character needs to be immediate encoded before its written to stack.
+;;
+;; 1. Look for asm instructions that can do the bytes in bulk rather than one at
+;; a time. Even if its not any more efficient, the generated asm should be a lot
+;; easier to read.
+;;
+;; 2. This is technically a ByteString rather than Text. We wont be able to
+;; handle multi byte encoding like UTF-8 with this approach.
+;;
+(define (emit-string si env str)
+
+  (let* ([len (string-length str)]
+         [size (* wordsize (+ 1 len))])
+
+    (emit "    movq [rsi + 0], ~a    # Store \"~a\"" len str)
+
+    (let f ([index wordsize]
+            [ls (string->list str)])
+
+      (unless (null? ls)
+        (emit "    movq [rsi + ~a], ~a" index (immediate-rep (car ls)))
+        (f (+ wordsize index) (cdr ls))))
+
+    (emit "    mov rax, rsi")
+    (emit "    or rax, ~a" strtag)
+    (emit "    add rsi, ~a" size)))
+
 (define (emit-expr si env expr)
   (cond
    [(immediate? expr) (emit-immediate si env expr)]
    [(primcall? expr) (emit-primcall si env expr)]
    [(variable? expr env) (emit-variable si env expr)]
+   [(string? expr) (emit-string si env expr)]
    [(let? expr) (emit-let si env (bindings expr) (body expr))]
    [(if? expr) (emit-if si env (cadr expr) (caddr expr) (cadddr expr))]
    [(lambda? expr) (emit-lambda si env (cadr expr) (caddr expr))]
