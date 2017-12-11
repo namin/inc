@@ -9,5 +9,4 @@ before_install:
   -
 
 script:
-  - make container
   - make ctest
