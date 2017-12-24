@@ -87,7 +87,7 @@ int main() {
     ptrdiff_t size = (uintptr_t)rsi - (uintptr_t)heap;
 
     fprintf(debug, "HEAP Segment : %p -> %p \n" , heap, (int64_t *)rsi);
-    fprintf(debug, "HEAP size    : %"  PRIuPTR " bytes\n", size);
+    fprintf(debug, "HEAP size    : %td bytes\n", size);
     fprintf(debug, "Result       : ");
     print(val, false);
     printf("\n");
