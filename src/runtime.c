@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,11 +72,23 @@ void print(int64_t val, bool nested) {
 
 int main() {
 
+    FILE *debug = getenv("DEBUG") ? stderr : fopen("/dev/null", "w");
+    fprintf(debug, "%s\n\n", "The glorious incremental compiler");
+
     int64_t *heap = calloc(1024, 8);
     int64_t val = init(heap);
 
-    // printf("HEAP %p  \n", heap);
+    int64_t rsi;
 
+    // Copy the value of RSI into a local variable. The nop instruction makes it
+    // easier to spot this in the generated asm
+    asm ("nop; movq %%rsi, %0" : "=r" (rsi));
+
+    ptrdiff_t size = (uintptr_t)rsi - (uintptr_t)heap;
+
+    fprintf(debug, "HEAP Segment : %p -> %p \n" , heap, (int64_t *)rsi);
+    fprintf(debug, "HEAP size    : %"  PRIuPTR " bytes\n", size);
+    fprintf(debug, "Result       : ");
     print(val, false);
     printf("\n");
 
