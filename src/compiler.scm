@@ -458,12 +458,12 @@
   (emit "  not rax")
   (emit "  shl rax, ~s" shift))
 
-(define-primitive (fxlogor si env expr1 arg2)
-  (emit-binop si env expr1 arg2)
+(define-primitive (fxlogor si env a b)
+  (emit-binop si env a b)
   (emit "  or rax, ~a" (get-stack-ea si)))
 
-(define-primitive (fxlogand si env expr1 arg2)
-  (emit-binop si env expr1 arg2)
+(define-primitive (fxlogand si env a b)
+  (emit-binop si env a b)
   (emit "  and rax, ~a" (get-stack-ea si)))
 
 (define-primitive (make-string si env len)
