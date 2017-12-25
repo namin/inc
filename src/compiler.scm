@@ -10,6 +10,7 @@
 (load "../tests/06-let.scm")
 (load "../tests/07-cons.scm")
 (load "../tests/08-procedures.scm")
+(load "../tests/09-strings.scm")
 
 ;; Constants
 (define wordsize             8)
@@ -384,6 +385,12 @@
   (emit "    jmp ~a" label))
 
 ;; All the primitives; functions defined in asm
+(define-primitive (fixnum? si env expr)
+  (emit-expr si env expr)
+  (emit "    and rax, ~s" mask)
+  (emit-cmp fxtag)
+  (emit-cmp-bool))
+
 (define-primitive (boolean? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" mask)
@@ -396,26 +403,26 @@
   (emit-cmp chartag)
   (emit-cmp-bool))
 
-(define-primitive (fixnum? si env expr)
-  (emit-expr si env expr)
-  (emit "    and rax, ~s" mask)
-  (emit-cmp fxtag)
-  (emit-cmp-bool))
-
 (define-primitive (pair? si env expr)
   (emit-expr si env expr)
   (emit "    and rax, ~s" mask)
   (emit-cmp pairtag)
   (emit-cmp-bool))
 
-(define-primitive (fxzero? si env expr)
-  (emit-expr si env expr)
-  (emit-cmp fxtag)
-  (emit-cmp-bool))
-
 (define-primitive (null? si env expr)
   (emit-expr si env expr)
   (emit-cmp niltag)
+  (emit-cmp-bool))
+
+(define-primitive (string? si env expr)
+  (emit-expr si env expr)
+  (emit "    and rax, ~s" mask)
+  (emit-cmp strtag)
+  (emit-cmp-bool))
+
+(define-primitive (fxzero? si env expr)
+  (emit-expr si env expr)
+  (emit-cmp fxtag)
   (emit-cmp-bool))
 
 (define-primitive (not si env expr)
@@ -458,6 +465,13 @@
 (define-primitive (fxlogand si env expr1 arg2)
   (emit-binop si env expr1 arg2)
   (emit "  and rax, ~a" (get-stack-ea si)))
+
+(define-primitive (make-string si env len)
+  (let ([size (* wordsize (+ 1 len))])
+    (emit "    movq [rsi + 0], ~a    # (make-string ~a)" len len)
+    (emit "    mov rax, rsi")
+    (emit "    or rax, ~a" strtag)
+    (emit "    add rsi, ~a" size)))
 
 (define (get-stack-ea si)
   (assert (not (= si 0)))
