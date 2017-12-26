@@ -420,7 +420,7 @@
   (emit-cmp strtag)
   (emit-cmp-bool))
 
-(define-primitive (fxzero? si env expr)
+(define-primitive (zero? si env expr)
   (emit-expr si env expr)
   (emit-cmp fxtag)
   (emit-cmp-bool))
@@ -430,11 +430,11 @@
   (emit "    cmp al, ~s" bool-f)
   (emit-cmp-bool))
 
-(define-primitive (fx+1 si env expr)
+(define-primitive (inc si env expr)
   (emit-expr si env expr)
   (emit "    add rax, ~s" (immediate-rep 1)))
 
-(define-primitive (fx-1 si env expr)
+(define-primitive (dec si env expr)
   (emit-expr si env expr)
   (emit "    sub rax, ~s" (immediate-rep 1)))
 
@@ -452,17 +452,17 @@
   (emit "    sub rax, ~s" chartag)
   (emit "    or rax, ~s" fxtag))
 
-(define-primitive (fxlognot si env expr)
+(define-primitive (lognot si env expr)
   (emit-expr si env expr)
   (emit "  shr rax, ~s" shift)
   (emit "  not rax")
   (emit "  shl rax, ~s" shift))
 
-(define-primitive (fxlogor si env a b)
+(define-primitive (logor si env a b)
   (emit-binop si env a b)
   (emit "  or rax, ~a" (get-stack-ea si)))
 
-(define-primitive (fxlogand si env a b)
+(define-primitive (logand si env a b)
   (emit-binop si env a b)
   (emit "  and rax, ~a" (get-stack-ea si)))
 
@@ -503,11 +503,11 @@
   (emit-stack-save si)
   (emit-expr (next-stack-index si) env b))
 
-(define-primitive (fx+ si env a b)
+(define-primitive (+ si env a b)
   (emit-binop si env a b)
   (emit "    add rax, ~a" (get-stack-ea si)))
 
-(define-primitive (fx- si env a b)
+(define-primitive (- si env a b)
   (emit-binop si env a b)
   ;; Subtracts the 2nd op from the first and stores the result in the 1st
   (emit "    sub ~a, rax" (get-stack-ea si))
@@ -515,7 +515,7 @@
   ;; Reverse the order and fix it up.
   (emit-stack-load si))
 
-(define-primitive (fx* si env a b)
+(define-primitive (* si env a b)
   (emit-binop si env a b)
   (emit "    shr rax, ~s" shift)
   ;; The destination operand is an implied operand located in register AX
@@ -542,11 +542,11 @@
   (emit "    cqo")
   (emit "    idivq rcx    # ~a/~a" a b))
 
-(define-primitive (fxquotient si env a b)
+(define-primitive (quotient si env a b)
   (emit-div si env a b)
   (emit "    shl rax, ~s" shift))
 
-(define-primitive (fxremainder si env a b)
+(define-primitive (remainder si env a b)
   (emit-div si env a b)
   (emit "   mov rax, rdx")
   (emit "   shl rax, ~s" shift))
@@ -566,19 +566,19 @@
   (emit "    cmp ~a, rax" (get-stack-ea si))
   (emit-cmp-bool setx))
 
-(define-primitive (fx= si env a b)
+(define-primitive (= si env a b)
   (emit-cmp-binop 'sete si env a b))
 
-(define-primitive (fx< si env a b)
+(define-primitive (< si env a b)
   (emit-cmp-binop 'setl si env a b))
 
-(define-primitive (fx<= si env a b)
+(define-primitive (<= si env a b)
   (emit-cmp-binop 'setle si env a b))
 
-(define-primitive (fx> si env a b)
+(define-primitive (> si env a b)
   (emit-cmp-binop 'setg si env a b))
 
-(define-primitive (fx>= si env a b)
+(define-primitive (>= si env a b)
   (emit-cmp-binop 'setge si env a b))
 
 ;; Allocate a pair in the heap

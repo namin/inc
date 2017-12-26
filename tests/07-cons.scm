@@ -15,8 +15,8 @@
   [(cdr (car (cons (cons 12 3) (cons #t #f)))) => 3]
   [(car (cdr (cons (cons 12 3) (cons #t #f)))) => #t]
   [(cdr (cdr (cons (cons 12 3) (cons #t #f)))) => #f]
-  [(let ([x (let ([y (fx+ 1 2)]) (fx* y y))])
-     (cons x (fx+ x x)))
+  [(let ([x (let ([y (+ 1 2)]) (* y y))])
+     (cons x (+ x x)))
    => (9 . 18)]
   [(let ([t0 (cons 1 2)] [t1 (cons 3 4)])
      (let ([a0 (car t0)] [a1 (car t1)] [d0 (cdr t0)] [d1 (cdr t1)])

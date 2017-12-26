@@ -1,13 +1,13 @@
-(add-tests "fx+1"
-  [(fx+1 0) => 1]
-  [(fx+1 -1) => 0]
-  [(fx+1 1) => 2]
-  [(fx+1 -100) => -99]
-  [(fx+1 1000) => 1001]
-  [(fx+1 536870910) => 536870911]
-  [(fx+1 -536870912) => -536870911]
-  [(fx+1 (fx+1 0)) => 2]
-  [(fx+1 (fx+1 (fx+1 (fx+1 (fx+1 (fx+1 12)))))) => 18])
+(add-tests "inc"
+  [(inc 0) => 1]
+  [(inc -1) => 0]
+  [(inc 1) => 2]
+  [(inc -100) => -99]
+  [(inc 1000) => 1001]
+  [(inc 536870910) => 536870911]
+  [(inc -536870912) => -536870911]
+  [(inc (inc 0)) => 2]
+  [(inc (inc (inc (inc (inc (inc 12)))))) => 18])
 
 (add-tests "fixnum->char and char->fixnum"
    [(fixnum->char 65) => #\A]
@@ -43,10 +43,10 @@
    [(fixnum? (char->fixnum #\r)) => #t]
    [(fixnum? (fixnum->char 12)) => #f])
 
-(add-tests "fxzero?"
-   [(fxzero? 0) => #t]
-   [(fxzero? 1) => #f]
-   [(fxzero? -1) => #f])
+(add-tests "zero?"
+   [(zero? 0) => #t]
+   [(zero? 1) => #f]
+   [(zero? -1) => #f])
 
 (add-tests "null?"
    [(null? ()) => #t]
@@ -93,9 +93,9 @@
   [(not (fixnum? 15)) => #f]
   [(not (fixnum? #f)) => #t])
 
-(add-tests "fxlognot"
-  [(fxlognot (fxlogor (fxlognot 7) (fxlognot 2))) => 2]
-  [(fxlognot (fxlogor (fxlognot 7) (fxlognot 2))) => 2]
-  [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]
-  [(fxlognot (fxlogor (fxlognot 7) 1)) => 6]
-  [(fxlognot -7) => 6])
+(add-tests "lognot"
+  [(lognot (logor (lognot 7) (lognot 2))) => 2]
+  [(lognot (logor (lognot 7) (lognot 2))) => 2]
+  [(lognot (logor (lognot 7) 1)) => 6]
+  [(lognot (logor (lognot 7) 1)) => 6]
+  [(lognot -7) => 6])
