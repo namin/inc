@@ -454,17 +454,17 @@
 
 (define-primitive (lognot si env expr)
   (emit-expr si env expr)
-  (emit "  shr rax, ~s" shift)
-  (emit "  not rax")
-  (emit "  shl rax, ~s" shift))
+  (emit "    shr rax, ~s" shift)
+  (emit "    not rax")
+  (emit "    shl rax, ~s" shift))
 
 (define-primitive (logor si env a b)
   (emit-binop si env a b)
-  (emit "  or rax, ~a" (get-stack-ea si)))
+  (emit "    or rax, ~a" (get-stack-ea si)))
 
 (define-primitive (logand si env a b)
   (emit-binop si env a b)
-  (emit "  and rax, ~a" (get-stack-ea si)))
+  (emit "    and rax, ~a" (get-stack-ea si)))
 
 (define-primitive (make-string si env len)
   (let ([size (* wordsize (+ 1 len))])
@@ -553,8 +553,8 @@
 
 (define-primitive (remainder si env a b)
   (emit-div si env a b)
-  (emit "   mov rax, rdx")
-  (emit "   shl rax, ~s" shift))
+  (emit "    mov rax, rdx")
+  (emit "    shl rax, ~s" shift))
 
 (define (emit-cmp-bool . args)
   ;; SETE sets the destination operand to 0 or 1 depending on the settings of
