@@ -323,13 +323,13 @@
   (let* ([len (string-length str)]
          [size (* wordsize (+ 1 len))])
 
-    (emit "    movq [rsi + 0], ~a    # Store \"~a\"" len str)
+    (emit "    mov qword ptr [rsi + 0], ~a    # Store \"~a\"" len str)
 
     (let f ([index wordsize]
             [ls (string->list str)])
 
       (unless (null? ls)
-        (emit "    movq [rsi + ~a], ~a" index (immediate-rep (car ls)))
+        (emit "    mov qword ptr [rsi + ~a], ~a" index (immediate-rep (car ls)))
         (f (+ wordsize index) (cdr ls))))
 
     (emit "    mov rax, rsi")
@@ -468,7 +468,7 @@
 
 (define-primitive (make-string si env len)
   (let ([size (* wordsize (+ 1 len))])
-    (emit "    movq [rsi + 0], ~a    # (make-string ~a)" len len)
+    (emit "    mov qword ptr [rsi + 0], ~a    # (make-string ~a)" len len)
     (emit "    mov rax, rsi")
     (emit "    or rax, ~a" strtag)
     (emit "    add rsi, ~a" size)))
@@ -521,7 +521,7 @@
   ;; The destination operand is an implied operand located in register AX
   ;; GCC throws `Error: ambiguous operand size for `mul'` without size
   ;; quantifier
-  (emit "    mulq ~a" (get-stack-ea si)))
+  (emit "    mul qword ptr ~a" (get-stack-ea si)))
 
 ;; Division turned out to be much more trickier than I expected it to be. Unlike
 ;; @namin's code, I'm using a shift arithmetic right (SAR) instead of shift
@@ -540,7 +540,7 @@
   (emit "    sar rax, ~s" shift)
   (emit "    mov rdx, 0")
   (emit "    cqo")
-  (emit "    idivq rcx    # ~a/~a" a b))
+  (emit "    idiv rcx    # ~a/~a" a b))
 
 (define-primitive (quotient si env a b)
   (emit-div si env a b)
@@ -591,9 +591,9 @@
   (emit-stack-save (next-stack-index si))
 
   (emit "    mov rax, ~a" (get-stack-ea si))
-  (emit "    movq [rsi + 0], rax    # '(~a ...)"  a)
+  (emit "    mov qword ptr [rsi + 0], rax    # '(~a ...)"  a)
   (emit "    mov rax, ~a" (get-stack-ea (next-stack-index si)))
-  (emit "    movq [rsi + 8], rax    # '(... ~a)"  b)
+  (emit "    mov qword ptr [rsi + 8], rax    # '(... ~a)"  b)
   (emit "    mov rax, rsi")
   (emit "    or rax, ~a" pairtag)
   (emit "    add rsi, ~a" (* 2 wordsize)))
