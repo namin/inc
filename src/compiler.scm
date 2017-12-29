@@ -473,6 +473,11 @@
     (emit "    or rax, ~a" strtag)
     (emit "    add rsi, ~a" size)))
 
+(define-primitive (string-length si env str)
+  (emit-expr si env str)
+  (emit "    mov rax, qword ptr [rax - ~a]" strtag)
+  (emit "    shl rax, ~s" shift))
+
 (define (get-stack-ea si)
   (assert (not (= si 0)))
   (cond
