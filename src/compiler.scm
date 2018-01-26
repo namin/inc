@@ -170,6 +170,29 @@
   (vector->list (hashtable-keys
                  (f expr env (make-eq-hashtable)))))
 
+;; Closure conversion
+;;
+;; Closure conversion aims to break down scheme lambdas into something simpler
+;; for code generation.
+;;
+;; The `code` form is effectively C style functions with free variables
+;; explicitly passed in as an argument.
+;;
+;; For example,
+;;
+;;     > (cc '(lambda (x) (+ x y)) '((+ #t)))
+;;     (code (x) (y) (+ x y)
+;;
+(define (cc expr env)
+  (cond
+   [(lambda? expr)
+    (let ([formals (cadr expr)]
+          ;; TODO: Handle implicit begin
+          [body (car (cddr expr))]
+          [free (free-vars expr env)])
+      (list 'code formals free (cc body env)))]
+   [else expr]))
+
 ;; Codegen helpers
 
 (define (emit-label label)
