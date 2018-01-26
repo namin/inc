@@ -142,6 +142,34 @@
 (define (app? env expr)
   (and (list? expr) (not (null? expr)) (lookup (car expr) env)))
 
+;; Find free variables in an expression.
+;;
+;; This is an extremely messy implementation because of the shitty stdlib and
+;; lack of even basic functional features like composition and currying. Will be
+;; very happy to replace with a clean version.
+;;
+(define (free-vars expr env)
+  (define (f expr env acc)
+    (cond
+     [(immediate? expr) acc]
+     [(symbol? expr) (if (lookup expr env) acc
+                         (begin
+                           (hashtable-set! acc expr #t)
+                           acc))]
+     [(lambda? expr)
+      (let* ([formals (cadr expr)]
+             [body (car (cddr expr))]
+             ;; Make a dummy environment out of formals
+             [fenv (map (lambda (x) (list x #t)) formals)]
+             ;; Make a unified env
+             [env (append env fenv)])
+        ;; In which Scheme pretends to be functional
+        (fold-right (lambda (e acc) (f e env acc)) acc body))]
+     [else (fold-right (lambda (e acc) (f e env acc)) acc expr)]))
+
+  (vector->list (hashtable-keys
+                 (f expr env (make-eq-hashtable)))))
+
 ;; Codegen helpers
 
 (define (emit-label label)
