@@ -223,6 +223,9 @@
     (emit-label final-label)))
 
 ;; Top level definitions
+;;
+;; TODO: I don't see why all bindings in a let rec should be a function. This
+;; restriction is not understood as of now.
 (define (emit-letrec si env expr)
   (letrec ([first car]
            [second cadr]
