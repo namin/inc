@@ -347,7 +347,6 @@
    [(string? expr) (emit-string si env expr)]
    [(let? expr) (emit-let si env (bindings expr) (body expr))]
    [(if? expr) (emit-if si env (cadr expr) (caddr expr) (cadddr expr))]
-   [(lambda? expr) (emit-lambda si env (cadr expr) (caddr expr))]
    [(app? env expr) (emit-app si env expr)]
    [else (error 'emit-expr (format "Unknown form ~a" expr))]))
 
