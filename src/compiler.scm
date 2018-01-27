@@ -1,5 +1,10 @@
 ;; An incremental compiler
 
+(library-directories "../")
+
+;; List utilities like that of Haskell.
+(import (srfi s1 lists))
+
 (load "tests-driver.scm")
 
 (load "../tests/01-integers.scm")
@@ -75,7 +80,7 @@
 ;; Get a value from an alist; check if this exists in stdlib
 (define (lookup key alist)
   (cond
-   [(assv key alist) => cadr]
+   [(assv key alist) => second]
    [else #f]))
 
 ;; Primitives with some magic global variables and macros.
@@ -99,7 +104,7 @@
 (define (primitive-emitter name)
   (define (compose f g) (lambda (x) (f (g x))))
   (cond
-   [(assv name prim-env) => (compose primitive-body cadr)]
+   [(assv name prim-env) => (compose primitive-body second)]
    [else (error 'primitive-emitter (format "~a is not a primitive" name))]))
 
 ;; Environment with alist
@@ -120,7 +125,7 @@
 
 (define (bindings expr)
   (assert (let? expr))
-  (cadr expr))
+  (second expr))
 
 (define (body expr)
   (assert (let? expr))
@@ -135,7 +140,7 @@
 (define (variable? x env)
   (and (symbol? x) (lookup x env)))
 
-;; Lambda; arguments at cadr, body at cddr
+;; Lambda; arguments at second, body at cddr
 (define (lambda? expr)
   (tagged-list expr 'lambda ))
 
@@ -158,8 +163,8 @@
                            (hashtable-set! acc expr #t)
                            acc))]
      [(lambda? expr)
-      (let* ([formals (cadr expr)]
-             [body (car (cddr expr))]
+      (let* ([formals (second expr)]
+             [body (third expr)]
              ;; Make a dummy environment out of formals
              [fenv (map (lambda (x) (list x #t)) formals)]
              ;; Make a unified env
@@ -187,9 +192,9 @@
 (define (cc expr env)
   (cond
    [(lambda? expr)
-    (let ([formals (cadr expr)]
+    (let ([formals (second expr)]
           ;; TODO: Handle implicit begin
-          [body (car (cddr expr))]
+          [body (third expr)]
           [free (free-vars expr env)])
       (list 'code formals free (cc body env)))]
    [(list? expr) (map (lambda (e) (cc e env)) expr)]
@@ -249,7 +254,7 @@
      [(null? b*) (emit-expr si new-env (car body))]
      [else
       (let ([b (car b*)])
-        (emit-expr si new-env (cadr b))
+        (emit-expr si new-env (second b))
         (emit-stack-save si)
         (f (next-stack-index si)
            (extend (car b) si new-env)
@@ -280,13 +285,11 @@
 ;; TODO: I don't see why all bindings in a let rec should be a function. This
 ;; restriction is not understood as of now.
 (define (emit-letrec si env expr)
-  (letrec ([first car]
-           [second cadr]
-           [make-env (lambda (lvars labels)
+  (letrec ([make-env (lambda (lvars labels)
                        (map list lvars labels))]
            ;; TODO: Allow multiple expressions in letrec body
-           [letrec-body caddr])
-    (let* ([bindings (cadr expr)]
+           [letrec-body third])
+    (let* ([bindings (second expr)]
            [lvars (map first bindings)]
            [lambdas (map second bindings)]
            ;; [labels (map unique-label lvars)]
@@ -311,9 +314,9 @@
   (lambda (expr label)
     (emit-function-header label)
     (emit-preamble)
-    (let ([formals (cadr expr)]
+    (let ([formals (second expr)]
           ;; TODO: Emit code for all expressions, not just car
-          [body (car (cddr expr))])
+          [body (third expr)])
       (let f ([formals formals]
               ;; The first argument to the function is available at `RSP - 8`
               [si (- wordsize)]
@@ -399,7 +402,7 @@
    [(variable? expr env) (emit-variable si env expr)]
    [(string? expr) (emit-string si env expr)]
    [(let? expr) (emit-let si env (bindings expr) (body expr))]
-   [(if? expr) (emit-if si env (cadr expr) (caddr expr) (cadddr expr))]
+   [(if? expr) (emit-if si env (second expr) (third expr) (fourth expr))]
    [(app? env expr) (emit-app si env expr)]
    [else (error 'emit-expr (format "Unknown form ~a" expr))]))
 
