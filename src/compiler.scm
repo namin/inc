@@ -191,6 +191,7 @@
           [body (car (cddr expr))]
           [free (free-vars expr env)])
       (list 'code formals free (cc body env)))]
+   [(list? expr) (map (lambda (e) (cc e env)) expr)]
    [else expr]))
 
 ;; Codegen helpers
