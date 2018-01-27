@@ -148,6 +148,7 @@
 ;; lack of even basic functional features like composition and currying. Will be
 ;; very happy to replace with a clean version.
 ;;
+;; It seems like finding free variables is exactly the same as an evaluator.
 (define (free-vars expr env)
   (define (f expr env acc)
     (cond
