@@ -10,7 +10,7 @@
 // R8, R9 and the return value is passed back in RAX.
 extern int64_t init(int64_t*) __attribute__((noinline));
 
-#define fxtag    0
+#define numtag    0
 #define booltag  1
 #define chartag  2
 #define pairtag  3
@@ -26,7 +26,7 @@ int64_t bool_t = (1 << shift) | booltag;
 
 void print(int64_t val, bool nested) {
 
-    if ((val & mask) == fxtag) {
+    if ((val & mask) == numtag) {
         printf("%" PRId64, val >> shift);
 
     } else if ((val & mask) == chartag) {
