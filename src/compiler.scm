@@ -177,8 +177,10 @@
         (fold-right (lambda (e acc) (f e env acc)) acc body))]
      [else (fold-right (lambda (e acc) (f e env acc)) acc expr)]))
 
-  (vector->list (hashtable-keys
-                 (f expr env (make-eq-hashtable)))))
+  ;; Ignore keywords and primitives from free variables
+  (let* ([keywords '((if #t))]
+         [new-env (if (null? env) (append prim-env keywords) env)])
+    (vector->list (hashtable-keys (f expr new-env (make-eq-hashtable))))))
 
 ;; Closure conversion
 ;;
