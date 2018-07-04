@@ -192,8 +192,8 @@
 ;;
 ;; For example,
 ;;
-;;     > (cc '(lambda (x) (+ x y)) '((+ #t)))
-;;     (code (x) (y) (+ x y)
+;;     > (cc '(lambda (x) (+ x y)) default-env)
+;;     '(code (x) (y) (+ x y))
 ;;
 (define (cc expr env)
   (cond

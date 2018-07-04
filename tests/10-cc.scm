@@ -10,4 +10,9 @@
                   (e 25)))
 
 (add-tests "closure conversion"
+
+  ;; The simplest example
+  [(cc '(lambda (x) (+ x y)) default-env) >>
+       '(code (x) (y) (+ x y))]
+
   [(cc sample default-env) >> result])
