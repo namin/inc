@@ -50,26 +50,35 @@
 (define all-tests '())
 
 (define-syntax add-tests
-  (syntax-rules (=>)
-    [(_ test-name [expr => output-string] ...)
+  (syntax-rules (=> >>)
+    [(_ test-name [input x expectation] ...)
      (set! all-tests
            (cons
-            '(test-name [expr string output-string] ...)
+            '(test-name [input x expectation] ...)
             all-tests))]))
 
 (define (test-one test-id test)
-  (let ([expr (car test)]
+  (let ([input (car test)]
         [type (cadr test)]
-        [expected-output (caddr test)])
-    (printf "Test ~s: ~s ..." test-id expr)
+        [expectation (caddr test)])
+    (printf "Test ~s: ~s ..." test-id input)
     (flush-output-port)
 
-    ;; Compile, build, execute and assert output with expectation
-    (let ([actual-output (run expr)])
-      (unless (equal? expected-output actual-output)
-        (error 'test-one
-               (format "Output mismatch for test ~s: expected ~s, got ~s"
-                       test-id expected-output actual-output))))
+    (case type
+
+      ;; Compile, build, execute and assert output with expectation
+      [=> (let ([result (run input)])
+            (unless (equal? expectation result)
+              (error 'match-test
+                     (format "~s. expected ~s, got ~s"
+                             test-id expectation result))))]
+
+      ;; Run a unit test
+      [>> (let ([result (eval input)])
+            (unless (equal? result (eval expectation))
+              (error 'unit-test
+                     (format "~s. expected ~s, got ~s"
+                             test-id expectation result))))])
     (printf " ok\n")))
 
 (define (test-all)
