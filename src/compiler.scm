@@ -16,6 +16,7 @@
 (load "../tests/07-cons.scm")
 (load "../tests/08-procedures.scm")
 (load "../tests/09-strings.scm")
+(load "../tests/10-cc.scm")
 
 ;; Constants
 (define wordsize             8)
