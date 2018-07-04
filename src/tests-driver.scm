@@ -46,13 +46,6 @@
   (build)
   (execute))
 
-;; Compile, build, execute and assert output with expectation
-(define (test-with-string-output test-id expr expected-output)
-  (let ([actual-output (run expr)])
-    (unless (equal? expected-output actual-output)
-      (error 'test (format "Output mismatch for test ~s: expected ~s, got ~s"
-                           test-id expected-output actual-output)))))
-
 ;; Collect all tests in a global variable
 (define all-tests '())
 
@@ -70,9 +63,13 @@
         [expected-output (caddr test)])
     (printf "Test ~s: ~s ..." test-id expr)
     (flush-output-port)
-    (case type
-      [(string) (test-with-string-output test-id expr expected-output)]
-      [else (error 'test "invalid test type ~s" type)])
+
+    ;; Compile, build, execute and assert output with expectation
+    (let ([actual-output (run expr)])
+      (unless (equal? expected-output actual-output)
+        (error 'test-one
+               (format "Output mismatch for test ~s: expected ~s, got ~s"
+                       test-id expected-output actual-output))))
     (printf " ok\n")))
 
 (define (test-all)
