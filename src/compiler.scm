@@ -117,19 +117,14 @@
 ;; Example: `((arg1 8) (b -24) (a -16))`
 (define default-env '())
 
+;; tagged-list is a helper function for checking syntactic forms.
+;;
+;; `(tagged-list e tag)` returns true for lists of the form `(tag 1 2 3)`
 (define (tagged-list expr name)
   (and (list? expr) (eq? name (car expr)) #t))
 
 (define (let? expr)
   (tagged-list expr 'let))
-
-(define (bindings expr)
-  (assert (let? expr))
-  (second expr))
-
-(define (body expr)
-  (assert (let? expr))
-  (cddr expr))
 
 (define (if? expr)
   (tagged-list expr 'if))
@@ -143,6 +138,14 @@
 ;; Lambda; arguments at second, body at cddr
 (define (lambda? expr)
   (tagged-list expr 'lambda ))
+
+(define (bindings expr)
+  (assert (let? expr))
+  (second expr))
+
+(define (body expr)
+  (assert (let? expr))
+  (cddr expr))
 
 (define (app? env expr)
   (and (list? expr) (not (null? expr)) (lookup (car expr) env)))

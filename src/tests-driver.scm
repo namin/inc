@@ -40,13 +40,13 @@
     (apply fprintf out args)
     (newline out)))
 
-;; Compile, build, execute and assert output with expectation
+;; Compile, build, execute and show the result in shell. Great for devel
 (define (run expr)
   (compile-program expr)
   (build)
   (execute))
 
-;; Compile, build, execute and show the result in shell. Great for devel
+;; Compile, build, execute and assert output with expectation
 (define (test-with-string-output test-id expr expected-output)
   (let ([actual-output (run expr)])
     (unless (equal? expected-output actual-output)
