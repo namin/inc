@@ -82,7 +82,7 @@
     (printf " ok\n")))
 
 (define (test-all)
-  (let f ([i 0] [ls (reverse all-tests)])
+  (let f ([i 0] [ls all-tests])
     (if (null? ls)
         (printf "Passed all ~s tests\n" i)
         (let ([x (car ls)] [ls (cdr ls)])
