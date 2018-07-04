@@ -78,7 +78,7 @@
             (unless (equal? result (eval expectation))
               (error 'unit-test
                      (format "~s. expected ~s, got ~s"
-                             test-id expectation result))))])
+                             test-id (eval expectation) result))))])
     (printf " ok\n")))
 
 (define (test-all)
