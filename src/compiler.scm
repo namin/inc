@@ -174,11 +174,15 @@
              ;; Make a unified env
              [env (append env fenv)])
         ;; In which Scheme pretends to be functional
-        (fold-right (lambda (e acc) (f e env acc)) acc body))]
-     [else (fold-right (lambda (e acc) (f e env acc)) acc expr)]))
+        (if (list? body)
+            (fold-right (lambda (e acc) (f e env acc)) acc body)
+            (f body env acc)))]
+     [else (if (list? expr)
+               (fold-right (lambda (e acc) (f e env acc)) acc expr)
+               (f body env acc))]))
 
   ;; Ignore keywords and primitives from free variables
-  (let* ([keywords '((if #t))]
+  (let* ([keywords '((if #t) (letrec #t))]
          [new-env (if (null? env) (append prim-env keywords) env)])
     (vector->list (hashtable-keys (f expr new-env (make-eq-hashtable))))))
 
