@@ -120,15 +120,14 @@
 
 ;; tagged-list is a helper function for checking syntactic forms.
 ;;
-;; `(tagged-list e tag)` returns true for lists of the form `(tag 1 2 3)`
-(define (tagged-list expr name)
-  (and (list? expr) (eq? name (car expr)) #t))
+;; `(tagged-list tag e)` returns true for lists of the form `(tag 1 2 3)`
+(define (tagged-list name)
+  (lambda (expr)
+    (and (list? expr) (eq? name (car expr)) #t)))
 
-(define (let? expr)
-  (tagged-list expr 'let))
+(define let? (tagged-list 'let))
 
-(define (if? expr)
-  (tagged-list expr 'if))
+(define if? (tagged-list 'if))
 
 (define (letrec? expr)
   (and (pair? expr) (eq? 'letrec (car expr))))
@@ -137,8 +136,7 @@
   (and (symbol? x) (lookup x env)))
 
 ;; Lambda; arguments at second, body at cddr
-(define (lambda? expr)
-  (tagged-list expr 'lambda ))
+(define lambda? (tagged-list 'lambda))
 
 (define (bindings expr)
   (assert (let? expr))
