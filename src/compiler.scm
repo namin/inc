@@ -208,6 +208,55 @@
    [(list? expr) (map (lambda (e) (cc e env)) expr)]
    [else expr]))
 
+;; lift code blocks
+;;
+;; An incremental approach is required here more than anywhere else. Sigh!
+;;
+;; 1. Lambdas bound inside named letrec, with no free variables
+;;
+
+(define (lift env expr)
+
+  (define labels '())
+
+  ;; Replace a function call of the form (NAME ...) with (labelcall NAME ...)
+  (define (labelcall name)
+    (lambda (expr)
+      (cond [((tagged-list name) expr)
+             (cons 'labelcall (cons name (cdr expr)) )]
+            [(list? expr) (map (labelcall name) expr)]
+            [else expr])))
+
+  (define (lift-lambda name expr)
+    (assert (lambda? expr))
+
+    (let* ([formals (second expr)]
+           [body (third expr)]
+           [free (free-vars expr env)]
+
+           ;; Use the components to build transformed version
+           [this (list 'code formals free (cc body env))])
+
+      ;; Add the code to top label with name
+      (set! labels (cons (list name this) labels))))
+
+  ;; Handle simplest letrec to begin with
+  (assert (letrec? expr))
+
+  ;; OMG! Scheme is so fucking hard to read, write or understand.
+  (letrec ([bindings (second expr)])
+    (let* ([lvars (map first bindings)]
+           [lambdas (map second bindings)]
+           [letrec-body (third expr)])
+
+      ;; Lift each lambda to top level labels and replace calls in the body
+      (for-each (lambda (name lam)
+                  (lift-lambda name lam)
+                  (set! letrec-body ((labelcall name) letrec-body)))
+                lvars lambdas)
+
+      (list 'labels labels letrec-body))))
+
 ;; Codegen helpers
 
 (define (emit-label label)
