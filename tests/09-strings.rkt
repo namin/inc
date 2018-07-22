@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "strings"
   ["Hello world !!" => "Hello world !!"]
   ["#t" => "#t"]

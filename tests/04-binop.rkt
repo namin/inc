@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 ;; WOW! I've never seem something that is more quickcheck friendly than this.
 ;;
 ;; I ended up with this file after cleaning up the tests and grouping them

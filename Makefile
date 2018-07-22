@@ -13,25 +13,21 @@
 # `-fno-asynchronous-unwind-tables` gets rid of all the '.cfi' directives from
 # the generated asm.
 
-src/inc: src/inc.s src/runtime.c
-	cd src && \
+inc: /tmp/inc.s src/runtime.c
 	gcc	-m64 \
 		-g3 -ggdb3 \
 		-fomit-frame-pointer \
 		-fno-asynchronous-unwind-tables \
-		-O0 runtime.c inc.s \
+		-O0 src/runtime.c /tmp/inc.s \
 		-o inc
-
-.PHONY: inc
-inc: src/inc
 
 .PHONY: test
 test:
-	cd src && echo '(test-all)' | scheme compiler.scm --quiet
+	cd src && racket run.rkt
 
 .PHONY: clean
 clean:
-	cd src && rm -f inc.s inc inc.out
+	rm -f inc /tmp/inc.s /tmp/inc.out
 
 .PHONY: container
 container:
@@ -41,4 +37,3 @@ container:
 .PHONY: ctest
 ctest: container
 	docker run inc make test
-

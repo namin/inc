@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "immediate constants"
    [#f => #f]
    [#t => #t]

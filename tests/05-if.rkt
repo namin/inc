@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "if"
   [(if #t 12 13) => 12]
   [(if #f 12 13) => 13]

@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "let"
   [(let ([x 5]) x) => 5]
   [(let ([x (+ 1 2)]) x) => 3]

@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "inc"
   [(inc 0) => 1]
   [(inc -1) => 0]

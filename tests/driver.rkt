@@ -1,44 +1,49 @@
-;; Test runner for the incremental compiler
+#lang racket
 
-(define file-asm "inc.s")
+(require "../src/compiler.rkt")
+
+(provide all-tests add-tests test-all)
+
+(define file-asm "/tmp/inc.s")
 (define file-bin "inc")
-(define file-out "inc.out")
+(define file-out "/tmp/inc.out")
 
-(define (build)
-  (unless (zero? (system "make -C .. --quiet"))
-    (error 'make "Could not build target")))
+;; Collect all tests in a global variable
+(define all-tests '())
 
-;; Execute the binary and return the output as a string
-(define (execute)
-  (let ([command (format "./~a > ~a" file-bin file-out)])
-    (unless (zero? (system command))
-      (error 'make "Produced program exited abnormally"))
-    (read (open-input-file file-out))))
+;; Indirect way to get around mutating module level variables.
+;;
+;; tldr; `set!` is not allowed on module level variables, this function prevents
+;; the error `set!: cannot mutate module-required identifier`
+;; https://docs.racket-lang.org/guide/module-set.html
+(define (mut! val)
+  (set! all-tests val))
 
-;; Compile port is a parameter that returns a port to write the generated asm
-;; to. This can be a file or stdout.
-(define compile-port
-  (make-parameter
-   (current-output-port)
-   (lambda (p)
-     (unless (output-port? p)
-       (error 'compile-port "Not an output port ~s" p))
-     p)))
+(define-syntax add-tests
+  (syntax-rules (=> >>)
+    [(_ test-name [input x expectation] ...)
+     (mut! (cons '(test-name [input x expectation] ...) all-tests))]))
 
 ;; Run the compiler but send the output to a file instead
 (define (compile-program expr)
   ;; Delete previous output file if any; existence of this file fails the test
   ;; consistently on docker.
   (system (format "rm -f ~a ~a" file-out file-bin))
-  (let ([p (open-output-file file-asm 'replace)])
+  (let ([p (open-output-file file-asm #:exists 'replace)])
     (parameterize ([compile-port p])
       (emit-program expr))
     (close-output-port p)))
 
-(define (emit . args)
-  (let ([out (compile-port)])
-    (apply fprintf out args)
-    (newline out)))
+(define (build)
+  (unless (system "make -C .. --quiet")
+    (error 'make "Could not build target")))
+
+;; Execute the binary and return the output as a string
+(define (execute)
+  (let ([command (format "./~a > ~a" file-bin file-out)])
+    (unless (system command)
+      (error 'make "Produced program exited abnormally"))
+    (read (open-input-file file-out))))
 
 ;; Compile, build, execute and show the result in shell. Great for devel
 (define (run expr)
@@ -46,39 +51,29 @@
   (build)
   (execute))
 
-;; Collect all tests in a global variable
-(define all-tests '())
-
-(define-syntax add-tests
-  (syntax-rules (=> >>)
-    [(_ test-name [input x expectation] ...)
-     (set! all-tests
-           (cons
-            '(test-name [input x expectation] ...)
-            all-tests))]))
-
 (define (test-one test-id test)
   (let ([input (car test)]
         [type (cadr test)]
         [expectation (caddr test)])
     (printf "Test ~s: ~s ..." test-id input)
-    (flush-output-port)
 
     (case type
 
       ;; Compile, build, execute and assert output with expectation
-      [=> (let ([result (run input)])
+      ['=> (let ([result (run input)])
             (unless (equal? expectation result)
               (error 'match-test
                      (format "~s. expected ~s, got ~s"
                              test-id expectation result))))]
 
       ;; Run a unit test
-      [>> (let ([result (eval input)])
-            (unless (equal? result (eval expectation))
+      ['>> (let* (;; Eval + namespace is really ugly and needs to be sorted out.
+                  [ns (module->namespace "src/compiler.rkt")]
+                  [result (eval input ns)])
+            (unless (equal? result (eval expectation ns))
               (error 'unit-test
                      (format "~s. expected ~s, got ~s"
-                             test-id (eval expectation) result))))])
+                             test-id (eval expectation ns) result))))])
     (printf " ok\n")))
 
 (define (test-all)

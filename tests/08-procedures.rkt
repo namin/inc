@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "procedures"
   [(letrec () 12) => 12]
   [(letrec () (let ([x 5]) (+ x x))) => 10]

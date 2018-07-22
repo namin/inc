@@ -1,22 +1,8 @@
 ;; An incremental compiler
 
-(library-directories "../")
+#lang racket
 
-;; List utilities like that of Haskell.
-(import (srfi s1 lists))
-
-(load "tests-driver.scm")
-
-(load "../tests/01-integers.scm")
-(load "../tests/02-immediate.scm")
-(load "../tests/03-unary.scm")
-(load "../tests/04-binop.scm")
-(load "../tests/05-if.scm")
-(load "../tests/06-let.scm")
-(load "../tests/07-cons.scm")
-(load "../tests/08-procedures.scm")
-(load "../tests/09-strings.scm")
-(load "../tests/10-cc.scm")
+(provide free-vars compile-port emit-program)
 
 ;; Constants
 (define wordsize             8)
@@ -50,8 +36,8 @@
 (define shift 3)
 
 ;; Boolean values can be computed just once upfront
-(define bool-f (bitwise-ior (ash 0 shift) booltag))
-(define bool-t (bitwise-ior (ash 1 shift) booltag))
+(define bool-f (bitwise-ior (arithmetic-shift 0 shift) booltag))
+(define bool-t (bitwise-ior (arithmetic-shift 1 shift) booltag))
 
 ;; Range for fixnums
 (define fixnum-bits (- (* wordsize 8) shift))
@@ -60,11 +46,11 @@
 
 (define (immediate-rep x)
   (cond
-   [(fixnum? x) (ash x shift)]
-   [(boolean? x) (if x bool-t bool-f)]
-   [(null? x) niltag]
-   [(char? x) (bitwise-ior (ash (char->integer x) shift) chartag)]
-   [else (error 'immediate-rep (format "Unknown form ~a" x))]))
+    [(fixnum? x) (arithmetic-shift x shift)]
+    [(boolean? x) (if x bool-t bool-f)]
+    [(null? x) niltag]
+    [(char? x) (bitwise-ior (arithmetic-shift (char->integer x) shift) chartag)]
+    [else (error 'immediate-rep (format "Unknown form ~a" x))]))
 
 (define (fixnum? x)
   (and (integer? x) (exact? x) (<= fxlower x fxupper)))
@@ -89,14 +75,14 @@
 ;; Top level environment
 (define prim-env '())
 
-(define-record-type primitive (fields name arity body))
+(struct primitive (name arity body))
 
 (define-syntax define-primitive
   (syntax-rules ()
     [(_ (prim-name arg* ...) b b* ...)
-     (let ([p (make-primitive 'prim-name
-                              (length '(arg* ...))
-                              (lambda (arg* ...) b b* ...))])
+     (let ([p (primitive 'prim-name
+                         (length '(arg* ...))
+                         (lambda (arg* ...) b b* ...))])
        (set! prim-env (extend 'prim-name p prim-env)))]))
 
 (define (primcall? expr)
@@ -139,11 +125,11 @@
 (define lambda? (tagged-list 'lambda))
 
 (define (bindings expr)
-  (assert (let? expr))
+  ;; (assert (let? expr))
   (second expr))
 
 (define (body expr)
-  (assert (let? expr))
+  ;; (assert (let? expr))
   (cddr expr))
 
 (define (app? env expr)
@@ -162,7 +148,7 @@
      [(immediate? expr) acc]
      [(symbol? expr) (if (lookup expr env) acc
                          (begin
-                           (hashtable-set! acc expr #t)
+                           (hash-set! acc expr #t)
                            acc))]
      [(lambda? expr)
       (let* ([formals (second expr)]
@@ -173,16 +159,16 @@
              [env (append env fenv)])
         ;; In which Scheme pretends to be functional
         (if (list? body)
-            (fold-right (lambda (e acc) (f e env acc)) acc body)
+            (foldr (lambda (e acc) (f e env acc)) acc body)
             (f body env acc)))]
      [else (if (list? expr)
-               (fold-right (lambda (e acc) (f e env acc)) acc expr)
+               (foldr (lambda (e acc) (f e env acc)) acc expr)
                (f body env acc))]))
 
   ;; Ignore keywords and primitives from free variables
   (let* ([keywords '((if #t) (letrec #t))]
          [new-env (if (null? env) (append prim-env keywords) env)])
-    (vector->list (hashtable-keys (f expr new-env (make-eq-hashtable))))))
+    (hash-keys (f expr new-env (make-hash)))))
 
 ;; Closure conversion
 ;;
@@ -228,7 +214,7 @@
             [else expr])))
 
   (define (lift-lambda name expr)
-    (assert (lambda? expr))
+    ;;(assert (lambda? expr))
 
     (let* ([formals (second expr)]
            [body (third expr)]
@@ -241,7 +227,7 @@
       (set! labels (cons (list name this) labels))))
 
   ;; Handle simplest letrec to begin with
-  (assert (letrec? expr))
+  ;; (assert (letrec? expr))
 
   ;; OMG! Scheme is so fucking hard to read, write or understand.
   (letrec ([bindings (second expr)])
@@ -258,6 +244,21 @@
       (list 'labels labels letrec-body))))
 
 ;; Codegen helpers
+
+;; Compile port is a parameter that returns a port to write the generated asm
+;; to. This can be a file or stdout.
+(define compile-port
+  (make-parameter
+   (current-output-port)
+   (lambda (p)
+     (unless (output-port? p)
+       (error 'compile-port "Not an output port ~s" p))
+     p)))
+
+(define (emit . args)
+  (let ([out (compile-port)])
+    (apply fprintf out args)
+    (newline out)))
 
 (define (emit-label label)
   (emit "~a:" label))
@@ -594,7 +595,7 @@
   (emit "    shl rax, ~s" shift))
 
 (define (get-stack-ea si)
-  (assert (not (= si 0)))
+  ;; (assert (not (= si 0)))
   (cond
    [(> si 0) (format "[rbp + ~s]" si)]
    [(< si 0) (format "[rbp - ~s]" (- si))]))

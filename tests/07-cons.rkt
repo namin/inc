@@ -1,3 +1,7 @@
+#lang racket
+
+(require "../src/driver.rkt")
+
 (add-tests "cons"
   [(pair? (cons 1 2)) => #t]
   [(pair? 12) => #f]
