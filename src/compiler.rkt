@@ -170,37 +170,18 @@
          [new-env (if (null? env) (append prim-env keywords) env)])
     (hash-keys (f expr new-env (make-hash)))))
 
-;; Closure conversion
+;; lift code blocks, aka closure conversion
 ;;
 ;; Closure conversion aims to break down scheme lambdas into something simpler
 ;; for code generation.
 ;;
 ;; The `code` form is effectively C style functions with free variables
-;; explicitly passed in as an argument.
-;;
-;; For example,
-;;
-;;     > (cc '(lambda (x) (+ x y)) default-env)
-;;     '(code (x) (y) (+ x y))
-;;
-(define (cc expr env)
-  (cond
-   [(lambda? expr)
-    (let ([formals (second expr)]
-          ;; TODO: Handle implicit begin
-          [body (third expr)]
-          [free (free-vars expr env)])
-      (list 'code formals free (cc body env)))]
-   [(list? expr) (map (lambda (e) (cc e env)) expr)]
-   [else expr]))
-
-;; lift code blocks
+;; explicitly passed in as an argument with a closure object on heap.
 ;;
 ;; An incremental approach is required here more than anywhere else. Sigh!
 ;;
 ;; 1. Lambdas bound inside named letrec, with no free variables
 ;;
-
 (define (lift env expr)
 
   (define labels '())
@@ -221,7 +202,7 @@
            [free (free-vars expr env)]
 
            ;; Use the components to build transformed version
-           [this (list 'code formals free (cc body env))])
+           [this (list 'code formals free body)])
 
       ;; Add the code to top label with name
       (set! labels (cons (list name this) labels))))

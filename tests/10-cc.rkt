@@ -38,12 +38,9 @@
                  (e 25))
               default-env) >> '(e o)])
 
-(add-tests "closure conversion"
+(add-tests "Closure conversion"
 
-  ;; The simplest example
-  [(cc '(lambda (x) (+ x y)) empty) >> '(code (x) (y) (+ x y))])
-
-(add-tests "lift"
+  ;; Simple recursive letrec
   [(lift empty '(letrec ([e (lambda (x) (if (zero? x) #t (o (dec x))))]
                          [o (lambda (x) (if (zero? x) #f (e (dec x))))])
                   (e 25)) ) >>
