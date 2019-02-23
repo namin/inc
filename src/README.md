@@ -4,12 +4,12 @@ Inc: an incrementally developed compiler
 Setup instructions for Ubuntu x86
 ---------------------------------
 
-- [Install Petite Chez Scheme](http://www.scheme.com/download/index.html#sec:petitechezscheme)
+- `$ sudo apt-get install chezscheme`
 - `$ sudo apt-get install libc6-dev-i386`
 
 Quick instructions to run all tests
 -----------------------------------
-    $ petite compiler.scm
+    $ scheme compiler.scm
       > (compile-lib)     ;; just once
       > (test-all)        ;; run all the tests
 
