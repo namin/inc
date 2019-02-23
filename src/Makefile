@@ -16,6 +16,7 @@
 lib.s: tests-driver.scm compiler.scm lib.scm
 	echo '(compile-lib)' | scheme compiler.scm --quiet
 
+.PHONY: stst
 stst: startup.c lib.s stst.s
 	gcc	-m32 \
 		-Wall \
