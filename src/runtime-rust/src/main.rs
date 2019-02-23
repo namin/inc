@@ -1,3 +1,8 @@
+extern "C" {
+    fn scheme_entry() -> u32;
+}
+
 fn main() {
-    println!("Hello, world!");
+   let r = unsafe { scheme_entry() };
+   println!("{}", r);
 }
