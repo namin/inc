@@ -50,7 +50,7 @@ fn print_ptr_rec(p: ptr, state: PrintState) {
         let cdr = cell.cdr;
         if cdr != list_nil {
             if (cdr & obj_mask) != pair_tag {
-                print!(".");
+                print!(" . ");
                 print_ptr_rec(cdr, PrintState::OUT);
             } else {
                 print!(" ");
@@ -58,8 +58,35 @@ fn print_ptr_rec(p: ptr, state: PrintState) {
             }
         }
         if state == PrintState::OUT { print!(")"); }
+    } else if (x & obj_mask) == vector_tag {
+        print!("#(");
+        let p = unsafe { *((x-vector_tag) as *mut vector) };
+        let n = (p.length as i32) >> fx_shift;
+        for i in 0..n {
+            if i > 0 { print!(" "); }
+            print_ptr_rec(
+                unsafe { *((&p.buf[0] as *const ptr).offset(i as isize)) },
+                PrintState::OUT)
+        }
+        print!(")");
+    } else if (x & obj_mask) == string_tag {
+        if state == PrintState::OUT { print!("\""); }
+        let p = unsafe { *((x-string_tag) as *mut string) };
+        let n = (p.length as i32) >> fx_shift;
+        for i in 0..n {
+            let c = std::char::from_u32(unsafe { *((&p.buf[0] as *const c_char).offset(i as isize)) } as u32)
+                .expect("char");
+            if c == '"'       { print!("\\\""); }
+            else if c == '\\' { print!("\\\\"); }
+            else              { print!("{}", c); }
+        }
+        if state == PrintState::OUT { print!("\""); }
+    } else if (x & obj_mask) == symbol_tag {
+        print_ptr_rec((x - symbol_tag) | string_tag, PrintState::IN);
+    } else if (x & obj_mask) == closure_tag {
+        print!("#<procedure>");
     } else {
-        print!("TODO");
+        print!("#<unknown 0x{:x}>", x);
     }
 }
 fn print_ptr(x: ptr) {
