@@ -7,19 +7,42 @@
 
 include!("bindings.rs");
 
-use std::os::raw::c_uint;
-use std :: os :: raw :: c_char;
+//use std::os::raw::c_uint;
+//use std::os::raw::c_int;
+use std::os::raw::c_char;
 use std::io::Write;
 
+#[derive(PartialEq)]
 enum PrintState {
     OUT,
     IN,
-    DISPLY
+    DISPLAY
 }
 
-fn print_ptr_rec(mut port: std::io::Stdout, x: ptr, state: PrintState) {
+fn print_ptr_rec(mut port: std::io::Stdout, p: ptr, state: PrintState) {
+    let x = p as u32;
     if  (x & fx_mask) == fx_tag {
-        write!(port, "{}", (x as c_uint) >> fx_shift);
+        write!(port, "{}", (x as i32) >> fx_shift);
+    } else if x == bool_f {
+        write!(port, "#f");
+    } else if x == bool_t {
+        write!(port, "#t");
+    } else if x == list_nil {
+        write!(port, "()");
+    } else if x == eof_obj {
+        write!(port, "#!eof");
+    } else if (x & char_mask) == char_tag {
+        let c = std::char::from_u32(x >> char_shift).
+            expect("a char");
+        if state == PrintState::DISPLAY {
+            write!(port, "{}", c);
+        } else {
+            if      c == '\t' { write!(port, "#\\tab"); }
+            else if c == '\n' { write!(port, "#\\newline"); }
+            else if c == '\r' { write!(port, "#\\return"); }
+            else if c == ' '  { write!(port, "#\\space"); }
+            else              { write!(port, "#\\{}", c); }
+        }
     } else {
         write!(port, "TODO");
     }
