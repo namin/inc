@@ -3,6 +3,7 @@ extern crate bindgen;
 
 fn main() {
     cc::Build::new()
+        .file("../lib.s")
         .file("../stst.s")
         .compile("scheme-entry-lib");
 

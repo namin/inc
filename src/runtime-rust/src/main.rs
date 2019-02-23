@@ -10,7 +10,6 @@ include!("bindings.rs");
 //use std::os::raw::c_uint;
 //use std::os::raw::c_int;
 use std::os::raw::c_char;
-use std::io::Write;
 
 #[derive(PartialEq)]
 enum PrintState {
@@ -19,37 +18,100 @@ enum PrintState {
     DISPLAY
 }
 
-fn print_ptr_rec(mut port: std::io::Stdout, p: ptr, state: PrintState) {
+fn print_ptr_rec(p: ptr, state: PrintState) {
     let x = p as u32;
     if  (x & fx_mask) == fx_tag {
-        write!(port, "{}", (x as i32) >> fx_shift);
+        print!("{}", (x as i32) >> fx_shift);
     } else if x == bool_f {
-        write!(port, "#f");
+        print!("#f");
     } else if x == bool_t {
-        write!(port, "#t");
+        print!("#t");
     } else if x == list_nil {
-        write!(port, "()");
+        print!("()");
     } else if x == eof_obj {
-        write!(port, "#!eof");
+        print!("#!eof");
     } else if (x & char_mask) == char_tag {
         let c = std::char::from_u32(x >> char_shift).
             expect("a char");
         if state == PrintState::DISPLAY {
-            write!(port, "{}", c);
+            print!("{}", c);
         } else {
-            if      c == '\t' { write!(port, "#\\tab"); }
-            else if c == '\n' { write!(port, "#\\newline"); }
-            else if c == '\r' { write!(port, "#\\return"); }
-            else if c == ' '  { write!(port, "#\\space"); }
-            else              { write!(port, "#\\{}", c); }
+            if      c == '\t' { print!("#\\tab"); }
+            else if c == '\n' { print!("#\\newline"); }
+            else if c == '\r' { print!("#\\return"); }
+            else if c == ' '  { print!("#\\space"); }
+            else              { print!("#\\{}", c); }
         }
+    } else if (x & obj_mask) == pair_tag {
+        if state == PrintState::OUT { print!("("); }
+        let cell = unsafe { *((x-pair_tag) as *mut cell) };
+        let car = cell.car;
+        print_ptr_rec(car, PrintState::OUT);
+        let cdr = cell.cdr;
+        if cdr != list_nil {
+            if (cdr & obj_mask) != pair_tag {
+                print!(".");
+                print_ptr_rec(cdr, PrintState::OUT);
+            } else {
+                print!(" ");
+                print_ptr_rec(cdr, PrintState::IN);
+            }
+        }
+        if state == PrintState::OUT { print!(")"); }
     } else {
-        write!(port, "TODO");
+        print!("TODO");
     }
 }
 fn print_ptr(x: ptr) {
-    print_ptr_rec(std::io::stdout(), x, PrintState::OUT);
+    print_ptr_rec(x, PrintState::OUT);
     println!("");
+}
+
+#[no_mangle]
+pub extern "C" fn ik_log(msg: ptr) {
+}
+#[no_mangle]
+pub extern "C" fn ik_error(x: ptr) {
+}
+#[no_mangle]
+pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
+    0
+}
+#[no_mangle]
+pub extern "C" fn s_open_write(fname: ptr) -> ptr {
+    0
+}
+#[no_mangle]
+pub extern "C" fn s_fflush(fd: ptr) -> ptr {
+    0
+}
+#[no_mangle]
+pub extern "C" fn scheme_write(fd: ptr, x: ptr, opt: ptr) -> ptr {
+    0
+}
+#[no_mangle]
+pub extern "C" fn s_open_read(fname: ptr) -> ptr {
+    0
+}
+#[no_mangle]
+pub extern "C" fn s_read_char(fd: ptr) -> ptr {
+    0
+}
+#[no_mangle]
+pub extern "C" fn s_close(fd: ptr) -> ptr {
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn heap_alloc(mem: *mut memory, stack: *mut c_char, size: usize) -> *mut c_char {
+    let heap_next = unsafe { (*mem).heap_next };
+    let heap_new = unsafe { heap_next.offset(size as isize) };
+    if heap_new >= unsafe { (*mem).heap_top } {
+        eprintln!("Exception: overflow");
+        std::process::exit(0);
+    }
+    unsafe {(*mem).heap_next = heap_new};
+    return heap_next;
 }
 
 fn allocate_protected_space(size: usize) -> *mut c_char {
