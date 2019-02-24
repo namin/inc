@@ -46,18 +46,18 @@ typedef struct {
 
 typedef struct {
   ptr length;
-  ptr buf[1];
+  ptr buf[];
 } vector;
 
 typedef struct {
   ptr length;
-  char buf[1];
+  char buf[];
 } string;
 
 typedef struct {
   ptr length;
   ptr label;
-  ptr fvs[1];
+  ptr fvs[];
 } closure;
 
 typedef struct {

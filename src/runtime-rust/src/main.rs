@@ -44,7 +44,7 @@ fn print_ptr_rec(p: ptr, state: PrintState) {
         }
     } else if (x & obj_mask) == pair_tag {
         if state == PrintState::OUT { print!("("); }
-        let cell = unsafe { *((x-pair_tag) as *mut cell) };
+        let cell = unsafe { *((x-pair_tag) as *const cell) };
         let car = cell.car;
         print_ptr_rec(car, PrintState::OUT);
         let cdr = cell.cdr;
@@ -60,26 +60,28 @@ fn print_ptr_rec(p: ptr, state: PrintState) {
         if state == PrintState::OUT { print!(")"); }
     } else if (x & obj_mask) == vector_tag {
         print!("#(");
-        let p = unsafe { *((x-vector_tag) as *mut vector) };
+        unsafe {
+        let p = &*((x-vector_tag) as *const vector);
         let n = (p.length as i32) >> fx_shift;
         for i in 0..n {
             if i > 0 { print!(" "); }
             print_ptr_rec(
-                unsafe { *((&p.buf[0] as *const ptr).offset(i as isize)) },
+                *((p.buf.as_ptr()).offset(i as isize)),
                 PrintState::OUT)
-        }
+        }}
         print!(")");
     } else if (x & obj_mask) == string_tag {
         if state == PrintState::OUT { print!("\""); }
-        let p = unsafe { *((x-string_tag) as *mut string) };
+        unsafe {
+        let p = &*((x-string_tag) as *const string);
         let n = (p.length as i32) >> fx_shift;
         for i in 0..n {
-            let c = std::char::from_u32(unsafe { *((&p.buf[0] as *const c_char).offset(i as isize)) } as u32)
+            let c = std::char::from_u32(*((p.buf.as_ptr()).offset(i as isize)) as u32)
                 .expect("char");
             if c == '"'       { print!("\\\""); }
             else if c == '\\' { print!("\\\\"); }
             else              { print!("{}", c); }
-        }
+        }}
         if state == PrintState::OUT { print!("\""); }
     } else if (x & obj_mask) == symbol_tag {
         print_ptr_rec((x - symbol_tag) | string_tag, PrintState::IN);
