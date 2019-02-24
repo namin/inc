@@ -1,9 +1,10 @@
 # runtime-rust
 
-This is an (abandoned?) attempt to rewrite `startup.c` in Rust.
+This is an attempt to rewrite `startup.c` in Rust, as an exercise in learning Rust.
+Pointless?
 
-All the tests below `4.*` pass, but there is more work to reach
-parity, including implementing the garbage collector.
+All the tests below `5.*` pass.
+The remaining TODO to reach parity is to implement the garbage collector.
 
 In Scheme, from `..`:
 ```
