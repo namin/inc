@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_must_use)]
+#![allow(unused_imports)]
 
 include!("bindings.rs");
 
@@ -12,7 +13,7 @@ use std::os::raw::c_char;
 use std::io::Write;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::io::IntoRawFd;
-
+use std::convert::From;
 extern crate libc;
 
 #[derive(PartialEq)]
@@ -141,15 +142,15 @@ fn string_data(x: ptr) -> *mut c_char {
         p.buf.as_ptr() as *mut c_char
     }
 }
-fn cp_str_data(x: ptr, buf: *mut c_char, buf_length: u32) {
+fn ptr_string_to_str(x: ptr) -> String {
     unsafe {
         let p = &*((x-string_tag) as *const string);
-        let n = unshift(p.length) as u32;
-        let m = std::cmp::min(n, buf_length-1);
-        for i in 0..m {
-            *(buf.offset(i as isize)) = *(p.buf.as_ptr().offset(i as isize));
+        let n = unshift(p.length) as usize;
+        let mut v = Vec::with_capacity(n);
+        for i in 0..n {
+            v.push(*(p.buf.as_ptr().offset(i as isize)) as u8);
         }
-        *(buf.offset(m as isize)) = 0;
+        std::ffi::CString::from_vec_unchecked(v).into_string().expect("string")
     }
 }
 #[no_mangle]
@@ -159,9 +160,9 @@ pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_open_write(fname: ptr) -> ptr {
-    let mut c_fname: [c_char; 10] = [0 as c_char; 10];
-    cp_str_data(fname, c_fname.as_mut_ptr(), 10);
-    let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC, 0640) };
+    let s_fname = ptr_string_to_str(fname);
+    let port = std::fs::File::create(s_fname).expect("created");
+    let fd = port.into_raw_fd();
     shift(fd)
 }
 #[no_mangle]
@@ -188,9 +189,9 @@ pub extern "C" fn scheme_write(fd: ptr, x: ptr, opt: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_open_read(fname: ptr) -> ptr {
-    let mut c_fname: [c_char; 10] = [0; 10];
-    cp_str_data(fname, c_fname.as_mut_ptr(), 10);
-    let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_RDONLY) };
+    let s_fname = ptr_string_to_str(fname);
+    let port = std::fs::File::open(s_fname).expect("opened");
+    let fd = port.into_raw_fd();
     shift(fd)
 }
 #[no_mangle]
