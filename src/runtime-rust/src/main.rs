@@ -322,8 +322,8 @@ fn gc(mem: *mut memory, stack: *mut c_char) {
             } else {
                 *root = gc_forward(*root);
             }
+            root = root.offset(-1);
         }
-        root.offset(-1);
     }
 
     unsafe {
