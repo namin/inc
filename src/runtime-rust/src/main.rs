@@ -155,8 +155,15 @@ fn ptr_string_to_str(x: ptr) -> String {
 }
 #[no_mangle]
 pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
-    let bytes = unsafe { libc::write(unshift(fd), string_data(str) as *const libc::c_void, unshift(len) as usize)};
-    shift(bytes as i32)
+    let s = ptr_string_to_str(str);
+    let len = unshift(len) as usize;
+    let s: String = s.chars().take(len).collect();
+    let ufd = unshift(fd) as i32;
+    let mut w = unsafe { std::fs::File::from_raw_fd(ufd) };
+    write!(w, "{}", s);
+    w.flush();
+    w.into_raw_fd();
+    shift(s.len() as i32)
 }
 #[no_mangle]
 pub extern "C" fn s_open_write(fname: ptr) -> ptr {
