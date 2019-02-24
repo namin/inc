@@ -3,6 +3,7 @@
 #![allow(non_snake_case)]
 
 #![allow(unused_must_use)]
+#![allow(unused_variables)]
 
 include!("bindings.rs");
 
@@ -210,13 +211,177 @@ pub extern "C" fn s_close(fd: ptr) -> ptr {
     shift(0)
 }
 
+fn gc_align(n: usize) -> usize {
+  let cell = 1 << obj_shift;
+  (((n + cell - 1)/cell) * cell) as usize
+}
+
+fn gc_ptr_object(x: ptr) -> bool {
+    let tag = x & obj_mask;
+    match tag {
+        pair_tag |
+        vector_tag |
+        symbol_tag |
+        string_tag |
+        closure_tag => true,
+        _ => false
+    }
+}
+fn gc_size(x: ptr) -> usize {
+    let tag = x & obj_mask;
+    let p = x-tag;
+    match tag {
+        pair_tag => 2 << word_shift,
+        vector_tag => {
+            let n = shift(unsafe{(&*(p as *const vector)).length} as i32) + 1;
+            (n as usize) << word_shift
+        },
+        symbol_tag | string_tag =>
+            (shift(unsafe{(&*(p as *const string)).length} as i32) + word_size) as usize,
+        closure_tag => {
+            let n = shift(unsafe{(&*(p as *const closure)).length} as i32) + 2;
+            (n as usize) << word_shift
+        },
+        _ => 0
+    }
+}
+
+
+static mut gc_new_heap_base: *mut c_char = 0 as *mut c_char;
+static mut gc_new_heap_top: *mut c_char = 0 as *mut c_char;
+static mut gc_next: *mut c_char = 0 as *mut c_char;
+static mut gc_queue: *mut ptr = 0 as *mut ptr;
+
+fn gc_get_forward_pointer(p: *mut c_char) -> *mut c_char {
+    let x = unsafe{*p as ptr};
+    if x != gc_forward_mark { return 0 as *mut c_char; }
+    let q = unsafe{*((p as *mut ptr).add(1)) as *mut c_char};
+    q
+}
+
+fn gc_set_forward_pointer(p: *mut c_char, q: *mut c_char) {
+    unsafe {
+        *p = gc_forward_mark as c_char;
+        *((p as *mut ptr).add(1)) = q as ptr;
+    }
+}
+
+fn gc_forward(x: ptr) -> ptr {
+    if !gc_ptr_object(x) {
+        return x;
+    }
+    
+    let tag = x & obj_mask;
+    let p = (x-tag) as *mut c_char;
+    let mut q = gc_get_forward_pointer(p);
+    if q != (0 as *mut c_char) {
+        return (q as ptr) | tag;
+    }
+
+    unsafe {
+    q = gc_next;
+    let n = gc_size(x);
+    for i in 0..n {
+        *gc_next.add(i) = *p.add(i);
+    }
+    gc_next = gc_next.add(gc_align(n));
+    gc_set_forward_pointer(p, q);
+    let f = ((q as ptr) | tag) as ptr;
+    *gc_queue = f;
+    gc_queue = gc_queue.add(1);
+    f
+    }
+}
+    
+
+fn gc(mem: *mut memory, stack: *mut c_char) {
+    unsafe {
+    gc_new_heap_base = (*mem).heap_base_alt as *mut c_char;
+    gc_new_heap_top = (*mem).heap_top_alt as *mut c_char;
+
+    gc_next = (*mem).heap_base_alt as *mut c_char;
+    gc_queue = (*mem).scratch_base as *mut ptr;
+    }
+
+    let scan = unsafe{gc_queue};
+    let mut root = unsafe{*mem}.global_base as *mut ptr;
+    while unsafe { (root as *mut c_char) < (*mem).global_next } {
+        unsafe {
+            *root = gc_forward(*root);
+            root = root.add(1);
+        }
+    }
+
+    root = unsafe{*mem}.stack_base as *mut ptr;
+    unsafe {
+    root.offset(-1);
+    root.offset(-1);
+        while root > (stack as *mut ptr) {
+            if *root == return_addr {
+                root.offset(-1);
+            } else {
+                *root = gc_forward(*root);
+            }
+        }
+        root.offset(-1);
+    }
+
+    unsafe {
+        (*mem).edi = gc_forward((*mem).edi);
+    }
+
+    while scan < unsafe{gc_queue} {
+        let x = unsafe { *(scan.add(1)) };
+        let tag = x & obj_mask;
+
+        if tag == pair_tag {
+            unsafe {
+                let p = (x-tag) as *mut cell;
+                (*p).car = gc_forward((*p).car);
+                (*p).cdr = gc_forward((*p).cdr);
+            }
+        } else if tag == vector_tag {
+            unsafe {
+                let p = (x-tag) as *mut vector;
+                let len = unshift((*p).length) as usize;
+                let b = (*p).buf.as_mut_ptr();
+                for i in 0..len {
+                    *(b.add(i)) = gc_forward(*(b.add(i)));
+                }
+            }
+        } else if tag == closure_tag {
+            unsafe {
+                let p = (x-tag) as *mut closure;
+                let len = unshift((*p).length) as usize;
+                let b = (*p).fvs.as_mut_ptr();
+                for i in 0..len {
+                    *(b.add(i)) = gc_forward(*(b.add(i)));
+                }
+            }
+        }
+    }
+
+    unsafe {
+        (*mem).heap_next = gc_next;
+        (*mem).heap_base_alt = (*mem).heap_base;
+        (*mem).heap_top_alt = (*mem).heap_top;
+        (*mem).heap_base = gc_new_heap_base;
+        (*mem).heap_top = gc_new_heap_top;
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn heap_alloc(mem: *mut memory, _stack: *mut c_char, size: usize) -> *mut c_char {
-    let heap_next = unsafe {*mem}.heap_next;
-    let heap_new = unsafe { heap_next.add(size) };
-    if heap_new >= unsafe {*mem}.heap_top {
-        eprintln!("Exception: overflow");
-        std::process::exit(0);
+pub extern "C" fn heap_alloc(mem: *mut memory, stack: *mut c_char, size: usize) -> *mut c_char {
+    let mut heap_next = unsafe {*mem}.heap_next;
+    let mut heap_new = unsafe { heap_next.add(size) };
+    if unsafe { heap_new >= (*mem).heap_top } {
+        gc(mem, stack);
+        heap_next = unsafe{*mem}.heap_next;
+        heap_new = unsafe { heap_next.add(size) };
+        if unsafe { heap_new >= (*mem).heap_top } {
+            eprintln!("Exception: overflow");
+            std::process::exit(0);
+        }
     }
     unsafe {(*mem).heap_next = heap_new};
     return heap_next;
