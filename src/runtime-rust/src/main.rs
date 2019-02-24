@@ -96,7 +96,11 @@ fn print_ptr(x: ptr) {
 }
 
 #[no_mangle]
-pub extern "C" fn ik_log(msg: ptr) {
+pub extern "C" fn ik_log(msg: ptr) -> ptr {
+    eprint!("log: ");
+    print_ptr_rec(&mut std::io::stderr(), msg, PrintState::IN);
+    eprintln!("");
+    0
 }
 #[no_mangle]
 pub extern "C" fn ik_error(x: ptr) {
