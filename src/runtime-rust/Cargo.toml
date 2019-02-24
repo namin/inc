@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Nada Amin <namin@alum.mit.edu>"]
 
 [dependencies]
-libc = "0.2"
 
 [build-dependencies]
 cc = "1.0"

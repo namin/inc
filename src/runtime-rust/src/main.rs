@@ -14,7 +14,7 @@ use std::io::Write;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::io::IntoRawFd;
 use std::convert::From;
-extern crate libc;
+use std::io::Read;
 
 #[derive(PartialEq)]
 enum PrintState {
@@ -203,13 +203,14 @@ pub extern "C" fn s_open_read(fname: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_read_char(fd: ptr) -> ptr {
-    let mut ca: [u32; 1] = [0;1];
-    let ufd = unshift(fd);
-    if unsafe { libc::read(ufd, ca.as_mut_ptr() as *mut libc::c_void, 1) } < 1 {
-        eof_obj
-    } else {
-        (ca[0] << char_shift) | char_tag
-    }
+    let ufd = unshift(fd) as i32;
+    let mut w = unsafe { std::fs::File::from_raw_fd(ufd) };
+    let mut b = [0; 1];
+    w.read_exact(&mut b);
+    let v = if b[0] == 0 { eof_obj }
+        else { ((b[0] as u32) << char_shift) | char_tag };
+    w.into_raw_fd();
+    v
 }
 #[no_mangle]
 pub extern "C" fn s_close(fd: ptr) -> ptr {
