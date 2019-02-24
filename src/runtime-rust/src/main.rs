@@ -144,12 +144,12 @@ fn string_data(x: ptr) -> *mut c_char {
 fn cp_str_data(x: ptr, buf: *mut c_char, buf_length: u32) {
     unsafe {
         let p = &*((x-string_tag) as *const string);
-        let n = shift(p.length as i32);
-        let m = std::cmp::max(n, buf_length);
+        let n = unshift(p.length) as u32;
+        let m = std::cmp::min(n, buf_length-1);
         for i in 0..m {
-            *buf.offset(i as isize) = *p.buf.as_ptr().offset(i as isize);
+            *(buf.offset(i as isize)) = *(p.buf.as_ptr().offset(i as isize));
         }
-        *buf.offset(m as isize) = 0;
+        *(buf.offset(m as isize)) = 0;
     }
 }
 #[no_mangle]
@@ -159,10 +159,8 @@ pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_open_write(fname: ptr) -> ptr {
-    let mut c_fname: [c_char; 100] = [0; 100];
-    std::io::stdout().flush();
+    let mut c_fname: [c_char; 100] = [0 as c_char; 100];
     cp_str_data(fname, c_fname.as_mut_ptr(), 100);
-    std::io::stdout().flush();
     let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC, 0640) };
     shift(fd)
 }
@@ -188,9 +186,7 @@ pub extern "C" fn scheme_write(fd: ptr, x: ptr, opt: ptr) -> ptr {
 #[no_mangle]
 pub extern "C" fn s_open_read(fname: ptr) -> ptr {
     let mut c_fname: [c_char; 100] = [0; 100];
-    std::io::stdout().flush();
     cp_str_data(fname, c_fname.as_mut_ptr(), 100);
-    std::io::stdout().flush();
     let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_RDONLY) };
     shift(fd)
 }
