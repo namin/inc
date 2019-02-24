@@ -3,10 +3,12 @@
 #![allow(non_snake_case)]
 
 #![allow(unused_variables)]
+#![allow(unused_must_use)]
 
 include!("bindings.rs");
 
 use std::os::raw::c_char;
+use std::io::Write;
 
 #[derive(PartialEq)]
 enum PrintState {
@@ -15,81 +17,81 @@ enum PrintState {
     DISPLAY
 }
 
-fn print_ptr_rec(p: ptr, state: PrintState) {
+fn print_ptr_rec<W: Write>(port: &mut W, p: ptr, state: PrintState) {
     let x = p as u32;
     if  (x & fx_mask) == fx_tag {
-        print!("{}", (x as i32) >> fx_shift);
+        write!(port, "{}", (x as i32) >> fx_shift);
     } else if x == bool_f {
-        print!("#f");
+        write!(port, "#f");
     } else if x == bool_t {
-        print!("#t");
+        write!(port, "#t");
     } else if x == list_nil {
-        print!("()");
+        write!(port, "()");
     } else if x == eof_obj {
-        print!("#!eof");
+        write!(port, "#!eof");
     } else if (x & char_mask) == char_tag {
         let c = std::char::from_u32(x >> char_shift).
             expect("a char");
         if state == PrintState::DISPLAY {
-            print!("{}", c);
+            write!(port, "{}", c);
         } else {
-            if      c == '\t' { print!("#\\tab"); }
-            else if c == '\n' { print!("#\\newline"); }
-            else if c == '\r' { print!("#\\return"); }
-            else if c == ' '  { print!("#\\space"); }
-            else              { print!("#\\{}", c); }
+            if      c == '\t' { write!(port, "#\\tab"); }
+            else if c == '\n' { write!(port, "#\\newline"); }
+            else if c == '\r' { write!(port, "#\\return"); }
+            else if c == ' '  { write!(port, "#\\space"); }
+            else              { write!(port, "#\\{}", c); }
         }
     } else if (x & obj_mask) == pair_tag {
-        if state == PrintState::OUT { print!("("); }
+        if state == PrintState::OUT { write!(port, "("); }
         let cell = unsafe { *((x-pair_tag) as *const cell) };
         let car = cell.car;
-        print_ptr_rec(car, PrintState::OUT);
+        print_ptr_rec(port, car, PrintState::OUT);
         let cdr = cell.cdr;
         if cdr != list_nil {
             if (cdr & obj_mask) != pair_tag {
-                print!(" . ");
-                print_ptr_rec(cdr, PrintState::OUT);
+                write!(port, " . ");
+                print_ptr_rec(port, cdr, PrintState::OUT);
             } else {
-                print!(" ");
-                print_ptr_rec(cdr, PrintState::IN);
+                write!(port, " ");
+                print_ptr_rec(port, cdr, PrintState::IN);
             }
         }
-        if state == PrintState::OUT { print!(")"); }
+        if state == PrintState::OUT { write!(port, ")"); }
     } else if (x & obj_mask) == vector_tag {
-        print!("#(");
+        write!(port, "#(");
         unsafe {
         let p = &*((x-vector_tag) as *const vector);
         let n = (p.length as i32) >> fx_shift;
         for i in 0..n {
-            if i > 0 { print!(" "); }
-            print_ptr_rec(
+            if i > 0 { write!(port, " "); }
+            print_ptr_rec(port,
                 *((p.buf.as_ptr()).offset(i as isize)),
                 PrintState::OUT)
         }}
-        print!(")");
+        write!(port, ")");
     } else if (x & obj_mask) == string_tag {
-        if state == PrintState::OUT { print!("\""); }
+        if state == PrintState::OUT { write!(port, "\""); }
         unsafe {
         let p = &*((x-string_tag) as *const string);
         let n = (p.length as i32) >> fx_shift;
         for i in 0..n {
             let c = std::char::from_u32(*((p.buf.as_ptr()).offset(i as isize)) as u32)
                 .expect("char");
-            if c == '"'       { print!("\\\""); }
-            else if c == '\\' { print!("\\\\"); }
-            else              { print!("{}", c); }
+            if c == '"'       { write!(port, "\\\""); }
+            else if c == '\\' { write!(port, "\\\\"); }
+            else              { write!(port, "{}", c); }
         }}
-        if state == PrintState::OUT { print!("\""); }
+        if state == PrintState::OUT { write!(port, "\""); }
     } else if (x & obj_mask) == symbol_tag {
-        print_ptr_rec((x - symbol_tag) | string_tag, PrintState::IN);
+        print_ptr_rec(port, (x - symbol_tag) | string_tag, PrintState::IN);
     } else if (x & obj_mask) == closure_tag {
-        print!("#<procedure>");
+        write!(port, "#<procedure>");
     } else {
-        print!("#<unknown 0x{:x}>", x);
+        write!(port, "#<unknown 0x{:x}>", x);
     }
 }
 fn print_ptr(x: ptr) {
-    print_ptr_rec(x, PrintState::OUT);
+    print_ptr_rec(&mut std::io::stdout(), x, PrintState::OUT);
     println!("");
 }
 
