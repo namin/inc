@@ -159,8 +159,8 @@ pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_open_write(fname: ptr) -> ptr {
-    let mut c_fname: [c_char; 100] = [0 as c_char; 100];
-    cp_str_data(fname, c_fname.as_mut_ptr(), 100);
+    let mut c_fname: [c_char; 10] = [0 as c_char; 10];
+    cp_str_data(fname, c_fname.as_mut_ptr(), 10);
     let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC, 0640) };
     shift(fd)
 }
@@ -185,8 +185,8 @@ pub extern "C" fn scheme_write(fd: ptr, x: ptr, opt: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_open_read(fname: ptr) -> ptr {
-    let mut c_fname: [c_char; 100] = [0; 100];
-    cp_str_data(fname, c_fname.as_mut_ptr(), 100);
+    let mut c_fname: [c_char; 10] = [0; 10];
+    cp_str_data(fname, c_fname.as_mut_ptr(), 10);
     let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_RDONLY) };
     shift(fd)
 }
