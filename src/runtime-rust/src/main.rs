@@ -67,7 +67,7 @@ fn print_ptr_rec<W: Write>(port: &mut W, p: ptr, state: PrintState) {
         for i in 0..n {
             if i > 0 { write!(port, " "); }
             print_ptr_rec(port,
-                *((p.buf.as_ptr()).offset(i as isize)),
+                *((p.buf.as_ptr()).add(i as usize)),
                 PrintState::OUT)
         }}
         write!(port, ")");
@@ -77,7 +77,7 @@ fn print_ptr_rec<W: Write>(port: &mut W, p: ptr, state: PrintState) {
         let p = &*((x-string_tag) as *const string);
         let n = (p.length as i32) >> fx_shift;
         for i in 0..n {
-            let c = std::char::from_u32(*((p.buf.as_ptr()).offset(i as isize)) as u32)
+            let c = std::char::from_u32(*((p.buf.as_ptr()).add(i as usize)) as u32)
                 .expect("char");
             if c == '"'       { write!(port, "\\\""); }
             else if c == '\\' { write!(port, "\\\\"); }
@@ -94,7 +94,7 @@ fn print_ptr_rec<W: Write>(port: &mut W, p: ptr, state: PrintState) {
 }
 fn print_ptr(x: ptr) {
     print_ptr_rec(&mut std::io::stdout(), x, PrintState::OUT);
-    println!("");
+    println!();
 }
 
 fn eprint_ptr(msg: ptr, state: PrintState) {
@@ -105,7 +105,7 @@ fn eprint_ptr(msg: ptr, state: PrintState) {
 pub extern "C" fn ik_log(msg: ptr) -> ptr {
     eprint!("log: ");
     eprint_ptr(msg, PrintState::IN);
-    eprintln!("");
+    eprintln!();
     0
 }
 #[no_mangle]
@@ -122,7 +122,7 @@ pub extern "C" fn ik_error(x: ptr) {
         eprint!(": ");
         eprint_ptr(msg, PrintState::IN);
     }
-    eprintln!("");
+    eprintln!();
     std::process::exit(0);
 }
 
@@ -138,7 +138,7 @@ fn ptr_string_to_str(x: ptr) -> String {
         let n = unshift(p.length) as usize;
         let mut v = Vec::with_capacity(n);
         for i in 0..n {
-            v.push(*(p.buf.as_ptr().offset(i as isize)) as u8);
+            v.push(*(p.buf.as_ptr().add(i as usize)) as u8);
         }
         std::ffi::CString::from_vec_unchecked(v).into_string().expect("string")
     }
@@ -212,9 +212,9 @@ pub extern "C" fn s_close(fd: ptr) -> ptr {
 
 #[no_mangle]
 pub extern "C" fn heap_alloc(mem: *mut memory, _stack: *mut c_char, size: usize) -> *mut c_char {
-    let heap_next = unsafe { (*mem).heap_next };
-    let heap_new = unsafe { heap_next.offset(size as isize) };
-    if heap_new >= unsafe { (*mem).heap_top } {
+    let heap_next = unsafe {*mem}.heap_next;
+    let heap_new = unsafe { heap_next.add(size) };
+    if heap_new >= unsafe {*mem}.heap_top {
         eprintln!("Exception: overflow");
         std::process::exit(0);
     }
@@ -240,7 +240,7 @@ fn main() {
     let scratch_size = 16 * 4096;
 
     let stack_top = allocate_protected_space(stack_size);
-    let stack_base = unsafe { stack_top.offset(stack_size as isize) };
+    let stack_base = unsafe { stack_top.add(stack_size) };
 
     let heap = allocate_protected_space(heap_size);
     let global = allocate_protected_space(global_size);
@@ -259,20 +259,19 @@ fn main() {
         esp : uninit,
     };
 
-    let heap_top = unsafe { heap.offset((heap_size as isize)/2) };
+    let heap_top = unsafe { heap.add(heap_size/2) };
     let mut mem = memory {
         heap_next : heap,
         global_next : global,
         heap_base : heap,
         heap_top : heap_top,
         heap_base_alt : heap_top,
-        heap_top_alt : unsafe { heap.offset(heap_size as isize) },
+        heap_top_alt : unsafe { heap.add(heap_size) },
         global_base : global,
         stack_base : stack_base,
         scratch_base : scratch,
         edi : 0
     };
-
 
 
     let r = unsafe {
