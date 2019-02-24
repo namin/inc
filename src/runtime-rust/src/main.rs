@@ -166,7 +166,10 @@ pub extern "C" fn s_open_write(fname: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_fflush(fd: ptr) -> ptr {
-    unsafe { libc::fflush(libc::fdopen(unshift(fd), b"w".as_ptr() as *const i8)) };
+    let ufd = unshift(fd) as i32;
+    let mut w = unsafe { std::fs::File::from_raw_fd(ufd) };
+    w.flush();
+    w.into_raw_fd();
     0
 }
 #[no_mangle]
@@ -202,9 +205,10 @@ pub extern "C" fn s_read_char(fd: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_close(fd: ptr) -> ptr {
-    let ufd = unshift(fd);
-    let r = unsafe { libc::close(ufd) };
-    shift(r)
+    let ufd = unshift(fd) as i32;
+    let w = unsafe { std::fs::File::from_raw_fd(ufd) };
+    std::mem::drop(w);
+    shift(0)
 }
 
 #[no_mangle]
