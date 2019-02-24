@@ -2,10 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-#![allow(dead_code)]
-#![allow(unused_variables)]
 #![allow(unused_must_use)]
-#![allow(unused_imports)]
 
 include!("bindings.rs");
 
@@ -13,7 +10,6 @@ use std::os::raw::c_char;
 use std::io::Write;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::io::IntoRawFd;
-use std::convert::From;
 use std::io::Read;
 
 #[derive(PartialEq)]
@@ -102,7 +98,7 @@ fn print_ptr(x: ptr) {
 }
 
 fn eprint_ptr(msg: ptr, state: PrintState) {
-    print_ptr_rec(&mut std::io::stderr(), msg, PrintState::IN);
+    print_ptr_rec(&mut std::io::stderr(), msg, state);
 }
 
 #[no_mangle]
@@ -135,12 +131,6 @@ fn unshift(x: ptr) -> i32 {
 }
 fn shift(x: i32) -> ptr {
     (x << fx_shift) as u32
-}
-fn string_data(x: ptr) -> *mut c_char {
-    unsafe {
-        let p = &*((x-string_tag) as *const string);
-        p.buf.as_ptr() as *mut c_char
-    }
 }
 fn ptr_string_to_str(x: ptr) -> String {
     unsafe {
@@ -221,7 +211,7 @@ pub extern "C" fn s_close(fd: ptr) -> ptr {
 }
 
 #[no_mangle]
-pub extern "C" fn heap_alloc(mem: *mut memory, stack: *mut c_char, size: usize) -> *mut c_char {
+pub extern "C" fn heap_alloc(mem: *mut memory, _stack: *mut c_char, size: usize) -> *mut c_char {
     let heap_next = unsafe { (*mem).heap_next };
     let heap_new = unsafe { heap_next.offset(size as isize) };
     if heap_new >= unsafe { (*mem).heap_top } {
