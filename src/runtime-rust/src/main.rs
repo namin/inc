@@ -1,15 +1,11 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-#![allow(dead_code)]
+
 #![allow(unused_variables)]
-#![allow(unused_must_use)]
 
 include!("bindings.rs");
 
-use std::process;
-//use std::os::raw::c_uint;
-//use std::os::raw::c_int;
 use std::os::raw::c_char;
 
 #[derive(PartialEq)]
@@ -102,7 +98,7 @@ pub extern "C" fn ik_log(msg: ptr) {
 }
 #[no_mangle]
 pub extern "C" fn ik_error(x: ptr) {
-    process::exit(0);
+    std::process::exit(0);
 }
 #[no_mangle]
 pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
