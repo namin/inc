@@ -303,7 +303,7 @@ fn gc(mem: *mut memory, stack: *mut c_char) {
     gc_queue = (*mem).scratch_base as *mut ptr;
     }
 
-    let scan = unsafe{gc_queue};
+    let mut scan = unsafe{gc_queue};
     let mut root = unsafe{*mem}.global_base as *mut ptr;
     while unsafe { (root as *mut c_char) < (*mem).global_next } {
         unsafe {
@@ -314,11 +314,11 @@ fn gc(mem: *mut memory, stack: *mut c_char) {
 
     root = unsafe{*mem}.stack_base as *mut ptr;
     unsafe {
-    root.offset(-1);
-    root.offset(-1);
+        root.offset(-1);
+        root.offset(-1);
         while root > (stack as *mut ptr) {
             if *root == return_addr {
-                root.offset(-1);
+                root = root.offset(-1);
             } else {
                 *root = gc_forward(*root);
             }
@@ -331,7 +331,8 @@ fn gc(mem: *mut memory, stack: *mut c_char) {
     }
 
     while scan < unsafe{gc_queue} {
-        let x = unsafe { *(scan.add(1)) };
+        let x = unsafe { *scan };
+        scan = unsafe { scan.add(1) };
         let tag = x & obj_mask;
 
         if tag == pair_tag {
@@ -359,6 +360,7 @@ fn gc(mem: *mut memory, stack: *mut c_char) {
                 }
             }
         }
+        
     }
 
     unsafe {
