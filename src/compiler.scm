@@ -1,5 +1,5 @@
 (load "tests-driver.scm")
-(define enable-cps #f)
+(define enable-cps #t)
 (when enable-cps
   (load "tests-5.3-req.scm"))
 (load "tests-5.2-req.scm")
