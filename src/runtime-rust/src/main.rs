@@ -233,13 +233,13 @@ fn gc_size(x: ptr) -> usize {
     match tag {
         pair_tag => 2 << word_shift,
         vector_tag => {
-            let n = shift(unsafe{(&*(p as *const vector)).length} as i32) + 1;
+            let n = (unshift(unsafe{(&*(p as *const vector)).length}) as u32) + 1;
             (n as usize) << word_shift
         },
         symbol_tag | string_tag =>
-            (shift(unsafe{(&*(p as *const string)).length} as i32) + word_size) as usize,
+            ((unshift(unsafe{(&*(p as *const string)).length}) as u32) + word_size) as usize,
         closure_tag => {
-            let n = shift(unsafe{(&*(p as *const closure)).length} as i32) + 2;
+            let n = (unshift(unsafe{(&*(p as *const closure)).length}) as u32) + 2;
             (n as usize) << word_shift
         },
         _ => 0
@@ -293,12 +293,20 @@ fn gc_forward(x: ptr) -> ptr {
     }
 }
     
+fn gc_clean_new() {
+    let mut p = unsafe { gc_new_heap_base };
+    while unsafe { p < gc_new_heap_top } {
+        unsafe { *p = 0 as c_char };
+        p = unsafe { p.add(1) };
+    }
+}
 
 fn gc(mem: *mut memory, stack: *mut c_char) {
     unsafe {
     gc_new_heap_base = (*mem).heap_base_alt as *mut c_char;
     gc_new_heap_top = (*mem).heap_top_alt as *mut c_char;
-
+    gc_clean_new();
+        
     gc_next = (*mem).heap_base_alt as *mut c_char;
     gc_queue = (*mem).scratch_base as *mut ptr;
     }
