@@ -324,7 +324,7 @@ fn gc(mem: *mut memory, stack: *mut c_char) {
     unsafe {
         root = root.offset(-1);
         root = root.offset(-1);
-        while root > (stack as *mut ptr) {
+        while root >= (stack as *mut ptr) {
             if *root == return_addr {
                 root = root.offset(-1);
             } else {
