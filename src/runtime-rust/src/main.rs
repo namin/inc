@@ -95,15 +95,32 @@ fn print_ptr(x: ptr) {
     println!("");
 }
 
+fn eprint_ptr(msg: ptr, state: PrintState) {
+    print_ptr_rec(&mut std::io::stderr(), msg, PrintState::IN);
+}
+
 #[no_mangle]
 pub extern "C" fn ik_log(msg: ptr) -> ptr {
     eprint!("log: ");
-    print_ptr_rec(&mut std::io::stderr(), msg, PrintState::IN);
+    eprint_ptr(msg, PrintState::IN);
     eprintln!("");
     0
 }
 #[no_mangle]
 pub extern "C" fn ik_error(x: ptr) {
+    eprint!("Exception");
+    if (x & obj_mask) == pair_tag {
+        let cell = unsafe { *((x-pair_tag) as *const cell) };
+        let caller = cell.car;
+        let msg = cell.cdr;
+        if caller != bool_f {
+            eprint!(" in ");
+            eprint_ptr(caller, PrintState::OUT);
+        }
+        eprint!(": ");
+        eprint_ptr(msg, PrintState::IN);
+    }
+    eprintln!("");
     std::process::exit(0);
 }
 #[no_mangle]
