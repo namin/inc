@@ -132,8 +132,8 @@ pub extern "C" fn ik_error(x: ptr) {
 fn unshift(x: ptr) -> i32 {
     (x as i32) >> fx_shift
 }
-fn shift(x: u32) -> ptr {
-    x << fx_shift
+fn shift(x: i32) -> ptr {
+    (x << fx_shift) as u32
 }
 fn string_data(x: ptr) -> *mut c_char {
     unsafe {
@@ -144,7 +144,7 @@ fn string_data(x: ptr) -> *mut c_char {
 fn cp_str_data(x: ptr, buf: *mut c_char, buf_length: u32) {
     unsafe {
         let p = &*((x-string_tag) as *const string);
-        let n = shift(p.length);
+        let n = shift(p.length as i32);
         let m = std::cmp::max(n, buf_length);
         for i in 0..m {
             *buf.offset(i as isize) = *p.buf.as_ptr().offset(i as isize);
@@ -155,14 +155,16 @@ fn cp_str_data(x: ptr, buf: *mut c_char, buf_length: u32) {
 #[no_mangle]
 pub extern "C" fn s_write(fd: ptr, str: ptr, len: ptr) -> ptr {
     let bytes = unsafe { libc::write(unshift(fd), string_data(str) as *const libc::c_void, unshift(len) as usize)};
-    shift(bytes as u32)
+    shift(bytes as i32)
 }
 #[no_mangle]
 pub extern "C" fn s_open_write(fname: ptr) -> ptr {
     let mut c_fname: [c_char; 100] = [0; 100];
+    std::io::stdout().flush();
     cp_str_data(fname, c_fname.as_mut_ptr(), 100);
+    std::io::stdout().flush();
     let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_WRONLY | libc::O_CREAT | libc::O_TRUNC, 0640) };
-    shift(fd as u32)
+    shift(fd)
 }
 #[no_mangle]
 pub extern "C" fn s_fflush(fd: ptr) -> ptr {
@@ -185,24 +187,28 @@ pub extern "C" fn scheme_write(fd: ptr, x: ptr, opt: ptr) -> ptr {
 }
 #[no_mangle]
 pub extern "C" fn s_open_read(fname: ptr) -> ptr {
-    0
+    let mut c_fname: [c_char; 100] = [0; 100];
+    std::io::stdout().flush();
+    cp_str_data(fname, c_fname.as_mut_ptr(), 100);
+    std::io::stdout().flush();
+    let fd = unsafe { libc::open(c_fname.as_mut_ptr(), libc::O_RDONLY) };
+    shift(fd)
 }
 #[no_mangle]
 pub extern "C" fn s_read_char(fd: ptr) -> ptr {
-    unsafe {
     let mut ca: [u32; 1] = [0;1];
     let ufd = unshift(fd);
-    if libc::read(ufd, ca.as_mut_ptr() as *mut libc::c_void, 1) < 1 {
+    if unsafe { libc::read(ufd, ca.as_mut_ptr() as *mut libc::c_void, 1) } < 1 {
         eof_obj
     } else {
-        ((ca[0] as u32) << char_shift) | char_tag
-    }}
+        (ca[0] << char_shift) | char_tag
+    }
 }
 #[no_mangle]
 pub extern "C" fn s_close(fd: ptr) -> ptr {
     let ufd = unshift(fd);
     let r = unsafe { libc::close(ufd) };
-    shift(r as u32)
+    shift(r)
 }
 
 #[no_mangle]
