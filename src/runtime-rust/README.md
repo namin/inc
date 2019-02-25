@@ -1,7 +1,6 @@
 # runtime-rust
 
-A rewrite `startup.c` in Rust, as an exercise in learning Rust.
-Pointless? The rewrite does nothing better than in the original.
+A rewrite of `startup.c` in Rust, as an exercise in learning Rust.
 
 All the tests pass.
 
