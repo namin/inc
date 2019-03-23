@@ -1,10 +1,10 @@
 .PHONY:run
-run: a.out
+run:
 	@./a.out
 
 .PHONY: inc.s
 inc.s:
-	@ echo 42 | cargo run -q inc > inc.s
+	@cargo run -q inc > inc.s
 
 a.out: inc.s runtime.c
 	@clang -m64 \

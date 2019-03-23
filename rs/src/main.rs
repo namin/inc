@@ -37,19 +37,46 @@ fn compile_program(value: i64) {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    use std::process::Command;
+    use std::io::Write;
+    use std::process::{Command, Output, Stdio};
 
-    fn build() -> bool {
-        return Command::new("make")
+    fn build(input: &[u8]) -> bool {
+        let mut exe = Command::new("make")
             .arg("--quiet")
             .arg("a.out")
-            .status()
-            .expect("Failed to compile binary")
-            .success();
+            .stdin(Stdio::piped())
+            .spawn()
+            .expect("Failed to compile binary");
+
+        exe.stdin
+            .as_mut()
+            .expect("Failed to get stdin")
+            .write(input)
+            .expect("Failed to write to stdin");
+
+        return exe.wait().expect("Failed to wait for completion").success();
+    }
+
+    fn exec() -> Output {
+        return Command::new("make").output().expect("Failed to run binary");
+    }
+
+    fn run(input: &[u8]) -> std::vec::Vec<u8> {
+        assert!(build(input));
+        let proc = exec();
+        assert!(proc.status.success());
+        return proc.stdout;
     }
 
     #[test]
     fn it_builds() {
-        assert!(build());
+        assert!(build(b"42"));
     }
+
+    #[test]
+    fn it_runs() {
+        assert_eq!(run(b"42"), Vec::from("42\n"));
+        assert_eq!(run(b"36"), Vec::from("36\n"));
+    }
+
 }
