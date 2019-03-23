@@ -1,3 +1,6 @@
-/target
-**/*.rs.bk
 
+**/*.rs.bk
+*.s
+/a.out
+/a.out.dSYM
+/target
