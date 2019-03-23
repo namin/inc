@@ -18,3 +18,25 @@ fn compile_program(value: i64) {
     println!("  movq ${}, %rax", value);
     println!("  retq");
 }
+
+// Test driver
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+    use std::process::Command;
+
+    fn build() -> bool {
+        return Command::new("make")
+            .arg("--quiet")
+            .arg("a.out")
+            .status()
+            .expect("Failed to compile binary")
+            .success();
+    }
+
+    #[test]
+    fn it_builds() {
+        assert!(build());
+    }
+}
