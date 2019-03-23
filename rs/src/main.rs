@@ -1,14 +1,18 @@
 use std::io::{self, Read};
 
 // Expects the program in stdin, writes assembly to stdout
-fn main() {
+fn main() -> std::io::Result<()> {
     let mut program = String::new();
-    io::stdin().read_to_string(&mut program).unwrap();
+    io::stdin()
+        .read_to_string(&mut program)
+        .expect("Expected a program in stdin");
 
-    match program.trim_end().parse::<i64>() {
-        Ok(i) => compile_program(i),
-        Err(_) => panic!("Expected a program in stdin"),
-    }
+    let i: i64 = program
+        .trim_end()
+        .parse()
+        .expect("Failed to parse stdin to a valid program");
+
+    Ok(compile_program(i))
 }
 
 fn emit_label(label: String) {
@@ -33,7 +37,7 @@ fn compile_program(value: i64) {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    use std::process::{Command};
+    use std::process::Command;
 
     fn build() -> bool {
         return Command::new("make")
