@@ -12,22 +12,35 @@ fn main() -> std::io::Result<()> {
         .parse()
         .expect("Failed to parse stdin to a valid program");
 
-    Ok(compile_program(i))
+    println!("{}\n", compile_program(i));
+    Ok(())
 }
 
-fn emit_label(label: String) {
-    println!("{}:", label);
+fn emit_label(label: &str) -> String {
+    return format!("{}:\n", label);
 }
 
 #[cfg(target_os = "macos")]
-fn emit_function_header(name: String) {
-    println!("  .section __TEXT,__text");
-    println!("  .globl {}", name);
-    emit_label(name)
+fn emit_function_header(name: &str) -> String {
+    let mut ctx = String::new();
+
+    ctx.push_str(&format!("  .section __TEXT,__text\n"));
+    ctx.push_str(&format!("  .globl {}\n", &name));
+    ctx.push_str(&emit_label(&name));
+    return ctx
 }
 
-fn compile_program(value: i64) {
-    emit_function_header(String::from("_init"));
-    println!("  movq ${}, %rax", value);
-    println!("  retq");
+fn compile_program(value: i64) -> String {
+    let mut ctx = String::new();
+
+    ctx.push_str(&emit_function_header("_init")[..]);
+    ctx.push_str(&format!("  movq ${}, %rax\n", value));
+    ctx.push_str(&format!("  retq\n"));
+    return ctx;
 }
+
+// ---
+// Notes:
+//
+// 1. Why is there no formatln! macro?
+// 2. A nicer API to cat these tiny bits of strings would be great!
