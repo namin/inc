@@ -8,11 +8,7 @@ use std::io::{self, Read, Write};
 fn main() -> std::io::Result<()> {
     let mut config = Config::new();
 
-    let i: i64 = config
-        .program
-        .trim_end()
-        .parse()
-        .expect("Failed to parse stdin to a valid program");
+    let i: i64 = parse(config.program).expect("Failed to parse stdin to a valid program");
 
     config
         .outfile
@@ -46,6 +42,16 @@ impl Config {
 
         Config { program, outfile }
     }
+}
+
+// Parse the input from user into the form the top level of the compiler
+// understands.
+//
+// TODO: A better error message would be great!
+// .expect("Failed to parse stdin to a valid program")
+//
+fn parse(program: String) -> Result<i64, std::num::ParseIntError> {
+    program.trim_end().parse::<i64>()
 }
 
 fn emit_label(label: &str) -> String {
