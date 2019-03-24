@@ -1,5 +1,5 @@
 .PHONY:run
-run:
+run: a.out
 	@./a.out
 
 .PHONY: inc.s
