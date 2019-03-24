@@ -1,84 +1,45 @@
+extern crate inc;
+
+use inc::Config;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 
-// Usage: Expects the program in stdin, writes generated assembly to file name
-// specified as first argument or defaults to stdout.
-//
 fn main() -> std::io::Result<()> {
-    let mut config = Config::new();
+    let mut config = cli();
 
-    let i: i64 = parse(config.program).expect("Failed to parse stdin to a valid program");
-
-    config
-        .outfile
-        .write_all(compile_program(i).as_bytes())
-        .expect("Failed to write generated code");
+    inc::compile(&mut config).unwrap();
 
     Ok(())
 }
 
-struct Config {
-    program: String,
-    outfile: File,
-}
+// Config controls the external interaction of the program by providing it with
+// input and giving the compiler a file to write results to.
+//
+// Cli expects the program in stdin, writes generated assembly to file name
+// specified as first argument or defaults to stdout.
+//
+fn cli() -> Config {
+    let args: Vec<String> = env::args().collect();
 
-impl Config {
-    fn new() -> Config {
-        let args: Vec<String> = env::args().collect();
+    let mut program = String::new();
 
-        let mut program = String::new();
+    io::stdin()
+        .read_to_string(&mut program)
+        .expect("Expected a program in stdin");
 
-        io::stdin()
-            .read_to_string(&mut program)
-            .expect("Expected a program in stdin");
+    // impl Writer
+    let outpath = if args.len() == 1 {
+        String::from("/dev/stdout")
+    } else {
+        args[1].clone()
+    };
 
-        // impl Writer
-        let outfile = if args.len() == 1 {
-            File::open("/dev/stdout").unwrap()
-        } else {
-            File::create(args[1].clone()).expect("Failed to open output file")
-        };
+    let outfile = File::create(&outpath).expect("Failed to open output file");
 
-        Config { program, outfile }
+    Config {
+        program,
+        outfile,
+        outpath,
     }
 }
-
-// Parse the input from user into the form the top level of the compiler
-// understands.
-//
-// TODO: A better error message would be great!
-// .expect("Failed to parse stdin to a valid program")
-//
-fn parse(program: String) -> Result<i64, std::num::ParseIntError> {
-    program.trim_end().parse::<i64>()
-}
-
-fn emit_label(label: &str) -> String {
-    format!("{}:\n", label)
-}
-
-#[cfg(target_os = "macos")]
-fn emit_function_header(name: &str) -> String {
-    let mut ctx = String::new();
-
-    ctx.push_str("  .section __TEXT,__text\n");
-    ctx.push_str(&format!("  .globl {}\n", &name));
-    ctx.push_str(&emit_label(&name));
-    ctx
-}
-
-fn compile_program(value: i64) -> String {
-    let mut ctx = String::new();
-
-    ctx.push_str(&emit_function_header("_init")[..]);
-    ctx.push_str(&format!("  movq ${}, %rax\n", value));
-    ctx.push_str("  retq\n");
-    ctx
-}
-
-// ---
-// Notes:
-//
-// 1. Why is there no formatln! macro?
-// 2. A nicer API to cat these tiny bits of strings would be great!

@@ -1,51 +1,80 @@
 // Integration tests
+//
+// TODO:
+//
+// 1. Generate asm into a unique file for each run to avoid synchronization bugs
+// and to get a clean state per each run.
+//
 
-// use super::*;
-use std::io::Write;
-use std::process::{Command, Output, Stdio};
+extern crate inc;
 
-fn build(input: &[u8]) -> bool {
-    let mut exe = Command::new("make")
-        .arg("--quiet")
-        .arg("a.out")
-        .stdin(Stdio::piped())
-        .spawn()
-        .expect("Failed to compile binary");
+use inc::*;
+use std::fs::{self, File};
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-    exe.stdin
-        .as_mut()
-        .expect("Failed to get stdin")
-        .write(input)
-        .expect("Failed to write to stdin");
+// Get a test config with program as input
+fn config(program: String) -> Config {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
 
-    return exe.wait().expect("Failed to wait for completion").success();
+    let outpath = format!("inc-{:?}.s", since_the_epoch);
+    let outfile =
+        File::create(&outpath).expect(&format!("Failed to create temp file {}", &outpath));
+
+    Config {
+        program,
+        outfile,
+        outpath,
+    }
 }
 
-fn exec() -> Output {
-    return Command::new("make").output().expect("Failed to run binary");
+// Build an executable with generated asm
+fn build(mut config: &mut Config) -> bool {
+    inc::compile(&mut config).unwrap();
+
+    Command::new("clang")
+        .arg("-m64")
+        .arg("-g3")
+        .arg("-ggdb3")
+        .arg("-fomit-frame-pointer")
+        .arg("-fno-asynchronous-unwind-tables")
+        .arg("-O0")
+        .arg("runtime.c")
+        .arg(&config.outpath)
+        .status()
+        .expect("Failed to compile binary")
+        .success()
 }
 
-fn run(input: &[u8]) -> std::vec::Vec<u8> {
-    assert!(build(input));
-    let proc = exec();
-    assert!(proc.status.success());
-    return proc.stdout;
-}
+// Run a single test, assert everything and cleanup afterwards
+fn test1(input: String, output: Vec<u8>) {
+    // Create a fresh config per run, this should allow for parallelism later.
+    let mut config = config(input);
 
-#[test]
-fn it_builds() {
-    assert!(build(b"42"));
-}
+    // Rebuild before every run
+    assert!(build(&mut config));
 
-#[test]
-fn it_runs() {
-    assert_eq!(run(b"42"), Vec::from("42\n"));
+    // Run the generated binary and assert output
+    let proc = Command::new("./a.out")
+        .output()
+        .expect("Failed to run binary");
+
+    assert!(&proc.status.success());
+    assert_eq!(proc.stdout, output);
+
+    // Clean up all the intermediary files generated
+    fs::remove_file(&config.outpath).expect("Failed to clear generated asm files");
+    fs::remove_file("a.out").expect("Failed to rm a.out");
+    fs::remove_dir_all("a.out.dSYM").expect("Failed to rm a.out.dSYM");
 }
 
 #[test]
 fn it_integers() {
     let tests = vec![
-        ("0", "0\n"),
+        ("0", "0"),
         ("1", "1"),
         ("-1", "-1"),
         ("10", "10"),
@@ -57,6 +86,6 @@ fn it_integers() {
     ];
 
     for (inp, out) in tests.iter() {
-        assert_eq!(run(inp.as_bytes()), Vec::from(*out));
+        test1(String::from(*inp), Vec::from(format!("{}\n", &out)));
     }
 }
