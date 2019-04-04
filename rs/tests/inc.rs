@@ -9,9 +9,15 @@
 extern crate inc;
 
 use inc::*;
-use std::fs::{self, File};
+use std::fs::{self};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+#[macro_use(quickcheck)]
+extern crate quickcheck_macros;
 
 // Get a test config with program as input
 fn config(program: String) -> Config {
@@ -88,4 +94,9 @@ fn it_integers() {
     for (inp, out) in tests.iter() {
         test1(String::from(*inp), String::from(*out));
     }
+}
+
+#[quickcheck]
+fn qc_int64(i: i64) -> () {
+    test1(i.to_string(), i.to_string())
 }

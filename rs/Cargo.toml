@@ -5,3 +5,5 @@ authors = ["Jaseem Abid <jaseemabid@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
