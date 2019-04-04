@@ -2,7 +2,6 @@ extern crate inc;
 
 use inc::Config;
 use std::env;
-use std::fs::File;
 use std::io::{self, Read};
 
 fn main() -> std::io::Result<()> {
@@ -29,17 +28,15 @@ fn cli() -> Config {
         .expect("Expected a program in stdin");
 
     // impl Writer
-    let outpath = if args.len() == 1 {
+    let output = if args.len() == 1 {
         String::from("/dev/stdout")
     } else {
         args[1].clone()
     };
 
-    let outfile = File::create(&outpath).expect("Failed to open output file");
 
     Config {
         program,
-        outfile,
-        outpath,
+        output,
     }
 }

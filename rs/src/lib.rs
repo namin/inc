@@ -10,9 +10,16 @@ use std::io::Write;
 
 // Control behavior and external interaction of the program.
 pub struct Config {
+    // Program is the input source
     pub program: String,
-    pub outfile: File,
-    pub outpath: String,
+    // Outfile is the name of the generated asm and executable
+    pub output: String,
+}
+
+impl Config  {
+    pub fn asm(&self) -> String {
+        format!("{}.s", self.output)
+    }
 }
 
 // Custom error type for all of inc. This might not be idiomatic Rust, revisit
@@ -40,7 +47,11 @@ fn parse(program: &str) -> Result<i64, Error> {
 pub fn compile(config: &mut Config) -> Result<(), Error> {
     let i: i64 = parse(&config.program)?;
 
-    match config.outfile.write_all(emit::program(i).as_bytes()) {
+    let asm = format!("{}.s", &config.output);
+    let mut handler = File::create(&asm)
+        .expect(&format!("Failed to create {}", &asm));
+
+    match handler.write_all(emit::program(i).as_bytes()) {
         Ok(_) => Ok(()),
         Err(e) => Err(Error {
             message: format!("Failed to write generated code: {}", e),

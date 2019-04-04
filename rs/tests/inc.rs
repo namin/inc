@@ -15,19 +15,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 // Get a test config with program as input
 fn config(program: String) -> Config {
-    let start = SystemTime::now();
-    let since_the_epoch = start
+    let epoch = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
 
-    let outpath = format!("inc-{:?}.s", since_the_epoch);
-    let outfile =
-        File::create(&outpath).expect(&format!("Failed to create temp file {}", &outpath));
+    // On Mac, it's very important to run these tests in memory with tmpfs, file
+    // system ordering events made the test consistently.
+    let output = format!("/tmp/inc-{:?}", epoch);
 
     Config {
         program,
-        outfile,
-        outpath,
+        output,
     }
 }
 
@@ -43,14 +41,16 @@ fn build(mut config: &mut Config) -> bool {
         .arg("-fno-asynchronous-unwind-tables")
         .arg("-O0")
         .arg("runtime.c")
-        .arg(&config.outpath)
+        .arg(&config.asm())
+        .arg("-o")
+        .arg(&config.output)
         .status()
         .expect("Failed to compile binary")
         .success()
 }
 
 // Run a single test, assert everything and cleanup afterwards
-fn test1(input: String, output: Vec<u8>) {
+fn test1(input: String, output: String) {
     // Create a fresh config per run, this should allow for parallelism later.
     let mut config = config(input);
 
@@ -58,17 +58,17 @@ fn test1(input: String, output: Vec<u8>) {
     assert!(build(&mut config));
 
     // Run the generated binary and assert output
-    let proc = Command::new("./a.out")
+    let proc = Command::new(&config.output)
         .output()
-        .expect("Failed to run binary");
+        .expect(&format!("Failed to run binary `{}`", &config.output));
 
     assert!(&proc.status.success());
-    assert_eq!(proc.stdout, output);
+    assert_eq!(String::from_utf8(proc.stdout).unwrap().trim().replace("\n", ""), output);
 
     // Clean up all the intermediary files generated
-    fs::remove_file(&config.outpath).expect("Failed to clear generated asm files");
-    fs::remove_file("a.out").expect("Failed to rm a.out");
-    fs::remove_dir_all("a.out.dSYM").expect("Failed to rm a.out.dSYM");
+    fs::remove_file(&config.asm()).expect("Failed to clear generated asm files");
+    fs::remove_file(&config.output).expect("Failed to clear executable");
+    fs::remove_dir_all(format!("{}.dSYM", &config.output)).expect("Failed to rm a.out.dSYM");
 }
 
 #[test]
@@ -86,6 +86,6 @@ fn it_integers() {
     ];
 
     for (inp, out) in tests.iter() {
-        test1(String::from(*inp), Vec::from(format!("{}\n", &out)));
+        test1(String::from(*inp), String::from(*out));
     }
 }
