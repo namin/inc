@@ -34,9 +34,5 @@ fn cli() -> Config {
         args[1].clone()
     };
 
-
-    Config {
-        program,
-        output,
-    }
+    Config { program, output }
 }

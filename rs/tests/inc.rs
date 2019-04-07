@@ -2,7 +2,7 @@
 extern crate inc;
 
 use inc::*;
-use std::fs::{self};
+use std::fs;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -22,10 +22,7 @@ fn config(program: String) -> Config {
     // system ordering events made the test consistently.
     let output = format!("/tmp/inc-{:?}", epoch);
 
-    Config {
-        program,
-        output,
-    }
+    Config { program, output }
 }
 
 // Build an executable with generated asm
@@ -62,7 +59,13 @@ fn test1(input: String, output: String) {
         .expect(&format!("Failed to run binary `{}`", &config.output));
 
     assert!(&proc.status.success());
-    assert_eq!(String::from_utf8(proc.stdout).unwrap().trim().replace("\n", ""), output);
+    assert_eq!(
+        String::from_utf8(proc.stdout)
+            .unwrap()
+            .trim()
+            .replace("\n", ""),
+        output
+    );
 
     // Clean up all the intermediary files generated
     fs::remove_file(&config.asm()).expect("Failed to clear generated asm files");
@@ -70,8 +73,10 @@ fn test1(input: String, output: String) {
     fs::remove_dir_all(format!("{}.dSYM", &config.output)).expect("Failed to rm a.out.dSYM");
 }
 
+// Step 1: Integers
+
 #[test]
-fn it_integers() {
+fn integers() {
     let tests = vec![
         ("0", "0"),
         ("1", "1"),
@@ -82,6 +87,64 @@ fn it_integers() {
         ("-2736", "-2736"),
         ("536870911", "536870911"),
         ("-536870912", "-536870912"),
+    ];
+
+    for (inp, out) in tests.iter() {
+        test1(String::from(*inp), String::from(*out));
+    }
+}
+
+// Step 2: Immediate constants
+
+#[test]
+fn immediate_constants() {
+    let tests = vec![
+        (r"#f", r"#f"),
+        (r"#t", r"#t"),
+        ("()", r"()"),
+        (r"#\tab", r"#\tab"),
+        (r"#\newline", r"#\newline"),
+        (r"#\return", r"#\return"),
+        (r"#\space", r"#\space"),
+        (r"#\!", r"#\!"),
+        (r"#\#", r"#\#"),
+        (r"#\$", r"#\$"),
+        (r"#\%", r"#\%"),
+        (r"#\&", r"#\&"),
+        (r"#\'", r"#\'"),
+        (r"#\(", r"#\("),
+        (r"#\)", r"#\)"),
+        (r"#\*", r"#\*"),
+        (r"#\+", r"#\+"),
+        (r"#\,", r"#\,"),
+        (r"#\-", r"#\-"),
+        (r"#\.", r"#\."),
+        (r"#\/", r"#\/"),
+        (r"#\0", r"#\0"),
+        (r"#\9", r"#\9"),
+        (r"#\:", r"#\:"),
+        (r"#\;", r"#\;"),
+        (r"#\<", r"#\<"),
+        (r"#\=", r"#\="),
+        (r"#\>", r"#\>"),
+        (r"#\?", r"#\?"),
+        (r"#\@", r"#\@"),
+        (r"#\A", r"#\A"),
+        (r"#\B", r"#\B"),
+        (r"#\Z", r"#\Z"),
+        (r"#\(", r"#\("),
+        (r"#\\", r"#\\"),
+        (r"#\]", r"#\]"),
+        (r"#\^", r"#\^"),
+        (r"#\_", r"#\_"),
+        (r"#\`", r"#\`"),
+        (r"#\a", r"#\a"),
+        (r"#\b", r"#\b"),
+        (r"#\z", r"#\z"),
+        (r"#\{", r"#\{"),
+        (r"#\|", r"#\|"),
+        (r"#\}", r"#\}"),
+        (r"#\~", r"#\~"),
     ];
 
     for (inp, out) in tests.iter() {
