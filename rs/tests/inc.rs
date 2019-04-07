@@ -1,11 +1,4 @@
 // Integration tests
-//
-// TODO:
-//
-// 1. Generate asm into a unique file for each run to avoid synchronization bugs
-// and to get a clean state per each run.
-//
-
 extern crate inc;
 
 use inc::*;
