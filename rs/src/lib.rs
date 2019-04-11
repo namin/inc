@@ -1,10 +1,4 @@
-// ---
-// TODO:
-//
-// 1. Why is there no formatln! macro?
-// 2. A nicer API to cat these tiny bits of strings would be great!
-// ---
-
+use nom::types::CompleteByteSlice as S;
 use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
@@ -38,6 +32,7 @@ pub enum AST {
     // A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     // word; so this implementation makes sense only for ASCII.
     Char { c: u8 },
+    Identifier { i: &'static str },
     Nil,
 }
 
@@ -51,87 +46,188 @@ impl AST {
     }
 }
 
+// The scheme parser
+//
+// See http://www.scheme.com/tspl2d/grammar.html for formal grammar
+// Ported from https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs
+//
+mod parser {
+
+    use super::*;
+    use nom::types::CompleteByteSlice as S;
+    use nom::{self, *};
+    use std::str;
+
+    // Identifiers may denote variables, keywords, or symbols, depending upon
+    // context. They are formed from sequences of letters, digits, and special
+    // characters. With three exceptions, identifiers cannot begin with a
+    // character that can also begin a number, i.e., they cannot begin with .,
+    // +, -, or a digit. The three exceptions are the identifiers ..., +, and -.
+    // Case is insignificant in symbols so that, for example, newspaper,
+    // NewsPaper, and NEWSPAPER all represent the same identifier.
+    //
+    // <identifier> → <initial> <subsequent>* | + | - | ...
+    // <initial>    → <letter> | ! | $ | % | & | * | / | : | < | = | > | ? | ~ | _ | ^
+    // <subsequent> → <initial> | <digit> | . | + | -
+    // <letter>     → a | b | ... | z
+    // <digit>      → 0 | 1 | ... | 9
+    //
+    named!(identifier <S , String>, alt!(
+        value!(String::from("+"), tag!("+"))
+      | value!(String::from("-"), tag!("-"))
+      | value!(String::from("..."), tag!("..."))
+      | do_parse!(
+          i: initial >>
+          s: many1!(subsequent) >>
+          (format!("{}{}", i, s.into_iter().collect::<String>())))
+    ));
+
+    named!(initial <S, char>, alt!(letter | symbol));
+
+    named!(subsequent <S, char>, alt!(initial | digit | one_of!(".+-")));
+
+    named!(symbol <S, char>, one_of!("!$%&*/:<=>?~_^"));
+
+    named!(letter <S, char>, one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"));
+
+    named!(digit <S, char>, one_of!("0123456789"));
+
+    // Data include booleans, numbers, characters, strings, symbols, lists, and
+    // vectors. Case is insignificant in the syntax for booleans, numbers, and
+    // character names, but it is significant in other character constants and
+    // in strings. For example, #T is equivalent to #t, #E1E3 is equivalent to
+    // #e1e3, #X2aBc is equivalent to #x2abc, and #\NewLine is equivalent to
+    // #\newline; but #\A is distinct from #\a and "String" is distinct from
+    // string".
+    //
+    // <datum>            → <boolean> | <number> | <character> | <string> | <symbol> | <list> | <vector>
+    // <boolean>          → #t | #f
+    // <number>           → <num 2> | <num 8> | <num 10> | <num 16>
+    // <character>        → #\ <any character> | #\newline | #\space
+    // <string>           → " <string character>* "
+    // <string character> → \" | \\ | <any character other than" or \>
+    // <symbol>           →  <identifier>
+    // <list>             →  (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
+    // <abbreviation>     →  ' <datum> | ` <datum> | , <datum> | ,@ <datum>
+    // <vector>           → #(<datum>*)
+
+    named!(sign <S, i64>, alt!(
+        tag!("-") => { |_| -1 } |
+        tag!("+") => { |_|  1 }));
+
+    named!(boolean <S, bool>, alt!(
+        tag!("#t") => { |_| true } |
+        tag!("#f") => { |_| false }));
+
+    // ASCII Characters for now
+    named!(ascii <S, u8>, alt!(
+
+        // $ man ascii
+        value!(9  as u8, tag!(r"#\tab")) |
+        value!(10 as u8, tag!(r"#\newline")) |
+        value!(13 as u8, tag!(r"#\return")) |
+        value!(32 as u8, tag!(r"#\space")) |
+
+        // Picking the first byte is quite unsafe, fix for UTF8
+        preceded!(tag!(r"#\"), map!(take!(1), { |e: S| e.0[0] }))
+    ));
+
+    // This isn't quite right
+    named!(number <S, i64>, do_parse!(
+        s: opt!(sign) >>
+        n: map!(take_while!(is_digit),
+                { |e: S| str::from_utf8(e.0)
+                   .expect("Failed to parse string into UTF-8")
+                   .parse::<i64>()
+                   .expect(&format!("Failed to parse digits into i64: `{:?}`\n", e.0)[..])
+                }) >>
+            (s.unwrap_or(1) * n)
+    ));
+
+    named!(pub datum <S, AST>, alt!(
+        value!(AST::Nil, tag!("()"))       |
+        boolean => { |b| AST::Boolean{b} } |
+        ascii   => { |c| AST::Char{c} }    |
+        number  => { |i| AST::Number{i} }
+    ));
+
+    named!(parens, delimited!(char!('('), is_not!(")"), char!(')')));
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        // The complete input is parsed and there is nothing left.
+        const EMPTY: S<'static> = S(b"");
+
+        // OK consumes all of the input and succeeds
+        fn ok<T>(t: T) -> Result<(S<'static>, T), nom::Err<S<'static>, u32>> {
+            partial(EMPTY, t)
+        }
+
+        // Partial consumes some of the input and succeeds
+        fn partial<T>(unconsumed: S<'static>, t: T) -> Result<(S<'_>, T), nom::Err<S<'_>, u32>> {
+            Ok((unconsumed, t))
+        }
+
+        // Fail denotes a parser failing without consuming any of its input
+        fn fail<T>(unconsumed: S<'_>) -> Result<(S<'_>, T), nom::Err<S, u32>> {
+            Err(Err::Error(Context::Code(unconsumed, ErrorKind::Alt)))
+        }
+
+        #[test]
+        fn assorted() {
+            assert_eq!(ok(true), boolean(S(b"#t")));
+            assert_eq!(ok(false), boolean(S(b"#f")));
+            assert_eq!(fail(S(b"A")), boolean(S(b"A")));
+
+            assert_eq!(ok('?'), symbol(S(b"?")));
+
+            assert_eq!(ok(42), number(S(b"42")));
+            assert_eq!(ok(-42), number(S(b"-42")));
+
+            assert_eq!(ok('j' as u8), ascii(S(b"#\\j")));
+            assert_eq!(ok('^' as u8), ascii(S(b"#\\^")));
+
+            assert_eq!(ok(AST::Nil), datum(S(b"()")))
+        }
+
+        #[test]
+        fn identifiers() {
+            assert_eq!(ok(String::from("one")), identifier(S(b"one")));
+            assert_eq!(ok(String::from("!bang")), identifier(S(b"!bang")));
+            assert_eq!(ok(String::from("a->b")), identifier(S(b"a->b")));
+            assert_eq!(ok(String::from("+")), identifier(S(b"+")));
+            assert_eq!(ok(String::from("-")), identifier(S(b"-")));
+            assert_eq!(ok(String::from("i64")), identifier(S(b"i64")));
+
+            // -> is not an identifier, consume the - as an id and return the >
+            assert_eq!(partial(S(b">"), String::from("-")), identifier(S(b"->")));
+        }
+
+        // #[test]
+        // fn unicode() {
+        //     assert_eq!(fail(S(b"അ")), identifier(S(b"അ")))
+        // }
+    }
+}
+
 // Parse the input from user into the form the top level of the compiler
 // understands.
-//
-// TODO: There must be much nice idiomatic ways to do this without unwrapping
-// and wrapping the errors again.
-//
-// Migrate the simple hand written parser into something proper. `nom` maybe?
-
 impl FromStr for AST {
     type Err = Error;
 
     fn from_str(program: &str) -> Result<Self, Error> {
-        let marker = r"#\";
-
-        match program.trim_end() {
-            "#t" => Ok(AST::t()),
-            "#f" => Ok(AST::f()),
-            "()" => Ok(AST::Nil),
-
-            // $ man ascii
-            r"#\newline" => Ok(AST::Char { c: 10 }),
-            r"#\return" => Ok(AST::Char { c: 13 }),
-            r"#\space" => Ok(AST::Char { c: 32 }),
-            r"#\tab" => Ok(AST::Char { c: 9 }),
-
-            // Characters start with #\
-            p if p.starts_with(marker) => match p.replace(marker, "").parse::<char>() {
-                Ok(c) => {
-                    // ASCII; NOTE: .is_ascii might be cleaner?
-                    if c.len_utf8() == 1 {
-                        Ok(AST::Char { c: c as u8 })
-                    } else {
-                        Err(Error {
-                            message: String::from(format!("Failed to parse non ASCII char {}", c)),
-                        })
-                    }
-                }
-                Err(e) => Err(Error {
-                    message: format!("Parse error for `{}`: {}", p, e),
-                }),
-            },
-
-            n => match n.parse::<i64>() {
-                Ok(i) => Ok(AST::Number { i }),
-                Err(e) => Err(Error {
-                    message: String::from(format!("Failed to parse program: {}", e)),
-                }),
-            },
+        match parser::datum(S(program.as_bytes())) {
+            Ok((_rest, ast)) => Ok(ast),
+            // Ok((parser::EMPTY, ast)) => Ok(ast),
+            // Ok((_rest, _ast)) => Err(Error {
+            //     message: String::from("All of input not consumed"),
+            // }),
+            Err(e) => Err(Error {
+                message: format!("{}", e),
+            }),
         }
-    }
-}
-
-#[cfg(test)]
-mod parse {
-    use super::*;
-
-    fn void(_: AST) -> Result<(), Error> {
-        Ok(())
-    }
-
-    #[test]
-    fn number() -> Result<(), Error> {
-        "42".parse().and_then(void)
-    }
-
-    #[test]
-    fn bool() -> Result<(), Error> {
-        "#t".parse().and_then(void)?;
-        "#f".parse().and_then(void)
-    }
-
-    #[test]
-    fn char() -> Result<(), Error> {
-        r"#\a".parse().and_then(void)?;
-        r"#\t".parse().and_then(void)?;
-        r"#\^".parse().and_then(void)
-    }
-
-    #[test]
-    fn uncode() {
-        assert!("അ".parse::<AST>().is_err(), "Sadly no Unicode for now");
     }
 }
 
@@ -139,7 +235,7 @@ pub fn compile(config: &mut Config) -> Result<(), Error> {
     let i: AST = config.program.parse::<AST>()?;
 
     let asm = format!("{}.s", &config.output);
-    let mut handler = File::create(&asm).expect(&format!("Failed to create {}", &asm));
+    let mut handler = File::create(&asm).unwrap_or_else(|_| panic!("Failed to create {}", &asm));
 
     match handler.write_all(emit::program(i).as_bytes()) {
         Ok(_) => Ok(()),
@@ -214,6 +310,7 @@ mod immediate {
                 (i64::from(c) << SHIFT) | CHAR
             }
             AST::Nil => NIL,
+            AST::Identifier { .. } => unimplemented!(),
         }
     }
 
