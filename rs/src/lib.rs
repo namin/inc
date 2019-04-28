@@ -27,13 +27,17 @@ pub struct Error {
 // The LISP AST
 #[derive(Debug, PartialEq)]
 pub enum AST {
+    Nil,
     Number { i: i64 },
     Boolean { b: bool },
     // A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     // word; so this implementation makes sense only for ASCII.
     Char { c: u8 },
-    Nil,
     Identifier { i: String },
+    // Since Rust needs to know the size of the AST type upfront, we need an
+    // indirection here with Box for recursive types. The same applies again for
+    // the nested contents, so we use a Vec instead of an `[AST]`.
+    List {l: Box<Vec<AST>>}
 }
 
 impl AST {
@@ -43,6 +47,10 @@ impl AST {
 
     pub fn f() -> AST {
         AST::Boolean { b: false }
+    }
+
+    pub fn id(i: &str ) -> AST {
+        AST::Identifier {i: String::from(i)}
     }
 }
 
@@ -135,7 +143,7 @@ mod parser {
     // This isn't quite right
     named!(number <S, i64>, do_parse!(
         s: opt!(sign) >>
-        n: map!(take_while!(is_digit),
+        n: map!(take_while1!(is_digit),
                 { |e: S| str::from_utf8(e.0)
                    .expect("Failed to parse string into UTF-8")
                    .parse::<i64>()
@@ -145,13 +153,29 @@ mod parser {
     ));
 
     named!(pub datum <S, AST>, alt!(
-        value!(AST::Nil, tag!("()"))       |
-        boolean => { |b| AST::Boolean{b} } |
-        ascii   => { |c| AST::Char{c} }    |
-        number  => { |i| AST::Number{i} }
+        value!(AST::Nil, tag!("()"))            |
+        boolean    => { |b| AST::Boolean{b} }   |
+        ascii      => { |c| AST::Char{c} }      |
+        number     => { |i| AST::Number{i} }    |
+        identifier => { |i| AST::Identifier{i} }
     ));
 
-    named!(parens, delimited!(char!('('), is_not!(")"), char!(')')));
+    named!(pub parens, delimited!(char!('('), is_not!(")"), char!(')')));
+
+    // <list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
+    named!(pub list <S, AST>, do_parse!(
+        char!('(') >>
+        opt!(many0!(space)) >>
+        d: map!(separated_list!(space, datum),
+                {|ls: Vec<AST> |
+                 if ls.is_empty() {
+                     AST::Nil
+                 } else {
+                     AST::List{l: Box::new(ls)}
+                 }}) >>
+        opt!(many0!(space)) >>
+        char!(')') >>
+        (d)));
 
     #[cfg(test)]
     mod test {
@@ -188,8 +212,6 @@ mod parser {
 
             assert_eq!(ok('j' as u8), ascii(S(b"#\\j")));
             assert_eq!(ok('^' as u8), ascii(S(b"#\\^")));
-
-            assert_eq!(ok(AST::Nil), datum(S(b"()")))
         }
 
         #[test]
@@ -209,6 +231,22 @@ mod parser {
         // fn unicode() {
         //     assert_eq!(fail(S(b"അ")), identifier(S(b"അ")))
         // }
+
+        #[test]
+        fn data() {
+            assert_eq!(ok(AST::Nil), datum(S(b"()")));
+            assert_eq!(ok(AST::Identifier{i: String::from("one")}), datum(S(b"one")));
+            assert_eq!(ok(AST::Number{i: 42}), datum(S(b"42")))
+        }
+
+        #[test]
+        fn oneplus() {
+            let p = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
+            assert_eq!(ok(p), list(S(b"(+ 1)")));
+
+            let q = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
+            assert_eq!(ok(q), list(S(b"(  +   1 )")))
+        }
     }
 }
 
@@ -311,6 +349,7 @@ mod immediate {
             }
             AST::Nil => NIL,
             AST::Identifier { .. } => unimplemented!(),
+            AST::List { .. } => unimplemented!(),
         }
     }
 
