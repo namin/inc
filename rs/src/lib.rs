@@ -32,8 +32,8 @@ pub enum AST {
     // A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     // word; so this implementation makes sense only for ASCII.
     Char { c: u8 },
-    Identifier { i: &'static str },
     Nil,
+    Identifier { i: String },
 }
 
 impl AST {
