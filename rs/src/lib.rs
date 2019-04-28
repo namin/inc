@@ -52,6 +52,10 @@ impl AST {
     pub fn id(i: &str ) -> AST {
         AST::Identifier {i: String::from(i)}
     }
+
+    pub fn num(i: i64 ) -> AST {
+        AST::Number {i}
+    }
 }
 
 // The scheme parser
@@ -152,15 +156,13 @@ mod parser {
             (s.unwrap_or(1) * n)
     ));
 
-    named!(pub datum <S, AST>, alt!(
+    named!(datum <S, AST>, alt!(
         value!(AST::Nil, tag!("()"))            |
         boolean    => { |b| AST::Boolean{b} }   |
         ascii      => { |c| AST::Char{c} }      |
         number     => { |i| AST::Number{i} }    |
         identifier => { |i| AST::Identifier{i} }
     ));
-
-    named!(pub parens, delimited!(char!('('), is_not!(")"), char!(')')));
 
     // <list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
     named!(pub list <S, AST>, do_parse!(
@@ -256,7 +258,7 @@ impl FromStr for AST {
     type Err = Error;
 
     fn from_str(program: &str) -> Result<Self, Error> {
-        match parser::datum(S(program.as_bytes())) {
+        match parser::list(S(program.as_bytes())) {
             Ok((_rest, ast)) => Ok(ast),
             // Ok((parser::EMPTY, ast)) => Ok(ast),
             // Ok((_rest, _ast)) => Err(Error {
@@ -301,11 +303,44 @@ mod emit {
         ctx
     }
 
+    // Move the argument to RAX
+    fn rax(word: i64) -> String {
+        format!("  movq ${}, %rax\n", word)
+    }
+
+    // Add `k` to register RAX
+    fn add(k: i64) -> String {
+        format!("  add ${}, %rax\n", immediate::to(&AST::num(k)))
+    }
+
+    // eval a program and move result to RAX
+    fn eval(prog:AST) -> String {
+        match prog {
+            AST::List { l } => match l.as_slice() {
+                [AST::Identifier{i}, arg] => match &i[..] {
+                    "inc" => {
+                        let mut ctx = String::new();
+
+                        // mov `prog` RAX
+                        ctx.push_str(&rax(immediate::to(&arg)));
+
+                        // add 1 rax
+                        ctx.push_str(&add(1));
+                        ctx
+                    }
+                    _ => unimplemented!()
+                },
+                _ => unimplemented!()
+            },
+            _ => rax(immediate::to(&prog))
+        }
+    }
+
     pub fn program(prog: AST) -> String {
         let mut ctx = String::new();
 
         ctx.push_str(&function_header("_init")[..]);
-        ctx.push_str(&format!("  movq ${}, %rax\n", immediate::to(prog)));
+        ctx.push_str(&eval(prog));
         ctx.push_str("  retq\n");
         ctx
     }
@@ -335,7 +370,7 @@ mod immediate {
     const FALSE: i64 = (0 << SHIFT) | BOOL;
     const TRUE: i64 = (1 << SHIFT) | BOOL;
 
-    pub fn to(prog: AST) -> i64 {
+    pub fn to(prog: &AST) -> i64 {
         match prog {
             AST::Number { i } => (i << SHIFT) | NUM,
             AST::Boolean { b: true } => TRUE,
@@ -345,7 +380,7 @@ mod immediate {
             AST::Char { c } => {
                 // Expand u8 to i64 before shifting right, this will easily
                 // overflow and give bogus results otherwise. Unit testing FTW!
-                (i64::from(c) << SHIFT) | CHAR
+                (i64::from(*c) << SHIFT) | CHAR
             }
             AST::Nil => NIL,
             AST::Identifier { .. } => unimplemented!(),
@@ -386,8 +421,8 @@ mod immediate {
 
         #[test]
         fn numbers() {
-            assert_eq!(to(AST::Number { i: 0 }), 0);
-            assert_eq!(to(AST::Number { i: 1 }), 8);
+            assert_eq!(to(&AST::Number { i: 0 }), 0);
+            assert_eq!(to(&AST::Number { i: 1 }), 8);
 
             assert_eq!(from(0), (AST::Number { i: 0 }));
             assert_eq!(from(8), (AST::Number { i: 1 }));
@@ -397,7 +432,7 @@ mod immediate {
         fn chars() {
             let expect = (65 << SHIFT) + CHAR;
 
-            assert_eq!(to(AST::Char { c: 'A' as u8 }), expect);
+            assert_eq!(to(&AST::Char { c: 'A' as u8 }), expect);
             assert_eq!(from(expect), AST::Char { c: 'A' as u8 });
         }
     }
