@@ -42,24 +42,35 @@ pub enum AST {
     // Since Rust needs to know the size of the AST type upfront, we need an
     // indirection here with Box for recursive types. The same applies again for
     // the nested contents, so we use a Vec instead of an `[AST]`.
-    List {l: Box<Vec<AST>>}
+    List { l: Box<Vec<AST>> },
 }
 
-impl AST {
-    pub fn t() -> AST {
-        AST::Boolean { b: true }
+// Idiomatic type conversions from the primitive types to AST
+//
+// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
+// https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust
+//
+impl From<i64> for AST {
+    fn from(i: i64) -> Self {
+        AST::Number { i }
     }
+}
 
-    pub fn f() -> AST {
-        AST::Boolean { b: false }
+impl From<bool> for AST {
+    fn from(b: bool) -> Self {
+        AST::Boolean { b }
     }
+}
 
-    pub fn id(i: &str ) -> AST {
-        AST::Identifier {i: String::from(i)}
+impl From<char> for AST {
+    fn from(c: char) -> Self {
+        AST::Char { c: c as u8 }
     }
+}
 
-    pub fn num(i: i64 ) -> AST {
-        AST::Number {i}
+impl From<&str> for AST {
+    fn from(i: &str) -> Self {
+        AST::Identifier { i: String::from(i) }
     }
 }
 
@@ -244,34 +255,40 @@ mod parser {
         #[test]
         fn data() {
             assert_eq!(ok(AST::Nil), datum(S(b"()")));
-            assert_eq!(ok(AST::Identifier{i: String::from("one")}), datum(S(b"one")));
-            assert_eq!(ok(AST::Number{i: 42}), datum(S(b"42")))
+            assert_eq!(ok("one".into()), datum(S(b"one")));
+            assert_eq!(ok(42.into()), datum(S(b"42")))
         }
 
         #[test]
         fn oneplus() {
-            let p = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
+            let p = AST::List {
+                l: Box::new(vec!["+".into(), 1.into()]),
+            };
             assert_eq!(ok(p), list(S(b"(+ 1)")));
 
-            let q = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
+            let q = AST::List {
+                l: Box::new(vec!["+".into(), 1.into()]),
+            };
             assert_eq!(ok(q), list(S(b"(  +   1 )")));
 
-            let r = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
+            let r = AST::List {
+                l: Box::new(vec!["+".into(), 1.into()]),
+            };
             assert_eq!(ok(r), program(S(b"(+ 1)")));
         }
 
         #[test]
         fn top() {
-            assert_eq!(ok(AST::t()), program(S(b"#t")));
-            assert_eq!(ok(AST::f()), program(S(b"#f")));
+            assert_eq!(ok(true.into()), program(S(b"#t")));
+            assert_eq!(ok(false.into()), program(S(b"#f")));
 
-            assert_eq!(ok(AST::Char{c: '?' as u8}), program(S(b"#\\?")));
+            assert_eq!(ok('?'.into()), program(S(b"#\\?")));
 
-            assert_eq!(ok(AST::num(42)), program(S(b"42")));
-            assert_eq!(ok(AST::num(-42)), program(S(b"-42")));
+            assert_eq!(ok(42.into()), program(S(b"42")));
+            assert_eq!(ok((-42).into()), program(S(b"-42")));
 
-            assert_eq!(ok(AST::Char{c: 'j' as u8}), program(S(b"#\\j")));
-            assert_eq!(ok(AST::Char{c: '^' as u8}), program(S(b"#\\^")));
+            assert_eq!(ok('j'.into()), program(S(b"#\\j")));
+            assert_eq!(ok('^'.into()), program(S(b"#\\^")));
         }
     }
 }
@@ -334,14 +351,14 @@ mod emit {
 
     // Add `k` to register RAX
     fn add(k: i64) -> String {
-        format!("  add ${}, %rax\n", immediate::to(&AST::num(k)))
+        format!("  add ${}, %rax\n", immediate::to(&(k.into())))
     }
 
     // eval a program and move result to RAX
-    fn eval(prog:AST) -> String {
+    fn eval(prog: AST) -> String {
         match prog {
             AST::List { l } => match l.as_slice() {
-                [AST::Identifier{i}, arg] => match &i[..] {
+                [AST::Identifier { i }, arg] => match &i[..] {
                     "inc" => {
                         let mut ctx = String::new();
 
@@ -352,11 +369,11 @@ mod emit {
                         ctx.push_str(&add(1));
                         ctx
                     }
-                    _ => unimplemented!()
+                    _ => unimplemented!(),
                 },
-                _ => unimplemented!()
+                _ => unimplemented!(),
             },
-            _ => rax(immediate::to(&prog))
+            _ => rax(immediate::to(&prog)),
         }
     }
 
@@ -433,9 +450,9 @@ mod immediate {
                     c: (val >> SHIFT) as u8,
                 };
             } else if val == TRUE {
-                return AST::Boolean { b: true };
+                return true.into();
             } else if val == FALSE {
-                return AST::Boolean { b: false };
+                return false.into();
             } else if val == NIL {
                 return AST::Nil;
             } else {
@@ -445,19 +462,19 @@ mod immediate {
 
         #[test]
         fn numbers() {
-            assert_eq!(to(&AST::Number { i: 0 }), 0);
-            assert_eq!(to(&AST::Number { i: 1 }), 8);
+            assert_eq!(to(&0.into()), 0);
+            assert_eq!(to(&1.into()), 8);
 
-            assert_eq!(from(0), (AST::Number { i: 0 }));
-            assert_eq!(from(8), (AST::Number { i: 1 }));
+            assert_eq!(from(0), 0.into());
+            assert_eq!(from(8), 1.into());
         }
 
         #[test]
         fn chars() {
             let expect = (65 << SHIFT) + CHAR;
 
-            assert_eq!(to(&AST::Char { c: 'A' as u8 }), expect);
-            assert_eq!(from(expect), AST::Char { c: 'A' as u8 });
+            assert_eq!(to(&('A').into()), expect);
+            assert_eq!(from(expect), 'A'.into());
         }
     }
 }
