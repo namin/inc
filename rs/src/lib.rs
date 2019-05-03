@@ -13,7 +13,12 @@ pub struct Config {
 
 impl Config {
     pub fn asm(&self) -> String {
-        format!("{}.s", self.output)
+        let stdout = String::from("/dev/stdout");
+        if self.output == stdout {
+            stdout
+        } else {
+            format!("{}.s", self.output)
+        }
     }
 }
 
@@ -274,8 +279,8 @@ impl FromStr for AST {
 pub fn compile(config: &mut Config) -> Result<(), Error> {
     let i: AST = config.program.parse::<AST>()?;
 
-    let asm = format!("{}.s", &config.output);
-    let mut handler = File::create(&asm).unwrap_or_else(|_| panic!("Failed to create {}", &asm));
+    let mut handler = File::create(&config.asm())
+        .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
 
     match handler.write_all(emit::program(i).as_bytes()) {
         Ok(_) => Ok(()),
