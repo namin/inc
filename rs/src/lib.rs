@@ -198,7 +198,7 @@ mod parser {
     named!(pub program <S, AST>, alt!(datum | list));
 
     #[cfg(test)]
-    mod test {
+    mod tests {
         use super::*;
 
         // The complete input is parsed and there is nothing left.
