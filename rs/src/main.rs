@@ -4,12 +4,10 @@ use inc::Config;
 use std::env;
 use std::io::{self, Read};
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), inc::Error> {
     let mut config = cli();
 
-    inc::compile(&mut config).unwrap();
-
-    Ok(())
+    inc::compile(&mut config)
 }
 
 // Config controls the external interaction of the program by providing it with
