@@ -170,7 +170,7 @@ mod parser {
     ));
 
     // <list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
-    named!(pub list <S, AST>, do_parse!(
+    named!(list <S, AST>, do_parse!(
         char!('(') >>
         opt!(many0!(space)) >>
         d: map!(separated_list!(space, datum),
@@ -183,6 +183,8 @@ mod parser {
         opt!(many0!(space)) >>
         char!(')') >>
         (d)));
+
+    named!(pub program <S, AST>, alt!(datum | list));
 
     #[cfg(test)]
     mod test {
@@ -252,7 +254,24 @@ mod parser {
             assert_eq!(ok(p), list(S(b"(+ 1)")));
 
             let q = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
-            assert_eq!(ok(q), list(S(b"(  +   1 )")))
+            assert_eq!(ok(q), list(S(b"(  +   1 )")));
+
+            let r = AST::List{l: Box::new(vec![AST::id("+"), AST::Number{i: 1}])};
+            assert_eq!(ok(r), program(S(b"(+ 1)")));
+        }
+
+        #[test]
+        fn top() {
+            assert_eq!(ok(AST::t()), program(S(b"#t")));
+            assert_eq!(ok(AST::f()), program(S(b"#f")));
+
+            assert_eq!(ok(AST::Char{c: '?' as u8}), program(S(b"#\\?")));
+
+            assert_eq!(ok(AST::num(42)), program(S(b"42")));
+            assert_eq!(ok(AST::num(-42)), program(S(b"-42")));
+
+            assert_eq!(ok(AST::Char{c: 'j' as u8}), program(S(b"#\\j")));
+            assert_eq!(ok(AST::Char{c: '^' as u8}), program(S(b"#\\^")));
         }
     }
 }
@@ -263,7 +282,7 @@ impl FromStr for AST {
     type Err = Error;
 
     fn from_str(program: &str) -> Result<Self, Error> {
-        match parser::list(S(program.as_bytes())) {
+        match parser::program(S(program.as_bytes())) {
             Ok((_rest, ast)) => Ok(ast),
             // Ok((parser::EMPTY, ast)) => Ok(ast),
             // Ok((_rest, _ast)) => Err(Error {
