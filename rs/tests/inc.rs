@@ -91,6 +91,85 @@ mod steps {
             test1(String::from(*inp), String::from(*out));
         }
     }
+
+    // Step 3: Unary functions
+    mod unary {
+        use super::*;
+
+        #[test]
+        fn inc() {
+            let tests = vec![
+                (r"(inc 0)", r"1"),
+                (r"(inc -1)", r"0"),
+                (r"(inc 41)", r"42"),
+                (r"(inc -100) ", r"-99"),
+                (r"(inc 1000) ", r"1001"),
+                (r"(inc 536870910) ", r"536870911"),
+                (r"(inc -536870912) ", r"-536870911"),
+            ];
+
+            for (inp, out) in tests.iter() {
+                test1(String::from(*inp), String::from(*out));
+            }
+        }
+
+        #[test]
+        fn types() {
+            let tests = vec![
+                ("(fixnum? 0)", "#t"),
+                ("(fixnum? 1)", "#t"),
+                ("(fixnum? -1)", "#t"),
+                ("(fixnum? 37287)", "#t"),
+                ("(fixnum? -23873)", "#t"),
+                ("(fixnum? 536870911)", "#t"),
+                ("(fixnum? -536870912)", "#t"),
+                ("(fixnum? #t)", "#f"),
+                ("(fixnum? #f)", "#f"),
+                ("(fixnum? ())", "#f"),
+                ("(fixnum? #\\Q)", "#f"),
+                ("(char? #\\Q)", "#t"),
+                ("(char? 0)", "#f"),
+                ("(char? 1)", "#f"),
+                ("(char? -1)", "#f"),
+                ("(char? 37287)", "#f"),
+                ("(char? -23873)", "#f"),
+                ("(char? 536870911)", "#f"),
+                ("(char? -536870912)", "#f"),
+                ("(char? #t)", "#f"),
+                ("(char? #f)", "#f"),
+                ("(char? ())", "#f"),
+                ("(not 1)", "#f"),
+                ("(not #t)", "#f"),
+                ("(not #f)", "#t"),
+                ("(not ())", "#f"),
+            ];
+
+            for (inp, out) in tests.iter() {
+                test1(String::from(*inp), String::from(*out));
+            }
+        }
+
+        #[test]
+        fn zn() {
+            let tests = vec![
+                (r"(zero? 0)", r"#t"),
+                (r"(zero? 1)", r"#f"),
+                (r"(zero? #t)", r"#f"),
+                (r"(zero? ())", r"#f"),
+                (r"(null? ())", r"#t"),
+                (r"(null? #\Q)", r"#f"),
+                (r"(null? #f)", r"#f"),
+                (r"(null? #t)", r"#f"),
+                (r"(null? -23873)", r"#f"),
+                (r"(null? 37287)", r"#f"),
+                (r"(null? #\a)", r"#f"),
+            ];
+
+            for (inp, out) in tests.iter() {
+                test1(String::from(*inp), String::from(*out));
+            }
+        }
+    }
 }
 
 mod quick {

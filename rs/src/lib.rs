@@ -331,6 +331,8 @@ mod emit {
     use super::immediate;
     use super::*;
 
+    /* ASM templates */
+
     fn label(label: &str) -> String {
         format!("{}:\n", label)
     }
@@ -338,25 +340,66 @@ mod emit {
     fn function_header(name: &str) -> String {
         let mut ctx = String::new();
 
-        ctx.push_str("  .section __TEXT,__text\n");
-        ctx.push_str("  .intel_syntax noprefix\n");
-        ctx.push_str(&format!("  .globl {}\n", &name));
+        ctx.push_str("    .section __TEXT,__text\n");
+        ctx.push_str("    .intel_syntax noprefix\n");
+        ctx.push_str(&format!("    .globl {}\n", &name));
         ctx.push_str(&label(&name));
         ctx
     }
 
+    /* Instruction wrappers */
+
+    // Unconditional function call
+    // fn call(label: &str) -> String {
+    //     format!("    call {} \n", label)
+    // }
+
+    // Compare the value to register RAX
+    pub fn cmp(with: i64) -> String {
+        format!("    cmp rax, {} \n", with)
+    }
+
+    // Jump to the specified label if last comparison resulted in equality
+    // fn je(label: &str) -> String {
+    //     format!("    je {} \n", label)
+    // }
+
+    // Unconditionally jump to the specified label
+    // fn jmp(label: &str) -> String {
+    //     format!("    jmp {} \n", label)
+    // }
+
+    /* Helpers */
+
     // Move the argument to RAX
     fn rax(word: i64) -> String {
-        format!("  mov rax, {} \n", word)
+        format!("    mov rax, {} \n", word)
     }
 
-    fn immediate(x: &AST) -> String {
-        rax(immediate::to(&x))
+    pub fn mask() -> String {
+        format!("    and rax, {} \n", immediate::MASK)
     }
 
-    // Add `k` to register RAX
-    fn inc(k: i64) -> String {
-        format!("  add rax, {} \n", immediate::to(&(k.into())))
+    // Evaluate an expression into RAX
+    pub fn expr(e: &AST) -> String {
+        rax(immediate::to(&e))
+    }
+
+    pub fn cmp_bool() -> String {
+        let mut ctx = String::new();
+
+        // SETE sets the destination operand to 0 or 1 depending on the settings
+        // of the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
+        ctx.push_str("    sete al \n");
+
+        // MOVZX copies the contents of the source operand (register or memory
+        // location) to the destination operand (register) and zero extends the
+        // value.
+        ctx.push_str(&format!("    movzx rax, al \n"));
+        ctx.push_str(&format!("    sal al, {} \n", immediate::SHIFT));
+        ctx.push_str(&format!("    or al, {} \n", immediate::BOOL));
+
+        ctx
     }
 
     // eval a program and move result to RAX
@@ -364,16 +407,14 @@ mod emit {
         match prog {
             AST::List { l } => match l.as_slice() {
                 [AST::Identifier { i }, arg] => match &i[..] {
-                    "inc" => {
-                        let mut ctx = String::new();
-
-                        // mov `prog` RAX
-                        ctx.push_str(&immediate(arg));
-
-                        // add 1 rax
-                        ctx.push_str(&inc(1));
-                        ctx
-                    }
+                    "inc" => primitives::inc(arg),
+                    "dec" => primitives::dec(arg),
+                    "null?" => primitives::nullp(arg),
+                    "zero?" => primitives::zerop(arg),
+                    "not" => primitives::not(arg),
+                    "fixnum?" => primitives::fixnump(arg),
+                    "boolean?" => primitives::booleanp(arg),
+                    "char?" => primitives::charp(arg),
                     _ => unimplemented!(),
                 },
                 _ => unimplemented!(),
@@ -387,7 +428,95 @@ mod emit {
 
         ctx.push_str(&function_header("_init")[..]);
         ctx.push_str(&eval(prog));
-        ctx.push_str("  ret\n");
+        ctx.push_str("    ret\n");
+        ctx
+    }
+}
+
+mod primitives {
+
+    use super::*;
+
+    // Add `k` to register RAX
+    pub fn add(k: i64) -> String {
+        format!("    add rax, {} \n", immediate::to(&(k.into())))
+    }
+
+    // Sub `k` from register RAX
+    pub fn sub(k: i64) -> String {
+        format!("    sub rax, {} \n", immediate::to(&(k.into())))
+    }
+
+    pub fn inc(x: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(x));
+        ctx.push_str(&add(1));
+        ctx
+    }
+
+    pub fn dec(x: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(x));
+        ctx.push_str(&sub(1));
+        ctx
+    }
+
+    pub fn fixnump(expr: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(expr));
+        ctx.push_str(&emit::mask());
+        ctx.push_str(&emit::cmp(immediate::NUM));
+        ctx.push_str(&emit::cmp_bool());
+        ctx
+    }
+
+    pub fn booleanp(expr: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(expr));
+        ctx.push_str(&emit::mask());
+        ctx.push_str(&emit::cmp(immediate::BOOL));
+        ctx.push_str(&emit::cmp_bool());
+        ctx
+    }
+
+    pub fn charp(expr: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(expr));
+        ctx.push_str(&emit::mask());
+        ctx.push_str(&emit::cmp(immediate::CHAR));
+        ctx.push_str(&emit::cmp_bool());
+        ctx
+    }
+
+    pub fn nullp(expr: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(expr));
+        ctx.push_str(&emit::cmp(immediate::NIL));
+        ctx.push_str(&emit::cmp_bool());
+        ctx
+    }
+
+    pub fn zerop(expr: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(expr));
+        ctx.push_str(&emit::cmp(immediate::NUM));
+        ctx.push_str(&emit::cmp_bool());
+        ctx
+    }
+
+    pub fn not(expr: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::expr(expr));
+        ctx.push_str(&emit::cmp(immediate::FALSE));
+        ctx.push_str(&emit::cmp_bool());
         ctx
     }
 }
@@ -406,15 +535,16 @@ mod emit {
 mod immediate {
     use super::*;
 
-    const NUM: i64 = 0;
-    const BOOL: i64 = 1;
-    const CHAR: i64 = 2;
-    const NIL: i64 = 4;
+    pub const NUM: i64 = 0;
+    pub const BOOL: i64 = 1;
+    pub const CHAR: i64 = 2;
+    pub const NIL: i64 = 4;
 
-    const SHIFT: i64 = 3;
+    pub const SHIFT: i64 = 3;
+    pub const MASK: i64 = 0b00000111;
 
-    const FALSE: i64 = (0 << SHIFT) | BOOL;
-    const TRUE: i64 = (1 << SHIFT) | BOOL;
+    pub const FALSE: i64 = (0 << SHIFT) | BOOL;
+    pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 
     pub fn to(prog: &AST) -> i64 {
         match prog {
@@ -437,8 +567,6 @@ mod immediate {
     #[cfg(test)]
     mod tests {
         use super::*;
-
-        const MASK: i64 = 0b00000111;
 
         // As of now, there is no need for this function in Rust other than
         // testing, but good to have :) There is an equivalent C implementation
