@@ -339,6 +339,7 @@ mod emit {
         let mut ctx = String::new();
 
         ctx.push_str("  .section __TEXT,__text\n");
+        ctx.push_str("  .intel_syntax noprefix\n");
         ctx.push_str(&format!("  .globl {}\n", &name));
         ctx.push_str(&label(&name));
         ctx
@@ -346,12 +347,16 @@ mod emit {
 
     // Move the argument to RAX
     fn rax(word: i64) -> String {
-        format!("  movq ${}, %rax\n", word)
+        format!("  mov rax, {} \n", word)
+    }
+
+    fn immediate(x: &AST) -> String {
+        rax(immediate::to(&x))
     }
 
     // Add `k` to register RAX
-    fn add(k: i64) -> String {
-        format!("  add ${}, %rax\n", immediate::to(&(k.into())))
+    fn inc(k: i64) -> String {
+        format!("  add rax, {} \n", immediate::to(&(k.into())))
     }
 
     // eval a program and move result to RAX
@@ -363,10 +368,10 @@ mod emit {
                         let mut ctx = String::new();
 
                         // mov `prog` RAX
-                        ctx.push_str(&rax(immediate::to(&arg)));
+                        ctx.push_str(&immediate(arg));
 
                         // add 1 rax
-                        ctx.push_str(&add(1));
+                        ctx.push_str(&inc(1));
                         ctx
                     }
                     _ => unimplemented!(),
@@ -382,7 +387,7 @@ mod emit {
 
         ctx.push_str(&function_header("_init")[..]);
         ctx.push_str(&eval(prog));
-        ctx.push_str("  retq\n");
+        ctx.push_str("  ret\n");
         ctx
     }
 }
