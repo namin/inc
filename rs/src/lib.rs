@@ -42,7 +42,7 @@ pub enum AST {
     // Since Rust needs to know the size of the AST type upfront, we need an
     // indirection here with Box for recursive types. The same applies again for
     // the nested contents, so we use a Vec instead of an `[AST]`.
-    List { l: Box<Vec<AST>> },
+    List { l: Vec<AST> },
 }
 
 // Idiomatic type conversions from the primitive types to AST
@@ -189,7 +189,7 @@ mod parser {
                  if ls.is_empty() {
                      AST::Nil
                  } else {
-                     AST::List{l: Box::new(ls)}
+                     AST::List{l: ls}
                  }}) >>
         opt!(many0!(space)) >>
         char!(')') >>
@@ -262,17 +262,17 @@ mod parser {
         #[test]
         fn oneplus() {
             let p = AST::List {
-                l: Box::new(vec!["+".into(), 1.into()]),
+                l: vec!["+".into(), 1.into()],
             };
             assert_eq!(ok(p), list(S(b"(+ 1)")));
 
             let q = AST::List {
-                l: Box::new(vec!["+".into(), 1.into()]),
+                l: vec!["+".into(), 1.into()],
             };
             assert_eq!(ok(q), list(S(b"(  +   1 )")));
 
             let r = AST::List {
-                l: Box::new(vec!["+".into(), 1.into()]),
+                l: vec!["+".into(), 1.into()],
             };
             assert_eq!(ok(r), program(S(b"(+ 1)")));
         }
