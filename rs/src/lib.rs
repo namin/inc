@@ -7,18 +7,13 @@ use std::str::FromStr;
 pub struct Config {
     // Program is the input source
     pub program: String,
-    // Outfile is the name of the generated asm and executable
-    pub output: String,
+    // Name of the generated asm and executable, stdout otherwise
+    pub output: Option<String>,
 }
 
 impl Config {
-    pub fn asm(&self) -> String {
-        let stdout = String::from("/dev/stdout");
-        if self.output == stdout {
-            stdout
-        } else {
-            format!("{}.s", self.output)
-        }
+    pub fn asm(&self) -> Option<String> {
+        self.output.clone().map(|f| format!("{}.s", f))
     }
 }
 
@@ -619,8 +614,8 @@ impl FromStr for AST {
 pub fn compile(config: &mut Config) -> Result<(), Error> {
     let i: AST = config.program.parse::<AST>()?;
 
-    let mut handler = File::create(&config.asm())
-        .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
+    let file = config.asm().unwrap_or(String::from("/dev/stdout"));
+    let mut handler = File::create(&file).expect(&format!("Failed to create {}", file));
 
     match handler.write_all(emit::program(i).as_bytes()) {
         Ok(_) => Ok(()),
