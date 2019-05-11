@@ -1,13 +1,18 @@
+//! # Inc
+//!
+//! Incremental approach to compiler construction.
+//!
+//!
 use nom::types::CompleteByteSlice as S;
 use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
 
-// Control behavior and external interaction of the program.
+/// Control behavior and external interaction of the program.
 pub struct Config {
-    // Program is the input source
+    /// Program is the input source
     pub program: String,
-    // Name of the generated asm and executable, stdout otherwise
+    /// Name of the generated asm and executable, stdout otherwise
     pub output: Option<String>,
 }
 
@@ -17,34 +22,36 @@ impl Config {
     }
 }
 
-// Custom error type for all of inc. This might not be idiomatic Rust, revisit
-// later.
+/// Custom error type for all of inc.
+// This might not be idiomatic Rust, revisit later.
 #[derive(Debug)]
 pub struct Error {
     message: String,
 }
 
-// The LISP AST
+/// The LISP AST
+///
+/// The canonical type to represent lisp programs. The parser parses the input
+/// program to generate an AST. See tests for several examples.
 #[derive(Debug, PartialEq)]
 pub enum AST {
     Nil,
     Number { i: i64 },
     Boolean { b: bool },
-    // A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
-    // word; so this implementation makes sense only for ASCII.
+    /// A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
+    /// word; so this implementation makes sense only for ASCII.
     Char { c: u8 },
     Identifier { i: String },
-    // Since Rust needs to know the size of the AST type upfront, we need an
-    // indirection here with Box for recursive types. The same applies again for
-    // the nested contents, so we use a Vec instead of an `[AST]`.
+    /// Since Rust needs to know the size of the AST type upfront, we need an
+    /// indirection here with `Vec<>` for recursive types. In this context, Vec
+    /// is just a convenient way to have a `Box<[AST]>`
     List { l: Vec<AST> },
 }
 
-// Idiomatic type conversions from the primitive types to AST
-//
-// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
-// https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust
-//
+/// Idiomatic type conversions from the primitive types to AST
+///
+/// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
+/// https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust
 impl From<i64> for AST {
     fn from(i: i64) -> Self {
         AST::Number { i }
@@ -69,12 +76,15 @@ impl From<&str> for AST {
     }
 }
 
-// The scheme parser
-//
-// See http://www.scheme.com/tspl2d/grammar.html for formal grammar
-// Ported from https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs
-//
-mod parser {
+/// A scheme parser in nom.
+///
+/// See http://www.scheme.com/tspl2d/grammar.html for formal grammar
+/// specification. This module tries to describe this BNF grammar in Rust as
+/// closely as posible using the nom parser combinator library.
+///
+/// Ported from https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs
+///
+pub mod parser {
 
     use super::*;
     use nom::types::CompleteByteSlice as S;
@@ -288,13 +298,26 @@ mod parser {
     }
 }
 
-mod emit {
+/// Generate x86 assembly for an AST
+///
+/// This module implements bulk of the compiler and is a good place to start
+/// reading code. Platform specific code is annotated with `cfg(target_os)` for
+/// both linux and mac.
+pub mod emit {
     use super::immediate;
     use super::*;
 
     /* ASM templates */
 
     #[cfg(target_os = "macos")]
+    /// A label is a target to jump to
+    ///
+    /// # Example:
+    ///
+    /// ```asm
+    /// init:
+    ///     mov rax, 42
+    /// ```
     fn label(label: &str) -> String {
         format!("_{}:\n", label)
     }
@@ -334,7 +357,7 @@ mod emit {
     //     format!("    call {} \n", label)
     // }
 
-    // Compare the value to register RAX
+    /// Compare the value to register RAX
     pub fn cmp(with: i64) -> String {
         format!("    cmp rax, {} \n", with)
     }
@@ -351,20 +374,22 @@ mod emit {
 
     /* Helpers */
 
-    // Move the argument to RAX
+    /// Move the argument to RAX
     fn rax(word: i64) -> String {
         format!("    mov rax, {} \n", word)
     }
 
+    /// Clear (mask) all except the least significant 3 tag bits
     pub fn mask() -> String {
         format!("    and rax, {} \n", immediate::MASK)
     }
 
-    // Evaluate an expression into RAX
+    /// Evaluate an expression into RAX
     pub fn expr(e: &AST) -> String {
         rax(immediate::to(&e))
     }
 
+    /// Convert the result in RAX into a boolean
     pub fn cmp_bool() -> String {
         // SETE sets the destination operand to 0 or 1 depending on the settings
         // of the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
@@ -378,7 +403,7 @@ mod emit {
         &format!("    or al, {} \n", immediate::BOOL)
     }
 
-    // eval a program and move result to RAX
+    /// eval a program and move result to RAX
     fn eval(prog: AST) -> String {
         match prog {
             AST::List { l } => match l.as_slice() {
@@ -399,70 +424,91 @@ mod emit {
         }
     }
 
+    /// Top level interface to the emit module
     pub fn program(prog: AST) -> String {
         function_header("init") + &eval(prog) + "    ret\n"
     }
 }
 
-mod primitives {
+/// Scheme primitives implemented directly in the compiler
+///
+/// Several scheme functions like `(add ...` are implemented by the compiler in
+/// assembly rather than in scheme. All of them live in this module.
+pub mod primitives {
 
     use super::*;
 
-    // Add `k` to register RAX
+    /// Add `k` to register RAX
     pub fn add(k: i64) -> String {
         format!("    add rax, {} \n", immediate::to(&(k.into())))
     }
 
-    // Sub `k` from register RAX
+    /// Sub `k` from register RAX
     pub fn sub(k: i64) -> String {
         format!("    sub rax, {} \n", immediate::to(&(k.into())))
     }
 
+    /// Increment number by 1
     pub fn inc(x: &AST) -> String {
         emit::expr(x) + &add(1)
     }
 
+    /// Decrement by 1
     pub fn dec(x: &AST) -> String {
         emit::expr(x) + &sub(1)
     }
 
+    /// Is the expression a fixnum?
+    ///
+    /// # Examples
+    ///
+    /// ```scheme
+    /// (fixnum? 42) => #t
+    /// (fixnum? "hello") => #f
+    /// ```
     pub fn fixnump(expr: &AST) -> String {
         emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
+    /// Is the expression a boolean?
     pub fn booleanp(expr: &AST) -> String {
         emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
     }
 
+    /// Is the expression a char?
     pub fn charp(expr: &AST) -> String {
         emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
     }
 
+    /// Is the expression null?
     pub fn nullp(expr: &AST) -> String {
         emit::expr(expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
     }
 
+    /// Is the expression zero?
     pub fn zerop(expr: &AST) -> String {
         emit::expr(expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
+    /// Logical not
     pub fn not(expr: &AST) -> String {
         emit::expr(expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
     }
 }
 
-// Constants for runtime representation
-//
-// Immediate values (values that can be fit in one machine word) are tagged for
-// distinguising them from heap allocated pointers. The last 3 bits effectively
-// serve as the runtime type of the value. Always using 3 bits is a simpler
-// approach than the multi bit technique the paper uses. This is a very
-// efficient and low overhead technique at the cost of losing precision -
-// completely acceptable for types like characters and booleans but having to
-// live with 61bit numerics instead of native 64 and some overhead for
-// operations like multiplication & division.
-
-mod immediate {
+/// Runtime representation of typed scheme values
+///
+/// Immediate values (values that can be fit in one machine word) are tagged for
+/// distinguising them from heap allocated pointers. The last 3 bits effectively
+/// serve as the runtime type of the value. Always using 3 bits is a simpler
+/// approach than the multi bit technique the paper uses. This is a very
+/// efficient and low overhead technique at the cost of losing precision -
+/// completely acceptable for types like characters and booleans but having to
+/// live with 61bit numerics instead of native 64 and some overhead for
+/// operations like multiplication & division.
+///
+/// See the paper for details. See tests for examples.
+pub mod immediate {
     use super::*;
 
     pub const NUM: i64 = 0;
@@ -542,8 +588,8 @@ mod immediate {
     }
 }
 
-// Parse the input from user into the form the top level of the compiler
-// understands.
+/// Parse the input from user into the form the top level of the compiler
+/// understands.
 impl FromStr for AST {
     type Err = Error;
 
@@ -561,6 +607,10 @@ impl FromStr for AST {
     }
 }
 
+/// Top level API for inc
+///
+/// Compile a scheme program into x86 asm; input program and output file is
+/// passed with Config.
 pub fn compile(config: &mut Config) -> Result<(), Error> {
     let i: AST = config.program.parse::<AST>()?;
 
