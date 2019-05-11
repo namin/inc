@@ -293,38 +293,6 @@ mod parser {
     }
 }
 
-// Parse the input from user into the form the top level of the compiler
-// understands.
-impl FromStr for AST {
-    type Err = Error;
-
-    fn from_str(program: &str) -> Result<Self, Error> {
-        match parser::program(S(program.as_bytes())) {
-            Ok((_rest, ast)) => Ok(ast),
-            // Ok((parser::EMPTY, ast)) => Ok(ast),
-            // Ok((_rest, _ast)) => Err(Error {
-            //     message: String::from("All of input not consumed"),
-            // }),
-            Err(e) => Err(Error {
-                message: format!("{}", e),
-            }),
-        }
-    }
-}
-
-pub fn compile(config: &mut Config) -> Result<(), Error> {
-    let i: AST = config.program.parse::<AST>()?;
-
-    let mut handler = File::create(&config.asm())
-        .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
-
-    match handler.write_all(emit::program(i).as_bytes()) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error {
-            message: format!("Failed to write generated code: {}", e),
-        }),
-    }
-}
 
 #[cfg(target_os = "macos")]
 mod emit {
@@ -609,5 +577,38 @@ mod immediate {
             assert_eq!(to(&('A').into()), expect);
             assert_eq!(from(expect), 'A'.into());
         }
+    }
+}
+
+// Parse the input from user into the form the top level of the compiler
+// understands.
+impl FromStr for AST {
+    type Err = Error;
+
+    fn from_str(program: &str) -> Result<Self, Error> {
+        match parser::program(S(program.as_bytes())) {
+            Ok((_rest, ast)) => Ok(ast),
+            // Ok((parser::EMPTY, ast)) => Ok(ast),
+            // Ok((_rest, _ast)) => Err(Error {
+            //     message: String::from("All of input not consumed"),
+            // }),
+            Err(e) => Err(Error {
+                message: format!("{}", e),
+            }),
+        }
+    }
+}
+
+pub fn compile(config: &mut Config) -> Result<(), Error> {
+    let i: AST = config.program.parse::<AST>()?;
+
+    let mut handler = File::create(&config.asm())
+        .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
+
+    match handler.write_all(emit::program(i).as_bytes()) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error {
+            message: format!("Failed to write generated code: {}", e),
+        }),
     }
 }
