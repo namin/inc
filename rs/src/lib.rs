@@ -366,20 +366,16 @@ mod emit {
     }
 
     pub fn cmp_bool() -> String {
-        let mut ctx = String::new();
-
         // SETE sets the destination operand to 0 or 1 depending on the settings
         // of the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
-        ctx.push_str("    sete al \n");
+        String::from("    sete al \n") +
 
         // MOVZX copies the contents of the source operand (register or memory
         // location) to the destination operand (register) and zero extends the
         // value.
-        ctx.push_str(&format!("    movzx rax, al \n"));
-        ctx.push_str(&format!("    sal al, {} \n", immediate::SHIFT));
-        ctx.push_str(&format!("    or al, {} \n", immediate::BOOL));
-
-        ctx
+        &format!("    movzx rax, al \n") +
+        &format!("    sal al, {} \n", immediate::SHIFT) +
+        &format!("    or al, {} \n", immediate::BOOL)
     }
 
     // eval a program and move result to RAX
@@ -404,12 +400,7 @@ mod emit {
     }
 
     pub fn program(prog: AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&function_header("init")[..]);
-        ctx.push_str(&eval(prog));
-        ctx.push_str("    ret\n");
-        ctx
+        function_header("init") + &eval(prog) + "    ret\n"
     }
 }
 
@@ -428,76 +419,35 @@ mod primitives {
     }
 
     pub fn inc(x: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(x));
-        ctx.push_str(&add(1));
-        ctx
+        emit::expr(x) + &add(1)
     }
 
     pub fn dec(x: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(x));
-        ctx.push_str(&sub(1));
-        ctx
+        emit::expr(x) + &sub(1)
     }
 
     pub fn fixnump(expr: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(expr));
-        ctx.push_str(&emit::mask());
-        ctx.push_str(&emit::cmp(immediate::NUM));
-        ctx.push_str(&emit::cmp_bool());
-        ctx
+        emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
     pub fn booleanp(expr: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(expr));
-        ctx.push_str(&emit::mask());
-        ctx.push_str(&emit::cmp(immediate::BOOL));
-        ctx.push_str(&emit::cmp_bool());
-        ctx
+        emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
     }
 
     pub fn charp(expr: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(expr));
-        ctx.push_str(&emit::mask());
-        ctx.push_str(&emit::cmp(immediate::CHAR));
-        ctx.push_str(&emit::cmp_bool());
-        ctx
+        emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
     }
 
     pub fn nullp(expr: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(expr));
-        ctx.push_str(&emit::cmp(immediate::NIL));
-        ctx.push_str(&emit::cmp_bool());
-        ctx
+        emit::expr(expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
     }
 
     pub fn zerop(expr: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(expr));
-        ctx.push_str(&emit::cmp(immediate::NUM));
-        ctx.push_str(&emit::cmp_bool());
-        ctx
+        emit::expr(expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
     pub fn not(expr: &AST) -> String {
-        let mut ctx = String::new();
-
-        ctx.push_str(&emit::expr(expr));
-        ctx.push_str(&emit::cmp(immediate::FALSE));
-        ctx.push_str(&emit::cmp_bool());
-        ctx
+        emit::expr(expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
     }
 }
 
