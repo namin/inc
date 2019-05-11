@@ -293,24 +293,41 @@ mod parser {
     }
 }
 
-
-#[cfg(target_os = "macos")]
 mod emit {
     use super::immediate;
     use super::*;
 
     /* ASM templates */
 
+    #[cfg(target_os = "macos")]
+    fn label(label: &str) -> String {
+        format!("_{}:\n", label)
+    }
+
+    #[cfg(target_os = "linux")]
     fn label(label: &str) -> String {
         format!("{}:\n", label)
     }
 
+    #[cfg(target_os = "macos")]
     fn function_header(name: &str) -> String {
         let mut ctx = String::new();
 
         ctx.push_str("    .section __TEXT,__text\n");
         ctx.push_str("    .intel_syntax noprefix\n");
+        ctx.push_str(&format!("    .globl _{}\n", &name));
+        ctx.push_str(&label(&name));
+        ctx
+    }
+
+    #[cfg(target_os = "linux")]
+    fn function_header(name: &str) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str("    .text\n");
+        ctx.push_str("    .intel_syntax noprefix\n");
         ctx.push_str(&format!("    .globl {}\n", &name));
+        ctx.push_str(&format!("    .type {}, @function\n", &name));
         ctx.push_str(&label(&name));
         ctx
     }
@@ -394,7 +411,7 @@ mod emit {
     pub fn program(prog: AST) -> String {
         let mut ctx = String::new();
 
-        ctx.push_str(&function_header("_init")[..]);
+        ctx.push_str(&function_header("init")[..]);
         ctx.push_str(&eval(prog));
         ctx.push_str("    ret\n");
         ctx
