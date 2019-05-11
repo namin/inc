@@ -239,9 +239,5 @@ fn test1(input: String, output: String) {
     // Clean up all the intermediary files generated
     fs::remove_file(&config.asm()).expect("Failed to clear generated asm files");
     fs::remove_file(&config.output).expect("Failed to clear executable");
-
-    match fs::remove_dir_all(format!("{}.dSYM", &config.output)) {
-        Ok(()) => (),
-        Err(_) => (),
-    }
+    fs::remove_dir_all(format!("{}.dSYM", &config.output)).unwrap_or_default()
 }
