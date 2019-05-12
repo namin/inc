@@ -545,6 +545,12 @@ pub mod immediate {
     pub const FALSE: i64 = (0 << SHIFT) | BOOL;
     pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 
+    /// Immediate representation of an expression.
+    ///
+    /// Immediate representation is only defined for some types and this
+    /// function is partial. The caller for this function must make sure of it,
+    /// rather than make this module complicated. It would be great if the type
+    /// system could ensure that, but till then fail with a panic.
     pub fn to(prog: &AST) -> i64 {
         match prog {
             AST::Number { i } => (i << SHIFT) | NUM,
@@ -558,8 +564,8 @@ pub mod immediate {
                 (i64::from(*c) << SHIFT) | CHAR
             }
             AST::Nil => NIL,
-            AST::Identifier { .. } => unimplemented!(),
-            AST::List { .. } => unimplemented!(),
+            AST::Identifier { .. } => unimplemented!("immediate repr is undefined for identifiers"),
+            AST::List { .. } => unimplemented!("immediate repr is undefined for lists"),
         }
     }
 
