@@ -407,11 +407,6 @@ pub mod emit {
         format!("    and rax, {} \n", immediate::MASK)
     }
 
-    /// Evaluate an expression into RAX
-    pub fn expr(e: &AST) -> String {
-        rax(immediate::to(&e))
-    }
-
     /// Convert the result in RAX into a boolean
     pub fn cmp_bool() -> String {
         // SETE sets the destination operand to 0 or 1 depending on the settings
@@ -426,8 +421,11 @@ pub mod emit {
         &format!("    or al, {} \n", immediate::BOOL)
     }
 
-    /// eval a program and move result to RAX
-    fn eval(prog: AST) -> String {
+    /// Evaluate an expression into RAX
+    ///
+    /// If the expression fits in a machine word, immediately return with the
+    /// immediate repr, recurse for anything else till the base case.
+    pub fn eval(prog: &AST) -> String {
         match prog {
             AST::List { l } => match l.as_slice() {
                 [AST::Identifier { i }, arg] => match &i[..] {
@@ -439,16 +437,16 @@ pub mod emit {
                     "fixnum?" => primitives::fixnump(arg),
                     "boolean?" => primitives::booleanp(arg),
                     "char?" => primitives::charp(arg),
-                    _ => unimplemented!(),
+                    _ => unimplemented!("Unknown primitive"),
                 },
-                _ => unimplemented!(),
+                _ => unimplemented!("n item list"),
             },
             _ => rax(immediate::to(&prog)),
         }
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: AST) -> String {
+    pub fn program(prog: &AST) -> String {
         function_header("init") + &eval(prog) + "    ret\n"
     }
 }
@@ -473,12 +471,12 @@ pub mod primitives {
 
     /// Increment number by 1
     pub fn inc(x: &AST) -> String {
-        emit::expr(x) + &add(1)
+        emit::eval(x) + &add(1)
     }
 
     /// Decrement by 1
     pub fn dec(x: &AST) -> String {
-        emit::expr(x) + &sub(1)
+        emit::eval(x) + &sub(1)
     }
 
     /// Is the expression a fixnum?
@@ -490,32 +488,32 @@ pub mod primitives {
     /// (fixnum? "hello") => #f
     /// ```
     pub fn fixnump(expr: &AST) -> String {
-        emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
+        emit::eval(expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
     /// Is the expression a boolean?
     pub fn booleanp(expr: &AST) -> String {
-        emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
+        emit::eval(expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
     }
 
     /// Is the expression a char?
     pub fn charp(expr: &AST) -> String {
-        emit::expr(expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
+        emit::eval(expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
     }
 
     /// Is the expression null?
     pub fn nullp(expr: &AST) -> String {
-        emit::expr(expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
+        emit::eval(expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
     }
 
     /// Is the expression zero?
     pub fn zerop(expr: &AST) -> String {
-        emit::expr(expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
+        emit::eval(expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
     /// Logical not
     pub fn not(expr: &AST) -> String {
-        emit::expr(expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
+        emit::eval(expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
     }
 }
 
@@ -641,12 +639,12 @@ impl FromStr for AST {
 /// Compile a scheme program into x86 asm; input program and output file is
 /// passed with Config.
 pub fn compile(config: &mut Config) -> Result<(), Error> {
-    let i: AST = config.program.parse::<AST>()?;
+    let prog: AST = config.program.parse::<AST>()?;
 
     let mut handler = File::create(&config.asm())
         .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
 
-    match handler.write_all(emit::program(i).as_bytes()) {
+    match handler.write_all(emit::program(&prog).as_bytes()) {
         Ok(_) => Ok(()),
         Err(e) => Err(Error {
             message: format!("Failed to write generated code: {}", e),

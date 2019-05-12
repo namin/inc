@@ -106,6 +106,7 @@ mod steps {
                 (r"(inc 1000) ", r"1001"),
                 (r"(inc 536870910) ", r"536870911"),
                 (r"(inc -536870912) ", r"-536870911"),
+                (r"(inc (inc (inc (inc 1)))) ", r"5"),
             ];
 
             for (inp, out) in tests.iter() {
