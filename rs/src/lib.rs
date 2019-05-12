@@ -187,7 +187,8 @@ pub mod parser {
         boolean    => { |b| AST::Boolean{b} }   |
         ascii      => { |c| AST::Char{c} }      |
         number     => { |i| AST::Number{i} }    |
-        identifier => { |i| AST::Identifier{i} }
+        identifier => { |i| AST::Identifier{i} }|
+        list
     ));
 
     // <list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
@@ -270,21 +271,28 @@ pub mod parser {
         }
 
         #[test]
-        fn oneplus() {
-            let p = AST::List {
-                l: vec!["+".into(), 1.into()],
-            };
-            assert_eq!(ok(p), list(S(b"(+ 1)")));
+        fn lists() {
+            assert_eq!(
+                ok(AST::List {
+                    l: vec!["+".into(), 1.into()],
+                }),
+                list(S(b"(+ 1)"))
+            );
 
-            let q = AST::List {
-                l: vec!["+".into(), 1.into()],
-            };
-            assert_eq!(ok(q), list(S(b"(  +   1 )")));
+            assert_eq!(
+                ok(AST::List {
+                    l: vec![
+                        "inc".into(),
+                        AST::List {
+                            l: vec!["inc".into(), 42.into()],
+                        },
+                    ],
+                }),
+                list(S(b"(inc (inc 42))"))
+            );
 
-            let r = AST::List {
-                l: vec!["+".into(), 1.into()],
-            };
-            assert_eq!(ok(r), program(S(b"(+ 1)")));
+            // Lists should throw away all spaces in between
+            assert_eq!(program(S(b"(   +   1 )")), program(S(b"(+ 1)")));
         }
 
         #[test]
