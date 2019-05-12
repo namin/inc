@@ -27,9 +27,9 @@ fn cli() -> Config {
 
     // impl Writer
     let output = if args.len() == 1 {
-        None
+        String::from("/dev/stdout")
     } else {
-        Some(args[1].clone())
+        args[1].clone()
     };
 
     Config { program, output }
