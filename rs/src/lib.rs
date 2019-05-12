@@ -41,16 +41,26 @@ pub struct Error {
 #[derive(Debug, PartialEq)]
 pub enum AST {
     Nil,
-    Number { i: i64 },
-    Boolean { b: bool },
+    Number {
+        i: i64,
+    },
+    Boolean {
+        b: bool,
+    },
     /// A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     /// word; so this implementation makes sense only for ASCII.
-    Char { c: u8 },
-    Identifier { i: String },
+    Char {
+        c: u8,
+    },
+    Identifier {
+        i: String,
+    },
     /// Since Rust needs to know the size of the AST type upfront, we need an
     /// indirection here with `Vec<>` for recursive types. In this context, Vec
     /// is just a convenient way to have a `Box<[AST]>`
-    List { l: Vec<AST> },
+    List {
+        l: Vec<AST>,
+    },
 }
 
 /// Idiomatic type conversions from the primitive types to AST
