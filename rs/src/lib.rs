@@ -43,26 +43,16 @@ pub struct Error {
 #[derive(Debug, PartialEq)]
 pub enum AST {
     Nil,
-    Number {
-        i: i64,
-    },
-    Boolean {
-        b: bool,
-    },
+    Number(i64),
+    Boolean(bool),
     /// A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     /// word; so this implementation makes sense only for ASCII.
-    Char {
-        c: u8,
-    },
-    Identifier {
-        i: String,
-    },
+    Char(u8),
+    Identifier(String),
     /// Since Rust needs to know the size of the AST type upfront, we need an
     /// indirection here with `Vec<>` for recursive types. In this context, Vec
     /// is just a convenient way to have a `Box<[AST]>`
-    List {
-        l: Vec<AST>,
-    },
+    List(Vec<AST>),
 }
 
 /// Idiomatic type conversions from the primitive types to AST
@@ -71,25 +61,25 @@ pub enum AST {
 /// https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust
 impl From<i64> for AST {
     fn from(i: i64) -> Self {
-        AST::Number { i }
+        AST::Number(i)
     }
 }
 
 impl From<bool> for AST {
     fn from(b: bool) -> Self {
-        AST::Boolean { b }
+        AST::Boolean(b)
     }
 }
 
 impl From<char> for AST {
     fn from(c: char) -> Self {
-        AST::Char { c: c as u8 }
+        AST::Char(c as u8)
     }
 }
 
 impl From<&str> for AST {
     fn from(i: &str) -> Self {
-        AST::Identifier { i: String::from(i) }
+        AST::Identifier(String::from(i))
     }
 }
 
@@ -196,10 +186,10 @@ pub mod parser {
 
     named!(datum <S, AST>, alt!(
         value!(AST::Nil, tag!("()"))            |
-        boolean    => { |b| AST::Boolean{b} }   |
-        ascii      => { |c| AST::Char{c} }      |
-        number     => { |i| AST::Number{i} }    |
-        identifier => { |i| AST::Identifier{i} }|
+        boolean    => { |b| AST::Boolean(b) }   |
+        ascii      => { |c| AST::Char(c) }      |
+        number     => { |i| AST::Number(i) }    |
+        identifier => { |i| AST::Identifier(i) }|
         list
     ));
 
@@ -212,7 +202,7 @@ pub mod parser {
                  if ls.is_empty() {
                      AST::Nil
                  } else {
-                     AST::List{l: ls}
+                     AST::List(ls)
                  }}) >>
         opt!(many0!(space)) >>
         char!(')') >>
@@ -293,36 +283,25 @@ pub mod parser {
 
         #[test]
         fn lists() {
-            assert_eq!(
-                ok(AST::List {
-                    l: vec!["+".into(), 1.into()],
-                }),
-                list(S(b"(+ 1)"))
-            );
+            assert_eq!(ok(AST::List(vec!["+".into(), 1.into()])), list(S(b"(+ 1)")));
 
             assert_eq!(
-                ok(AST::List {
-                    l: vec![
-                        1.into(),
-                        2.into(),
-                        3.into(),
-                        "a".into(),
-                        "b".into(),
-                        "c".into()
-                    ],
-                }),
+                ok(AST::List(vec![
+                    1.into(),
+                    2.into(),
+                    3.into(),
+                    "a".into(),
+                    "b".into(),
+                    "c".into()
+                ])),
                 list(S(b"(1 2 3 a b c)"))
             );
 
             assert_eq!(
-                ok(AST::List {
-                    l: vec![
-                        "inc".into(),
-                        AST::List {
-                            l: vec!["inc".into(), 42.into()],
-                        },
-                    ],
-                }),
+                ok(AST::List(vec![
+                    "inc".into(),
+                    AST::List(vec!["inc".into(), 42.into()]),
+                ],)),
                 list(S(b"(inc (inc 42))"))
             );
 
@@ -333,22 +312,16 @@ pub mod parser {
         #[test]
         fn binary() {
             assert_eq!(
-                ok(AST::List {
-                    l: vec!["+".into(), "x".into(), 1776.into()]
-                }),
+                ok(AST::List(vec!["+".into(), "x".into(), 1776.into()])),
                 list(S(b"(+ x 1776)"))
             );
 
             assert_eq!(
-                ok(AST::List {
-                    l: vec![
-                        "+".into(),
-                        "x".into(),
-                        AST::List {
-                            l: vec!["*".into(), "a".into(), "b".into()],
-                        },
-                    ],
-                }),
+                ok(AST::List(vec![
+                    "+".into(),
+                    "x".into(),
+                    AST::List(vec!["*".into(), "a".into(), "b".into()],),
+                ],)),
                 list(S(b"(+ x (* a b))"))
             );
         }
@@ -369,16 +342,290 @@ pub mod parser {
     }
 }
 
-/// Generate x86 assembly for an AST
+/// A thin wrapper around x86 assembly.
+///
+/// This module should be a general purpose x86 library without importing
+/// anything else from the rest of the compiler.
+pub mod x86 {
+    use std::fmt;
+    use std::ops::{Add, AddAssign};
+
+    /// ASM is a list of instructions.
+    ///
+    /// `Display` trait converts this type to valid code that can be compiled
+    /// and executed. For now this is pretty dumb, but over time this could be
+    /// made into something a lot smarter and safe rather than concatenating so
+    /// many tiny strings together.
+    #[derive(Clone)]
+    pub struct ASM(pub Vec<Ins>);
+
+    pub const WORDSIZE: i64 = 8;
+
+    #[derive(Debug, PartialEq, Clone)]
+    pub enum Register {
+        RAX,
+        RBX,
+        RCX,
+        RDX,
+        RSP,
+        RBP,
+    }
+
+    /// Operand is a register, address or a constant; the argument to several
+    /// instructions.
+    ///
+    /// This is an extremely simplified view of the reality; `mov` alone with
+    /// the address access semantics x86 supports is Turning Complete.
+    /// https://esolangs.org/wiki/Mov
+    #[derive(Debug, Clone)]
+    pub enum Operand {
+        Const(i64),
+        Reg(Register),
+        Stack(i64),
+    }
+
+    /// Each x86 instruction this compiler understands.
+    ///
+    /// This type fundamentally limits what code can be generated and ideally no
+    /// other part of the compiler should generate ASM with strings.
+    #[derive(Debug, Clone)]
+    pub enum Ins {
+        /// Add `v` to register `r`
+        Add { r: Register, v: Operand },
+
+        /// Logical and of `v` to register `r`
+        And { r: Register, v: Operand },
+
+        /// Unconditional function call
+        Call(String),
+
+        /// Compare the value to register RAX
+        Cmp { r: Register, with: i64 },
+
+        /// x86 function preamble
+        ///
+        /// Not really a single instruction but having this as a single
+        /// operation makes it easier for callers of this module.
+        Enter,
+
+        /// Jump to the specified label if last comparison resulted in equality
+        Je(String),
+
+        /// Unconditionally jump to the specified label
+        Jmp(String),
+
+        /// A label is a target to jump to
+        Label(String),
+
+        /// Exit a function and clean up. See `Enter`
+        Leave,
+
+        /// Save a register `r` to stack at index `si`
+        Save { r: Register, si: i64 },
+
+        /// Load a value at stack index `si` to register `r`
+        Load { r: Register, si: i64 },
+
+        /// Mov! At least one of the operands must be a register, moving from
+        /// RAM to RAM isn't a valid op.
+        Mov { from: Operand, to: Operand },
+
+        /// Pop a register `r` from stack
+        Pop(Register),
+
+        /// Push a register `r` to stack
+        Push(Register),
+
+        /// Shift register `r` right by `v` bits
+        Shr { r: Register, v: i64 },
+
+        /// Sub `k` from register `r`
+        Sub { r: Register, v: Operand },
+
+        /// Raw slices for compatibility
+        ///
+        /// Often it can be just convenient to hand write some assembly and
+        /// eventually port it to a sensible type here. Till then this Variant
+        /// is a goods stop gap.
+        Slice(String),
+    }
+
+    /// Convert a single operation to ASM
+    impl From<Ins> for ASM {
+        fn from(op: Ins) -> Self {
+            ASM { 0: vec![op] }
+        }
+    }
+
+    /// Convert a raw string to ASM
+    impl From<String> for ASM {
+        fn from(s: String) -> Self {
+            ASM {
+                0: vec![Ins::Slice(s)],
+            }
+        }
+    }
+
+    /// Display for a register is the same as Debug
+    impl fmt::Display for Register {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}", format!("{:?}", self).to_lowercase())
+        }
+    }
+
+    /// Display an Operand
+    impl fmt::Display for Operand {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match &self {
+                Operand::Const(i) => write!(f, "{}", i),
+                Operand::Reg(r) => write!(f, "{}", r),
+                Operand::Stack(si) => writeln!(f, "{}", &stack(*si)),
+            }
+        }
+    }
+
+    /// Pretty print a single ASM instruction.
+    impl fmt::Display for Ins {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                Ins::Add { r, v } => writeln!(f, "    add {}, {}", r, v),
+                Ins::And { r, v } => writeln!(f, "    and {}, {}", r, v),
+                Ins::Call(l) => writeln!(f, "    call {}", l),
+                Ins::Cmp { r, with } => writeln!(f, "    cmp {}, {}", r, with),
+                Ins::Enter => write!(
+                    f,
+                    "{}",
+                    Ins::Push(Register::RBP)
+                        + Ins::Mov {
+                            from: Operand::Reg(Register::RSP),
+                            to: Operand::Reg(Register::RBP)
+                        }
+                ),
+                Ins::Je(l) => writeln!(f, "    je {}", l),
+                Ins::Jmp(l) => writeln!(f, "    jmp {}", l),
+                Ins::Label(l) => writeln!(f, "{}", label(l)),
+                Ins::Leave => writeln!(f, "    pop rbp \n    ret"),
+                Ins::Load { r, si } => writeln!(f, "    mov {}, {}", r, &stack(*si)),
+                Ins::Mov { from, to } => writeln!(f, "    mov {}, {}", to, from),
+                Ins::Pop(r) => writeln!(f, "    pop {}", r),
+                Ins::Push(r) => writeln!(f, "    push {}", r),
+                Ins::Save { r, si } => writeln!(f, "    mov {}, {}", &stack(*si), r),
+                Ins::Shr { r, v } => writeln!(f, "    shr {}, {}", r, v),
+                Ins::Sub { r, v } => writeln!(f, "    sub {}, {}", r, v),
+                Ins::Slice(s) => write!(f, "{}", s),
+            }
+        }
+    }
+
+    /// Collect all the bits and pieces together into valid assembly
+    impl fmt::Display for ASM {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let mut ctx = String::new();
+            for op in self.0.iter() {
+                ctx.push_str(&op.to_string());
+            }
+            writeln!(f, "{}", ctx)
+        }
+    }
+
+    /// Add operations with a easy to read `asm += op` short hand.
+    ///
+    /// This is pretty efficient at the cost of owning the value.
+    impl AddAssign<Ins> for ASM {
+        fn add_assign(&mut self, op: Ins) {
+            self.0.push(op)
+        }
+    }
+
+    /// Add operations to ASM with overloaded `asm' = asm + op`.
+    ///
+    /// NOTE: This is pretty inefficient due to copying of self.
+    impl Add<Ins> for ASM {
+        type Output = Self;
+
+        fn add(self, op: Ins) -> Self {
+            let mut t = self.clone();
+            t.0.push(op);
+            t
+        }
+    }
+
+    /// Concat ASM; `asm + asm`
+    ///
+    /// NOTE: This is pretty inefficient due to copying both arguments.
+    impl Add<ASM> for ASM {
+        type Output = Self;
+
+        fn add(self, asm: ASM) -> Self {
+            let mut rhs = self.clone();
+            let mut lhs = asm.0.clone();
+            rhs.0.append(&mut lhs);
+            rhs
+        }
+    }
+
+    /// Concat Ins to get ASM; `asm = op + op`
+    ///
+    /// NOTE: This is pretty inefficient due to copying both arguments.
+    impl Add<Ins> for Ins {
+        type Output = ASM;
+
+        fn add(self, op: Ins) -> ASM {
+            ASM { 0: vec![self, op] }
+        }
+    }
+
+    // ¶ Module helpers
+
+    #[cfg(target_os = "macos")]
+    fn label(label: &str) -> String {
+        format!("_{}:", label)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn label(label: &str) -> String {
+        format!("{}:", label)
+    }
+
+    /// Stack gives stack address relative to base pointer
+    pub fn stack(si: i64) -> String {
+        match si {
+            index if index > 0 => format!("[rbp + {}]", index),
+            index if index < 0 => format!("[rbp - {}]", (-index)),
+            _ => panic!("Effective stack index cannot be 0"),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::x86::{Ins::*, Operand::*, Register::*};
+
+        #[test]
+        fn mov() {
+            assert_eq!(
+                String::from("    mov rax, 16\n"),
+                Mov {
+                    from: Const(16),
+                    to: Reg(RAX)
+                }
+                .to_string()
+            );
+        }
+    }
+}
+
+/// Emit machine code for inc AST.
 ///
 /// This module implements bulk of the compiler and is a good place to start
 /// reading code. Platform specific code is annotated with `cfg(target_os)` for
-/// both linux and mac.
+/// both linux and mac. This module implements code gen specific to inc and
+/// anything generic goes into `x86` module.
 pub mod emit {
-    use super::immediate;
-    use super::*;
-
-    const WORDSIZE: i64 = 8;
+    use super::{
+        immediate,
+        x86::{Ins::*, Operand::*, Register::*, *},
+        *,
+    };
 
     /// State for the code generator; easier to bundle it all into a struct than
     /// pass several arguments in.
@@ -389,66 +636,43 @@ pub mod emit {
     /// State should also implement some form of register allocation.
     pub struct State {
         pub si: i64,
+        pub asm: ASM,
     }
 
     impl Default for State {
         fn default() -> Self {
-            State { si: -WORDSIZE }
+            State {
+                si: -WORDSIZE,
+                asm: ASM(vec![]),
+            }
         }
     }
 
     impl State {
-        // Get the next stack index for allocation
+        /// Get the next stack index for allocation
+        //
+        //TODO: This function is pretty inefficient
         pub fn next(&self) -> State {
             State {
+                asm: self.asm.clone(),
                 si: self.si - WORDSIZE,
             }
         }
     }
 
-    /* ASM templates */
-
     #[cfg(target_os = "macos")]
-    /// A label is a target to jump to
-    ///
-    /// # Example:
-    ///
-    /// ```asm
-    /// init:
-    ///     mov rax, 42
-    /// ```
-    fn label(label: &str) -> String {
-        format!("_{}:\n", label)
-    }
-
-    #[cfg(target_os = "linux")]
-    fn label(label: &str) -> String {
-        format!("{}:\n", label)
-    }
-
-    /// The function preamble, emitted before every function entry
-    fn preamble() -> String {
-        format!("{}\n{}\n", "    push rbp", "    mov rbp, rsp")
-    }
-
-    /// Function exit
-    fn ret() -> String {
-        format!("{}\n{}\n", "    pop rbp", "    ret")
-    }
-
-    #[cfg(target_os = "macos")]
-    fn function_header(name: &str) -> String {
+    fn function_header(name: &str) -> ASM {
         let mut ctx = String::new();
 
         ctx.push_str("    .section __TEXT,__text\n");
         ctx.push_str("    .intel_syntax noprefix\n");
         ctx.push_str(&format!("    .globl _{}\n", &name));
-        ctx.push_str(&label(&name));
-        ctx
+        ctx.push_str(&Label(String::from(name)).to_string());
+        ctx.into()
     }
 
     #[cfg(target_os = "linux")]
-    fn function_header(name: &str) -> String {
+    fn function_header(name: &str) -> ASM {
         let mut ctx = String::new();
 
         ctx.push_str("    .text\n");
@@ -456,65 +680,42 @@ pub mod emit {
         ctx.push_str(&format!("    .globl {}\n", &name));
         ctx.push_str(&format!("    .type {}, @function\n", &name));
         ctx.push_str(&label(&name));
-        ctx
+        ctx.into()
     }
-
-    /* Instruction wrappers */
-
-    // Unconditional function call
-    // fn call(label: &str) -> String {
-    //     format!("    call {} \n", label)
-    // }
-
-    /// Compare the value to register RAX
-    pub fn cmp(with: i64) -> String {
-        format!("    cmp rax, {} \n", with)
-    }
-
-    // Jump to the specified label if last comparison resulted in equality
-    // fn je(label: &str) -> String {
-    //     format!("    je {} \n", label)
-    // }
-
-    // Unconditionally jump to the specified label
-    // fn jmp(label: &str) -> String {
-    //     format!("    jmp {} \n", label)
-    // }
 
     /* Helpers */
 
-    /// Move the argument to RAX
-    fn rax(word: i64) -> String {
-        format!("    mov rax, {} \n", word)
-    }
-
     /// Clear (mask) all except the least significant 3 tag bits
-    pub fn mask() -> String {
-        format!("    and rax, {} \n", immediate::MASK)
+    pub fn mask() -> Ins {
+        And {
+            r: RAX,
+            v: Const(immediate::MASK),
+        }
     }
 
     /// Convert the result in RAX into a boolean
-    pub fn cmp_bool() -> String {
+    pub fn cmp_bool() -> ASM {
         // SETE sets the destination operand to 0 or 1 depending on the settings
         // of the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
-        String::from("    sete al \n") +
+        (String::from("    sete al \n") +
 
-        // MOVZX copies the contents of the source operand (register or memory
-        // location) to the destination operand (register) and zero extends the
-        // value.
-        &format!("    movzx rax, al \n") +
-        &format!("    sal al, {} \n", immediate::SHIFT) +
-        &format!("    or al, {} \n", immediate::BOOL)
+         // MOVZX copies the contents of the source operand (register or
+         // memory location) to the destination operand (register) and zero
+         // extends the value.
+         "    movzx rax, al \n" +
+         &format!("    sal al, {} \n", immediate::SHIFT) +
+         &format!("    or al, {} \n", immediate::BOOL))
+            .into()
     }
 
     /// Evaluate an expression into RAX
     ///
     /// If the expression fits in a machine word, immediately return with the
     /// immediate repr, recurse for anything else till the base case.
-    pub fn eval(s: &State, prog: &AST) -> String {
+    pub fn eval(s: &State, prog: &AST) -> ASM {
         match prog {
-            AST::List { l } => match l.as_slice() {
-                [AST::Identifier { i }, arg] => match &i[..] {
+            AST::List(l) => match l.as_slice() {
+                [AST::Identifier(i), arg] => match &i[..] {
                     "inc" => primitives::inc(&s, arg),
                     "dec" => primitives::dec(&s, arg),
                     "null?" => primitives::nullp(&s, arg),
@@ -526,7 +727,7 @@ pub mod emit {
                     n => panic!("Unknown unary primitive: {}", n),
                 },
 
-                [AST::Identifier { i }, x, y] => match &i[..] {
+                [AST::Identifier(i), x, y] => match &i[..] {
                     "+" => primitives::plus(&s, x, y),
                     "-" => primitives::minus(&s, x, y),
                     "*" => primitives::mul(&s, x, y),
@@ -536,14 +737,20 @@ pub mod emit {
 
                 l => panic!("Unknown expression: {:?}", l),
             },
-            _ => rax(immediate::to(&prog)),
+            _ => Mov {
+                to: Operand::Reg(RAX),
+                from: Operand::Const(immediate::to(&prog)),
+            }
+            .into(),
         }
     }
 
     /// Top level interface to the emit module
     pub fn program(prog: &AST) -> String {
         let s: State = Default::default();
-        function_header("init") + &preamble() + &eval(&s, prog) + &ret()
+        let gen = function_header("init") + Ins::Enter + eval(&s, prog) + Ins::Leave;
+
+        gen.to_string()
     }
 }
 
@@ -551,38 +758,25 @@ pub mod emit {
 ///
 /// Several scheme functions like `(add ...` are implemented by the compiler in
 /// assembly rather than in scheme. All of them live in this module.
+#[rustfmt::skip]
 pub mod primitives {
 
     use super::emit::State;
+    use super::x86::{Ins::*, Register::*, *};
     use super::*;
 
     // Unary Primitives
 
-    /// Add `k` to register RAX
-    pub fn add(k: i64) -> String {
-        format!("    add rax, {} \n", immediate::to(&(k.into())))
-    }
-
-    /// Sub `k` from register RAX
-    pub fn sub(k: i64) -> String {
-        format!("    sub rax, {} \n", immediate::to(&(k.into())))
-    }
-
-    /// Shift register RAX `k` bits to the right.
-    ///
-    /// `RAX = RAX / 2^k`
-    pub fn shr(k: i64) -> String {
-        format!("    shr rax, {} \n", k)
-    }
-
     /// Increment number by 1
-    pub fn inc(s: &State, x: &AST) -> String {
-        emit::eval(&s, x) + &add(1)
+    pub fn inc(s: &State, x: &AST) -> ASM {
+        emit::eval(&s, x)
+            + Add {r: RAX, v: Operand::Const(immediate::n(1))}
     }
 
     /// Decrement by 1
-    pub fn dec(s: &State, x: &AST) -> String {
-        emit::eval(&s, x) + &sub(1)
+    pub fn dec(s: &State, x: &AST) -> ASM {
+        emit::eval(&s, x)
+            + Sub {r: RAX, v: Operand::Const(immediate::n(1))}
     }
 
     /// Is the expression a fixnum?
@@ -593,66 +787,61 @@ pub mod primitives {
     /// (fixnum? 42) => #t
     /// (fixnum? "hello") => #f
     /// ```
-    pub fn fixnump(s: &State, expr: &AST) -> String {
-        emit::eval(&s, expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
+    pub fn fixnump(s: &State, expr: &AST) -> ASM {
+        emit::eval(&s, expr)
+            + emit::mask()
+            + Cmp {r: RAX, with: immediate::NUM}
+            + emit::cmp_bool()
     }
 
     /// Is the expression a boolean?
-    pub fn booleanp(s: &State, expr: &AST) -> String {
-        emit::eval(&s, expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
+    pub fn booleanp(s: &State, expr: &AST) -> ASM {
+        emit::eval(&s, expr)
+            + emit::mask()
+            + Cmp {r: RAX, with: immediate::BOOL}
+            + emit::cmp_bool()
     }
 
     /// Is the expression a char?
-    pub fn charp(s: &State, expr: &AST) -> String {
-        emit::eval(&s, expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
+    pub fn charp(s: &State, expr: &AST) -> ASM {
+        emit::eval(&s, expr)
+            + emit::mask()
+            + Cmp {r: RAX, with: immediate::CHAR}
+            + emit::cmp_bool()
     }
 
     /// Is the expression null?
-    pub fn nullp(s: &State, expr: &AST) -> String {
-        emit::eval(&s, expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
+    pub fn nullp(s: &State, expr: &AST) -> ASM {
+        emit::eval(&s, expr)
+            + Cmp {r: RAX, with: immediate::NIL}
+            + emit::cmp_bool()
     }
 
     /// Is the expression zero?
-    pub fn zerop(s: &State, expr: &AST) -> String {
-        emit::eval(&s, expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
+    pub fn zerop(s: &State, expr: &AST) -> ASM {
+        emit::eval(&s, expr)
+            + Cmp {r: RAX, with: immediate::NUM}
+            + emit::cmp_bool()
     }
 
     /// Logical not
-    pub fn not(s: &State, expr: &AST) -> String {
-        emit::eval(&s, expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
-    }
-
-    // Stack operations
-
-    /// Stack gives stack address relative to base pointer
-    fn stack(s: &State) -> String {
-        match s.si {
-            index if index > 0 => format!("[rbp + {}]", index),
-            index if index < 0 => format!("[rbp - {}]", (-index)),
-            _ => panic!("Effective stack index cannot be 0"),
-        }
-    }
-
-    /// Save the variable in register RAX to stack index SI
-    fn save(s: &State) -> String {
-        format!("    mov {}, rax \n", stack(&s))
-    }
-
-    /// Load the variable from stack index SI to register RAX
-    fn load(s: &State) -> String {
-        format!("    mov rax, {} \n", stack(&s))
+    pub fn not(s: &State, expr: &AST) -> ASM {
+        emit::eval(&s, expr)
+            + Cmp {r: RAX, with: immediate::FALSE}
+            + emit::cmp_bool()
     }
 
     // Binary Primitives
 
     /// Evaluate arguments for a binary primitive and store them in stack
-    fn binop(s: &emit::State, x: &AST, y: &AST) -> String {
-        emit::eval(&s, x) + &save(&s) + &emit::eval(&s.next(), y)
+    fn binop(s: &emit::State, x: &AST, y: &AST) -> ASM {
+        emit::eval(&s, x) + Save { r: RAX, si: s.si } + emit::eval(&s.next(), y)
     }
 
     /// Add `x` and `y` and move result to register RAX
-    pub fn plus(s: &State, x: &AST, y: &AST) -> String {
-        binop(&s, &x, &y) + &format!("    add rax, {} \n", stack(&s))
+    pub fn plus(s: &State, x: &AST, y: &AST) -> ASM {
+        binop(&s, &x, &y)
+            + Add {r: RAX, v: Operand::Stack(s.si)}
     }
 
     /// Subtract `x` from `y` and move result to register RAX
@@ -660,16 +849,20 @@ pub mod primitives {
     // `sub` Subtracts the 2nd op from the first and stores the result in the
     // 1st. This is pretty inefficient to update result in stack and load it
     // back. Reverse the order and fix it up.
-    pub fn minus(s: &State, x: &AST, y: &AST) -> String {
-        binop(&s, &x, &y) + &format!("    sub {}, rax \n", stack(&s)) + &load(&s)
+    pub fn minus(s: &State, x: &AST, y: &AST) -> ASM {
+        binop(&s, &x, &y)
+            + Sub {r: RAX, v: Operand::Stack(s.si)}
+            + Load { r: RAX, si: s.si }
     }
 
     /// Multiply `x` and `y` and move result to register RAX
     // The destination operand is of `mul` is an implied operand located in
     // register AX. GCC throws `Error: ambiguous operand size for `mul'` without
     // size quantifier
-    pub fn mul(s: &State, x: &AST, y: &AST) -> String {
-        binop(&s, &x, &y) + &shr(immediate::SHIFT) + &format!("    mul qword ptr {} \n", stack(&s))
+    pub fn mul(s: &State, x: &AST, y: &AST) -> ASM {
+        binop(&s, &x, &y)
+            + Shr {r: RAX, v: immediate::n(immediate::SHIFT)}
+            + Slice(format!("    mul qword ptr {} \n", x86::stack(s.si)))
     }
 
     /// Divide `x` by `y` and move result to register RAX
@@ -682,18 +875,18 @@ pub mod primitives {
     //
     // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
     // argument. the quotient is stored in RAX and the remainder in RDX.
-    pub fn div(s: &State, x: &AST, y: &AST) -> String {
+    pub fn div(s: &State, x: &AST, y: &AST) -> ASM {
         let mut ctx = String::new();
 
-        ctx.push_str(&emit::eval(&s, y));
+        ctx.push_str(&(emit::eval(&s, y).to_string()));
         ctx.push_str(&format!("    sar rax, {} \n", immediate::SHIFT));
         ctx.push_str("    mov rcx, rax \n");
-        ctx.push_str(&emit::eval(&s, x));
+        ctx.push_str(&emit::eval(&s, x).to_string());
         ctx.push_str(&format!("    sar rax, {} \n", immediate::SHIFT));
         ctx.push_str("    mov rdx, 0 \n");
         ctx.push_str("    cqo \n");
         ctx.push_str("    idiv rcx \n");
-        ctx
+        ctx.into()
     }
 }
 
@@ -731,20 +924,26 @@ pub mod immediate {
     /// system could ensure that, but till then fail with a panic.
     pub fn to(prog: &AST) -> i64 {
         match prog {
-            AST::Number { i } => (i << SHIFT) | NUM,
-            AST::Boolean { b: true } => TRUE,
-            AST::Boolean { b: false } => FALSE,
+            AST::Number(i) => (i << SHIFT) | NUM,
+            AST::Boolean(true) => TRUE,
+            AST::Boolean(false) => FALSE,
             // An ASCII char is a single byte, so most of these shifts should be
             // OK. This is going to go wrong pretty badly with Unicode.
-            AST::Char { c } => {
+            AST::Char(c) => {
                 // Expand u8 to i64 before shifting right, this will easily
                 // overflow and give bogus results otherwise. Unit testing FTW!
                 (i64::from(*c) << SHIFT) | CHAR
             }
             AST::Nil => NIL,
-            AST::Identifier { .. } => unimplemented!("immediate repr is undefined for identifiers"),
-            AST::List { .. } => unimplemented!("immediate repr is undefined for lists"),
+            AST::Identifier(..) => unimplemented!("immediate repr is undefined for identifiers"),
+            AST::List(..) => unimplemented!("immediate repr is undefined for lists"),
         }
+    }
+
+    // Immediate representation of numbers is required so often a helper is
+    // useful.
+    pub fn n(i: i64) -> i64 {
+        (i << SHIFT) | NUM
     }
 
     #[cfg(test)]
@@ -760,11 +959,9 @@ pub mod immediate {
         // than the panic in the end.
         pub fn from(val: i64) -> AST {
             if (val & MASK) == NUM {
-                return AST::Number { i: (val >> SHIFT) };
+                return AST::Number(val >> SHIFT);
             } else if (val & MASK) == CHAR {
-                return AST::Char {
-                    c: (val >> SHIFT) as u8,
-                };
+                return AST::Char((val >> SHIFT) as u8);
             } else if val == TRUE {
                 return true.into();
             } else if val == FALSE {
