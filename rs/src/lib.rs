@@ -38,6 +38,8 @@ pub struct Error {
 ///
 /// The canonical type to represent lisp programs. The parser parses the input
 /// program to generate an AST. See tests for several examples.
+//
+// TODO: Implement `Display` trait to pretty print the AST
 #[derive(Debug, PartialEq)]
 pub enum AST {
     Nil,
@@ -376,6 +378,34 @@ pub mod emit {
     use super::immediate;
     use super::*;
 
+    const WORDSIZE: i64 = 8;
+
+    /// State for the code generator; easier to bundle it all into a struct than
+    /// pass several arguments in.
+    ///
+    /// Stack index points to the current available empty slot. Use and then
+    /// decrement the index to add a new variable. Default to `-word size`
+    ///
+    /// State should also implement some form of register allocation.
+    pub struct State {
+        pub si: i64,
+    }
+
+    impl Default for State {
+        fn default() -> Self {
+            State { si: -WORDSIZE }
+        }
+    }
+
+    impl State {
+        // Get the next stack index for allocation
+        pub fn next(&self) -> State {
+            State {
+                si: self.si - WORDSIZE,
+            }
+        }
+    }
+
     /* ASM templates */
 
     #[cfg(target_os = "macos")]
@@ -394,6 +424,16 @@ pub mod emit {
     #[cfg(target_os = "linux")]
     fn label(label: &str) -> String {
         format!("{}:\n", label)
+    }
+
+    /// The function preamble, emitted before every function entry
+    fn preamble() -> String {
+        format!("{}\n{}\n", "    push rbp", "    mov rbp, rsp")
+    }
+
+    /// Function exit
+    fn ret() -> String {
+        format!("{}\n{}\n", "    pop rbp", "    ret")
     }
 
     #[cfg(target_os = "macos")]
@@ -471,21 +511,27 @@ pub mod emit {
     ///
     /// If the expression fits in a machine word, immediately return with the
     /// immediate repr, recurse for anything else till the base case.
-    pub fn eval(prog: &AST) -> String {
+    pub fn eval(s: &State, prog: &AST) -> String {
         match prog {
             AST::List { l } => match l.as_slice() {
                 [AST::Identifier { i }, arg] => match &i[..] {
-                    "inc" => primitives::inc(arg),
-                    "dec" => primitives::dec(arg),
-                    "null?" => primitives::nullp(arg),
-                    "zero?" => primitives::zerop(arg),
-                    "not" => primitives::not(arg),
-                    "fixnum?" => primitives::fixnump(arg),
-                    "boolean?" => primitives::booleanp(arg),
-                    "char?" => primitives::charp(arg),
-                    _ => unimplemented!("Unknown primitive"),
+                    "inc" => primitives::inc(&s, arg),
+                    "dec" => primitives::dec(&s, arg),
+                    "null?" => primitives::nullp(&s, arg),
+                    "zero?" => primitives::zerop(&s, arg),
+                    "not" => primitives::not(&s, arg),
+                    "fixnum?" => primitives::fixnump(&s, arg),
+                    "boolean?" => primitives::booleanp(&s, arg),
+                    "char?" => primitives::charp(&s, arg),
+                    n => panic!("Unknown unary primitive: {}", n),
                 },
-                _ => unimplemented!("n item list"),
+
+                [AST::Identifier { i }, x, y] => match &i[..] {
+                    "+" => primitives::plus(&s, x, y),
+                    n => panic!("Unknown binary primitive: {}", n),
+                },
+
+                l => panic!("Unknown expression: {:?}", l),
             },
             _ => rax(immediate::to(&prog)),
         }
@@ -493,7 +539,8 @@ pub mod emit {
 
     /// Top level interface to the emit module
     pub fn program(prog: &AST) -> String {
-        function_header("init") + &eval(prog) + "    ret\n"
+        let s: State = Default::default();
+        function_header("init") + &preamble() + &eval(&s, prog) + &ret()
     }
 }
 
@@ -503,7 +550,10 @@ pub mod emit {
 /// assembly rather than in scheme. All of them live in this module.
 pub mod primitives {
 
+    use super::emit::State;
     use super::*;
+
+    // Unary Primitives
 
     /// Add `k` to register RAX
     pub fn add(k: i64) -> String {
@@ -516,13 +566,13 @@ pub mod primitives {
     }
 
     /// Increment number by 1
-    pub fn inc(x: &AST) -> String {
-        emit::eval(x) + &add(1)
+    pub fn inc(s: &State, x: &AST) -> String {
+        emit::eval(&s, x) + &add(1)
     }
 
     /// Decrement by 1
-    pub fn dec(x: &AST) -> String {
-        emit::eval(x) + &sub(1)
+    pub fn dec(s: &State, x: &AST) -> String {
+        emit::eval(&s, x) + &sub(1)
     }
 
     /// Is the expression a fixnum?
@@ -533,33 +583,66 @@ pub mod primitives {
     /// (fixnum? 42) => #t
     /// (fixnum? "hello") => #f
     /// ```
-    pub fn fixnump(expr: &AST) -> String {
-        emit::eval(expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
+    pub fn fixnump(s: &State, expr: &AST) -> String {
+        emit::eval(&s, expr) + &emit::mask() + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
     /// Is the expression a boolean?
-    pub fn booleanp(expr: &AST) -> String {
-        emit::eval(expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
+    pub fn booleanp(s: &State, expr: &AST) -> String {
+        emit::eval(&s, expr) + &emit::mask() + &emit::cmp(immediate::BOOL) + &emit::cmp_bool()
     }
 
     /// Is the expression a char?
-    pub fn charp(expr: &AST) -> String {
-        emit::eval(expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
+    pub fn charp(s: &State, expr: &AST) -> String {
+        emit::eval(&s, expr) + &emit::mask() + &emit::cmp(immediate::CHAR) + &emit::cmp_bool()
     }
 
     /// Is the expression null?
-    pub fn nullp(expr: &AST) -> String {
-        emit::eval(expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
+    pub fn nullp(s: &State, expr: &AST) -> String {
+        emit::eval(&s, expr) + &emit::cmp(immediate::NIL) + &emit::cmp_bool()
     }
 
     /// Is the expression zero?
-    pub fn zerop(expr: &AST) -> String {
-        emit::eval(expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
+    pub fn zerop(s: &State, expr: &AST) -> String {
+        emit::eval(&s, expr) + &emit::cmp(immediate::NUM) + &emit::cmp_bool()
     }
 
     /// Logical not
-    pub fn not(expr: &AST) -> String {
-        emit::eval(expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
+    pub fn not(s: &State, expr: &AST) -> String {
+        emit::eval(&s, expr) + &emit::cmp(immediate::FALSE) + &emit::cmp_bool()
+    }
+
+    // Stack operations
+
+    /// Stack gives stack address relative to base pointer
+    fn stack(s: &State) -> String {
+        match s.si {
+            index if index > 0 => format!("[rbp + {}]", index),
+            index if index < 0 => format!("[rbp - {}]", (-index)),
+            _ => panic!("Effective stack index cannot be 0"),
+        }
+    }
+
+    /// Save the variable in register RAX to stack index SI
+    fn save(s: &State) -> String {
+        format!("    mov {}, rax \n", stack(&s))
+    }
+
+    /// Load the variable from stack index SI to register RAX
+    // fn load(s: &State) -> String {
+    //     format!("    mov rax, {} \n", stack(&s))
+    // }
+
+    // Binary Primitives
+
+    /// Evaluate arguments for a binary primitive and store them in stack
+    fn binop(s: &emit::State, x: &AST, y: &AST) -> String {
+        emit::eval(&s, x) + &save(&s) + &emit::eval(&s.next(), y)
+    }
+
+    /// Add `x` and `y` and move result to register RAX
+    pub fn plus(s: &State, x: &AST, y: &AST) -> String {
+        binop(&s, &x, &y) + &format!("    add rax, {} \n", stack(&s))
     }
 }
 

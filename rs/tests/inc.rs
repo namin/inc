@@ -171,6 +171,20 @@ mod steps {
             }
         }
     }
+
+    // Step 3: Unary functions
+    mod binary {
+        use super::*;
+
+        #[test]
+        fn plus() {
+            let tests = vec![(r"(+ 10 20)", r"30"), (r"(+ 40 (inc (inc 0)))", r"42")];
+
+            for (inp, out) in tests.iter() {
+                test1(String::from(*inp), String::from(*out));
+            }
+        }
+    }
 }
 
 mod quick {
@@ -179,6 +193,11 @@ mod quick {
     #[quickcheck]
     fn int64(i: i64) -> () {
         test1(i.to_string(), i.to_string())
+    }
+
+    #[quickcheck]
+    fn plus(x: i64, y: i64) -> () {
+        test1(format!("(+ {} {})", x, y), (x + y).to_string())
     }
 }
 
