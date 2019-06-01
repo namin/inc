@@ -126,7 +126,7 @@ pub mod parser {
       | value!(String::from("..."), tag!("..."))
       | do_parse!(
           i: initial >>
-          s: many1!(subsequent) >>
+          s: many0!(subsequent) >>
           (format!("{}{}", i, s.into_iter().collect::<String>())))
     ));
 
@@ -253,10 +253,15 @@ pub mod parser {
 
             assert_eq!(ok('j' as u8), ascii(S(b"#\\j")));
             assert_eq!(ok('^' as u8), ascii(S(b"#\\^")));
+
+            // Character parser must not consume anything unless it starts with
+            // an explicit tag.
+            assert_eq!(fail(S(b"test")), ascii(S(b"test")));
         }
 
         #[test]
         fn identifiers() {
+            assert_eq!(ok(String::from("x")), identifier(S(b"x")));
             assert_eq!(ok(String::from("one")), identifier(S(b"one")));
             assert_eq!(ok(String::from("!bang")), identifier(S(b"!bang")));
             assert_eq!(ok(String::from("a->b")), identifier(S(b"a->b")));
@@ -266,6 +271,10 @@ pub mod parser {
 
             // -> is not an identifier, consume the - as an id and return the >
             assert_eq!(partial(S(b">"), String::from("-")), identifier(S(b"->")));
+
+            // Identifiers must split at space and not consume anything
+            // afterwards
+            assert_eq!(partial(S(b" b"), String::from("a")), identifier(S(b"a b")));
         }
 
         // #[test]
@@ -287,6 +296,20 @@ pub mod parser {
                     l: vec!["+".into(), 1.into()],
                 }),
                 list(S(b"(+ 1)"))
+            );
+
+            assert_eq!(
+                ok(AST::List {
+                    l: vec![
+                        1.into(),
+                        2.into(),
+                        3.into(),
+                        "a".into(),
+                        "b".into(),
+                        "c".into()
+                    ],
+                }),
+                list(S(b"(1 2 3 a b c)"))
             );
 
             assert_eq!(
