@@ -329,6 +329,29 @@ pub mod parser {
         }
 
         #[test]
+        fn binary() {
+            assert_eq!(
+                ok(AST::List {
+                    l: vec!["+".into(), "x".into(), 1776.into()]
+                }),
+                list(S(b"(+ x 1776)"))
+            );
+
+            assert_eq!(
+                ok(AST::List {
+                    l: vec![
+                        "+".into(),
+                        "x".into(),
+                        AST::List {
+                            l: vec!["*".into(), "a".into(), "b".into()],
+                        },
+                    ],
+                }),
+                list(S(b"(+ x (* a b))"))
+            );
+        }
+
+        #[test]
         fn top() {
             assert_eq!(ok(true.into()), program(S(b"#t")));
             assert_eq!(ok(false.into()), program(S(b"#f")));
