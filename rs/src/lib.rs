@@ -528,6 +528,9 @@ pub mod emit {
 
                 [AST::Identifier { i }, x, y] => match &i[..] {
                     "+" => primitives::plus(&s, x, y),
+                    "-" => primitives::minus(&s, x, y),
+                    "*" => primitives::mul(&s, x, y),
+                    "/" => primitives::div(&s, x, y),
                     n => panic!("Unknown binary primitive: {}", n),
                 },
 
@@ -563,6 +566,13 @@ pub mod primitives {
     /// Sub `k` from register RAX
     pub fn sub(k: i64) -> String {
         format!("    sub rax, {} \n", immediate::to(&(k.into())))
+    }
+
+    /// Shift register RAX `k` bits to the right.
+    ///
+    /// `RAX = RAX / 2^k`
+    pub fn shr(k: i64) -> String {
+        format!("    shr rax, {} \n", k)
     }
 
     /// Increment number by 1
@@ -629,9 +639,9 @@ pub mod primitives {
     }
 
     /// Load the variable from stack index SI to register RAX
-    // fn load(s: &State) -> String {
-    //     format!("    mov rax, {} \n", stack(&s))
-    // }
+    fn load(s: &State) -> String {
+        format!("    mov rax, {} \n", stack(&s))
+    }
 
     // Binary Primitives
 
@@ -643,6 +653,47 @@ pub mod primitives {
     /// Add `x` and `y` and move result to register RAX
     pub fn plus(s: &State, x: &AST, y: &AST) -> String {
         binop(&s, &x, &y) + &format!("    add rax, {} \n", stack(&s))
+    }
+
+    /// Subtract `x` from `y` and move result to register RAX
+    //
+    // `sub` Subtracts the 2nd op from the first and stores the result in the
+    // 1st. This is pretty inefficient to update result in stack and load it
+    // back. Reverse the order and fix it up.
+    pub fn minus(s: &State, x: &AST, y: &AST) -> String {
+        binop(&s, &x, &y) + &format!("    sub {}, rax \n", stack(&s)) + &load(&s)
+    }
+
+    /// Multiply `x` and `y` and move result to register RAX
+    // The destination operand is of `mul` is an implied operand located in
+    // register AX. GCC throws `Error: ambiguous operand size for `mul'` without
+    // size quantifier
+    pub fn mul(s: &State, x: &AST, y: &AST) -> String {
+        binop(&s, &x, &y) + &shr(immediate::SHIFT) + &format!("    mul qword ptr {} \n", stack(&s))
+    }
+
+    /// Divide `x` by `y` and move result to register RAX
+    // Division turned out to be much more trickier than I expected it to be.
+    // Unlike @namin's code, I'm using a shift arithmetic right (SAR) instead of
+    // shift logical right (SHR) and I don't know how the original examples
+    // worked at all for negative numbers. I also had to use the CQO instruction
+    // to Sign-Extend RAX which the 32 bit version is obviously not concerned
+    // with. I got the idea from GCC disassembly.
+    //
+    // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
+    // argument. the quotient is stored in RAX and the remainder in RDX.
+    pub fn div(s: &State, x: &AST, y: &AST) -> String {
+        let mut ctx = String::new();
+
+        ctx.push_str(&emit::eval(&s, y));
+        ctx.push_str(&format!("    sar rax, {} \n", immediate::SHIFT));
+        ctx.push_str("    mov rcx, rax \n");
+        ctx.push_str(&emit::eval(&s, x));
+        ctx.push_str(&format!("    sar rax, {} \n", immediate::SHIFT));
+        ctx.push_str("    mov rdx, 0 \n");
+        ctx.push_str("    cqo \n");
+        ctx.push_str("    idiv rcx \n");
+        ctx
     }
 }
 
