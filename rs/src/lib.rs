@@ -679,7 +679,7 @@ pub mod emit {
         ctx.push_str("    .intel_syntax noprefix\n");
         ctx.push_str(&format!("    .globl {}\n", &name));
         ctx.push_str(&format!("    .type {}, @function\n", &name));
-        ctx.push_str(&label(&name));
+        ctx.push_str(&Label(String::from(name)).to_string());
         ctx.into()
     }
 
