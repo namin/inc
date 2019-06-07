@@ -199,6 +199,25 @@ mod quick {
     fn plus(x: i64, y: i64) -> () {
         test1(format!("(+ {} {})", x, y), (x + y).to_string())
     }
+
+    #[quickcheck]
+    fn multiply(x: i64, y: i64) -> () {
+        test1(format!("(* {} {})", x, y), (x * y).to_string())
+    }
+
+    #[quickcheck]
+    fn divide(x: i64, y: i64) -> () {
+        if y != 0 {
+            test1(format!("(/ {} {})", (x * y), x), y.to_string())
+        }
+    }
+
+    #[quickcheck]
+    fn remainder(x: i64, y: i64) -> () {
+        if y != 0 {
+            test1(format!("(% {} {})", x, y), (x % y).to_string())
+        }
+    }
 }
 
 // Get a test config with program as input

@@ -430,6 +430,12 @@ pub mod x86 {
         /// RAM to RAM isn't a valid op.
         Mov { from: Operand, to: Operand },
 
+        /// Multiply register AX with value `v` and move result to register RAX
+        // The destination operand is of `mul` is an implied operand located in
+        // register AX. GCC throws `Error: ambiguous operand size for `mul'`
+        // without size quantifier
+        Mul { v: Operand },
+
         /// Pop a register `r` from stack
         Pop(Register),
 
@@ -507,6 +513,7 @@ pub mod x86 {
                 Ins::Leave => writeln!(f, "    pop rbp \n    ret"),
                 Ins::Load { r, si } => writeln!(f, "    mov {}, {}", r, &stack(*si)),
                 Ins::Mov { from, to } => writeln!(f, "    mov {}, {}", to, from),
+                Ins::Mul { v } => writeln!(f, "    mul qword ptr {}", v),
                 Ins::Pop(r) => writeln!(f, "    pop {}", r),
                 Ins::Push(r) => writeln!(f, "    push {}", r),
                 Ins::Save { r, si } => writeln!(f, "    mov {}, {}", &stack(*si), r),
@@ -731,7 +738,8 @@ pub mod emit {
                     "+" => primitives::plus(&s, x, y),
                     "-" => primitives::minus(&s, x, y),
                     "*" => primitives::mul(&s, x, y),
-                    "/" => primitives::div(&s, x, y),
+                    "/" => primitives::quotient(&s, x, y),
+                    "%" => primitives::remainder(&s, x, y),
                     n => panic!("Unknown binary primitive: {}", n),
                 },
 
@@ -861,8 +869,8 @@ pub mod primitives {
     // size quantifier
     pub fn mul(s: &State, x: &AST, y: &AST) -> ASM {
         binop(&s, &x, &y)
-            + Shr {r: RAX, v: immediate::n(immediate::SHIFT)}
-            + Slice(format!("    mul qword ptr {} \n", x86::stack(s.si)))
+        + Shr {r: RAX, v: immediate::SHIFT}
+        + Mul {v: Operand::Stack(s.si)}
     }
 
     /// Divide `x` by `y` and move result to register RAX
@@ -875,7 +883,7 @@ pub mod primitives {
     //
     // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
     // argument. the quotient is stored in RAX and the remainder in RDX.
-    pub fn div(s: &State, x: &AST, y: &AST) -> ASM {
+    fn div(s: &State, x: &AST, y: &AST) -> ASM {
         let mut ctx = String::new();
 
         ctx.push_str(&(emit::eval(&s, y).to_string()));
@@ -887,6 +895,14 @@ pub mod primitives {
         ctx.push_str("    cqo \n");
         ctx.push_str("    idiv rcx \n");
         ctx.into()
+    }
+
+    pub fn quotient(s: &State, x: &AST, y: &AST) -> ASM {
+        div(&s, x, y) + Slice(format!("    shl rax, {} \n", immediate::SHIFT))
+    }
+
+    pub fn remainder(s: &State, x: &AST, y: &AST) -> ASM {
+        div(&s, x, y) + Slice(format!("    mov rax, rdx \n    shl rax, {} \n", immediate::SHIFT))
     }
 }
 
