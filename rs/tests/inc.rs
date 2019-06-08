@@ -4,7 +4,7 @@ extern crate inc;
 use inc::*;
 use std::fs;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -222,13 +222,10 @@ mod quick {
 
 // Get a test config with program as input
 fn config(program: String) -> Config {
-    let epoch = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-
-    // On Mac, it's very important to run these tests in memory with tmpfs, file
-    // system ordering events made the test consistently.
-    let output = format!("/tmp/inc-{:?}", epoch);
+    // Time epoch instead of UUID occasionally ran into race conditions which
+    // made multiple tests write to the same file concurrently completely
+    // messing things up.
+    let output = format!("/tmp/inc-{:?}", Uuid::new_v4());
 
     Config { program, output }
 }

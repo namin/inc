@@ -8,3 +8,4 @@ edition = "2018"
 nom = "^4.2"
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
+uuid = { version = "0.7", features = ["serde", "v4"] }
