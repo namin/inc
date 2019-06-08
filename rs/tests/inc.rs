@@ -208,7 +208,7 @@ mod quick {
     #[quickcheck]
     fn divide(x: i64, y: i64) -> () {
         if y != 0 {
-            test1(format!("(/ {} {})", (x * y), x), y.to_string())
+            test1(format!("(/ {} {})", (x * y), y), x.to_string())
         }
     }
 
