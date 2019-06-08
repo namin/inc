@@ -266,7 +266,11 @@ fn test1(input: String, output: String) {
         .output()
         .expect(&format!("Failed to run binary `{}`", &config.output));
 
-    assert!(&proc.status.success());
+    assert!(
+        &proc.status.success(),
+        format!("Failed to run binary `{}`", &config.output)
+    );
+
     assert_eq!(
         String::from_utf8(proc.stdout)
             .unwrap()
