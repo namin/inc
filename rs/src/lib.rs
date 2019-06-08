@@ -456,6 +456,9 @@ pub mod x86 {
 
         /// Shift register `r` right by `v` bits
         Shr { r: Register, v: i64 },
+        /// Return from the calling function
+        Ret,
+
 
         /// Sub `k` from register `r`
         Sub { r: Register, v: Operand },
@@ -508,19 +511,21 @@ pub mod x86 {
                 Ins::And { r, v } => writeln!(f, "    and {}, {}", r, v),
                 Ins::Call(l) => writeln!(f, "    call {}", l),
                 Ins::Cmp { r, with } => writeln!(f, "    cmp {}, {}", r, with),
-                Ins::Enter => write!(
-                    f,
-                    "{}",
-                    Ins::Push(Register::RBP)
+                Ins::Enter => {
+                    let op = Ins::Push(Register::RBP)
                         + Ins::Mov {
                             from: Operand::Reg(Register::RSP),
-                            to: Operand::Reg(Register::RBP)
-                        }
-                ),
+                            to: Operand::Reg(Register::RBP),
+                        };
+                    write!(f, "{}", op)
+                }
                 Ins::Je(l) => writeln!(f, "    je {}", l),
                 Ins::Jmp(l) => writeln!(f, "    jmp {}", l),
                 Ins::Label(l) => writeln!(f, "{}", label(l)),
-                Ins::Leave => writeln!(f, "    pop rbp \n    ret"),
+                Ins::Leave => {
+                    let op = Ins::Pop(Register::RBP) + Ins::Ret;
+                    writeln!(f, "{}", op)
+                } ,
                 Ins::Load { r, si } => {
                     writeln!(f, "    mov {}, {}", r, &stack(*si))
                 }
@@ -530,6 +535,7 @@ pub mod x86 {
                 Ins::Mul { v } => writeln!(f, "    mul qword ptr {}", v),
                 Ins::Pop(r) => writeln!(f, "    pop {}", r),
                 Ins::Push(r) => writeln!(f, "    push {}", r),
+                Ins::Ret => writeln!(f, "    ret"),
                 Ins::Save { r, si } => {
                     writeln!(f, "    mov {}, {}", &stack(*si), r)
                 }
