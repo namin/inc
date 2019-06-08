@@ -603,6 +603,29 @@ pub mod x86 {
         }
     }
 
+    #[cfg(target_os = "macos")]
+    pub fn function_header(name: &str) -> ASM {
+        let mut ctx = String::new();
+
+        ctx.push_str("    .section __TEXT,__text\n");
+        ctx.push_str("    .intel_syntax noprefix\n");
+        ctx.push_str(&format!("    .globl _{}\n", &name));
+        ctx.push_str(&Ins::Label(String::from(name)).to_string());
+        ctx.into()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn function_header(name: &str) -> ASM {
+        let mut ctx = String::new();
+
+        ctx.push_str("    .text\n");
+        ctx.push_str("    .intel_syntax noprefix\n");
+        ctx.push_str(&format!("    .globl {}\n", &name));
+        ctx.push_str(&format!("    .type {}, @function\n", &name));
+        ctx.push_str(&Ins::Label(String::from(name)).to_string());
+        ctx.into()
+    }
+
     #[cfg(test)]
     mod tests {
         use crate::x86::{Ins::*, Operand::*, Register::*};
@@ -666,31 +689,6 @@ pub mod emit {
             }
         }
     }
-
-    #[cfg(target_os = "macos")]
-    fn function_header(name: &str) -> ASM {
-        let mut ctx = String::new();
-
-        ctx.push_str("    .section __TEXT,__text\n");
-        ctx.push_str("    .intel_syntax noprefix\n");
-        ctx.push_str(&format!("    .globl _{}\n", &name));
-        ctx.push_str(&Label(String::from(name)).to_string());
-        ctx.into()
-    }
-
-    #[cfg(target_os = "linux")]
-    fn function_header(name: &str) -> ASM {
-        let mut ctx = String::new();
-
-        ctx.push_str("    .text\n");
-        ctx.push_str("    .intel_syntax noprefix\n");
-        ctx.push_str(&format!("    .globl {}\n", &name));
-        ctx.push_str(&format!("    .type {}, @function\n", &name));
-        ctx.push_str(&Label(String::from(name)).to_string());
-        ctx.into()
-    }
-
-    /* Helpers */
 
     /// Clear (mask) all except the least significant 3 tag bits
     pub fn mask() -> Ins {
@@ -756,7 +754,10 @@ pub mod emit {
     /// Top level interface to the emit module
     pub fn program(prog: &AST) -> String {
         let s: State = Default::default();
-        let gen = function_header("init") + Ins::Enter + eval(&s, prog) + Ins::Leave;
+        let gen = x86::function_header("init")
+            + Ins::Enter
+            + eval(&s, prog)
+            + Ins::Leave;
 
         gen.to_string()
     }
