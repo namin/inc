@@ -454,11 +454,23 @@ pub mod x86 {
         /// Push a register `r` to stack
         Push(Register),
 
-        /// Shift register `r` right by `v` bits
-        Shr { r: Register, v: i64 },
         /// Return from the calling function
         Ret,
 
+        // Shift Operations fall into `arithmetic` (`SAR` & `SAL`) and `logical`
+        // (`SHR` & `SHL`) types and they differ in the way signs are preserved.
+        //
+        // Shifting left works the same for both because multiplying by 2^n wont
+        // change the sign, but logical right shifting a negative number with
+        // `SHR` will throw away the sign while `SAR` will preserve it. Prior
+        // versions of this compiler and paper used both, but unless there is a
+        // very good reason use shift arithmetic right (`SAR`) instead of shift
+        // logical right (`SHR`) everywhere.
+        /// Shift register `r` right by `v` bits; `r = r / 2^v`
+        Sar { r: Register, v: i64 },
+
+        /// Shift register `r` left by `v` bits; `r = r * 2^v`
+        Sal { r: Register, v: i64 },
 
         /// Sub `k` from register `r`
         Sub { r: Register, v: Operand },
@@ -525,7 +537,7 @@ pub mod x86 {
                 Ins::Leave => {
                     let op = Ins::Pop(Register::RBP) + Ins::Ret;
                     writeln!(f, "{}", op)
-                } ,
+                }
                 Ins::Load { r, si } => {
                     writeln!(f, "    mov {}, {}", r, &stack(*si))
                 }
@@ -539,7 +551,8 @@ pub mod x86 {
                 Ins::Save { r, si } => {
                     writeln!(f, "    mov {}, {}", &stack(*si), r)
                 }
-                Ins::Shr { r, v } => writeln!(f, "    shr {}, {}", r, v),
+                Ins::Sal { r, v } => writeln!(f, "    sal {}, {}", r, v),
+                Ins::Sar { r, v } => writeln!(f, "    sar {}, {}", r, v),
                 Ins::Sub { r, v } => writeln!(f, "    sub {}, {}", r, v),
                 Ins::Slice(s) => write!(f, "{}", s),
             }
@@ -875,7 +888,7 @@ pub mod primitives {
     // size quantifier
     pub fn mul(s: &State, x: &AST, y: &AST) -> ASM {
         binop(&s, &x, &y)
-            + Shr { r: RAX, v: immediate::SHIFT }
+            + Sar { r: RAX, v: immediate::SHIFT }
             + Mul { v: Operand::Stack(s.si) }
     }
 
@@ -893,10 +906,14 @@ pub mod primitives {
         let mut ctx = String::new();
 
         ctx.push_str(&(emit::eval(&s, y).to_string()));
-        ctx.push_str(&format!("    sar rax, {} \n", immediate::SHIFT));
+        ctx.push_str(
+            &Ins::Sar { r: Register::RAX, v: immediate::SHIFT }.to_string(),
+        );
         ctx.push_str("    mov rcx, rax \n");
         ctx.push_str(&emit::eval(&s, x).to_string());
-        ctx.push_str(&format!("    sar rax, {} \n", immediate::SHIFT));
+        ctx.push_str(
+            &Ins::Sar { r: Register::RAX, v: immediate::SHIFT }.to_string(),
+        );
         ctx.push_str("    mov rdx, 0 \n");
         ctx.push_str("    cqo \n");
         ctx.push_str("    idiv rcx \n");
@@ -904,11 +921,16 @@ pub mod primitives {
     }
 
     pub fn quotient(s: &State, x: &AST, y: &AST) -> ASM {
-        div(&s, x, y) + Slice(format!("    shl rax, {} \n", immediate::SHIFT))
+        div(&s, x, y) + Sal { r: Register::RAX, v: immediate::SHIFT }
     }
 
     pub fn remainder(s: &State, x: &AST, y: &AST) -> ASM {
-        div(&s, x, y) + Slice(format!("    mov rax, rdx \n    shl rax, {} \n", immediate::SHIFT))
+        div(&s, x, y)
+            + Mov {
+                to: Operand::Reg(Register::RAX),
+                from: Operand::Reg(Register::RDX),
+            }
+            + Sal { r: Register::RAX, v: immediate::SHIFT }
     }
 }
 
