@@ -268,7 +268,8 @@ fn test1(input: &str, output: &str) {
     assert_eq!(String::from_utf8(proc.stdout).unwrap().trim(), output);
 
     // Clean up all the intermediary files generated
-    fs::remove_file(&config.asm()).expect("Failed to clear generated asm files");
+    fs::remove_file(&config.asm())
+        .expect("Failed to clear generated asm files");
     fs::remove_file(&config.output).expect("Failed to clear executable");
     fs::remove_dir_all(format!("{}.dSYM", &config.output)).unwrap_or_default()
 }

@@ -223,7 +223,10 @@ pub mod parser {
         }
 
         // Partial consumes some of the input and succeeds
-        fn partial<T>(unconsumed: S<'static>, t: T) -> Result<(S<'_>, T), nom::Err<S<'_>, u32>> {
+        fn partial<T>(
+            unconsumed: S<'static>,
+            t: T,
+        ) -> Result<(S<'_>, T), nom::Err<S<'_>, u32>> {
             Ok((unconsumed, t))
         }
 
@@ -262,11 +265,17 @@ pub mod parser {
             assert_eq!(ok(String::from("i64")), identifier(S(b"i64")));
 
             // -> is not an identifier, consume the - as an id and return the >
-            assert_eq!(partial(S(b">"), String::from("-")), identifier(S(b"->")));
+            assert_eq!(
+                partial(S(b">"), String::from("-")),
+                identifier(S(b"->"))
+            );
 
             // Identifiers must split at space and not consume anything
             // afterwards
-            assert_eq!(partial(S(b" b"), String::from("a")), identifier(S(b"a b")));
+            assert_eq!(
+                partial(S(b" b"), String::from("a")),
+                identifier(S(b"a b"))
+            );
         }
 
         // #[test]
@@ -283,7 +292,10 @@ pub mod parser {
 
         #[test]
         fn lists() {
-            assert_eq!(ok(AST::List(vec!["+".into(), 1.into()])), list(S(b"(+ 1)")));
+            assert_eq!(
+                ok(AST::List(vec!["+".into(), 1.into()])),
+                list(S(b"(+ 1)"))
+            );
 
             assert_eq!(
                 ok(AST::List(vec![
@@ -466,9 +478,7 @@ pub mod x86 {
     /// Convert a raw string to ASM
     impl From<String> for ASM {
         fn from(s: String) -> Self {
-            ASM {
-                0: vec![Ins::Slice(s)],
-            }
+            ASM { 0: vec![Ins::Slice(s)] }
         }
     }
 
@@ -511,12 +521,18 @@ pub mod x86 {
                 Ins::Jmp(l) => writeln!(f, "    jmp {}", l),
                 Ins::Label(l) => writeln!(f, "{}", label(l)),
                 Ins::Leave => writeln!(f, "    pop rbp \n    ret"),
-                Ins::Load { r, si } => writeln!(f, "    mov {}, {}", r, &stack(*si)),
-                Ins::Mov { from, to } => writeln!(f, "    mov {}, {}", to, from),
+                Ins::Load { r, si } => {
+                    writeln!(f, "    mov {}, {}", r, &stack(*si))
+                }
+                Ins::Mov { from, to } => {
+                    writeln!(f, "    mov {}, {}", to, from)
+                }
                 Ins::Mul { v } => writeln!(f, "    mul qword ptr {}", v),
                 Ins::Pop(r) => writeln!(f, "    pop {}", r),
                 Ins::Push(r) => writeln!(f, "    push {}", r),
-                Ins::Save { r, si } => writeln!(f, "    mov {}, {}", &stack(*si), r),
+                Ins::Save { r, si } => {
+                    writeln!(f, "    mov {}, {}", &stack(*si), r)
+                }
                 Ins::Shr { r, v } => writeln!(f, "    shr {}, {}", r, v),
                 Ins::Sub { r, v } => writeln!(f, "    sub {}, {}", r, v),
                 Ins::Slice(s) => write!(f, "{}", s),
@@ -634,11 +650,7 @@ pub mod x86 {
         fn mov() {
             assert_eq!(
                 String::from("    mov rax, 16\n"),
-                Mov {
-                    from: Const(16),
-                    to: Reg(RAX)
-                }
-                .to_string()
+                Mov { from: Const(16), to: Reg(RAX) }.to_string()
             );
         }
     }
@@ -671,10 +683,7 @@ pub mod emit {
 
     impl Default for State {
         fn default() -> Self {
-            State {
-                si: -WORDSIZE,
-                asm: ASM(vec![]),
-            }
+            State { si: -WORDSIZE, asm: ASM(vec![]) }
         }
     }
 
@@ -683,19 +692,13 @@ pub mod emit {
         //
         //TODO: This function is pretty inefficient
         pub fn next(&self) -> State {
-            State {
-                asm: self.asm.clone(),
-                si: self.si - WORDSIZE,
-            }
+            State { asm: self.asm.clone(), si: self.si - WORDSIZE }
         }
     }
 
     /// Clear (mask) all except the least significant 3 tag bits
     pub fn mask() -> Ins {
-        And {
-            r: RAX,
-            v: Const(immediate::MASK),
-        }
+        And { r: RAX, v: Const(immediate::MASK) }
     }
 
     /// Convert the result in RAX into a boolean
@@ -767,7 +770,6 @@ pub mod emit {
 ///
 /// Several scheme functions like `(add ...` are implemented by the compiler in
 /// assembly rather than in scheme. All of them live in this module.
-#[rustfmt::skip]
 pub mod primitives {
 
     use super::emit::State;
@@ -778,14 +780,12 @@ pub mod primitives {
 
     /// Increment number by 1
     pub fn inc(s: &State, x: &AST) -> ASM {
-        emit::eval(&s, x)
-            + Add {r: RAX, v: Operand::Const(immediate::n(1))}
+        emit::eval(&s, x) + Add { r: RAX, v: Operand::Const(immediate::n(1)) }
     }
 
     /// Decrement by 1
     pub fn dec(s: &State, x: &AST) -> ASM {
-        emit::eval(&s, x)
-            + Sub {r: RAX, v: Operand::Const(immediate::n(1))}
+        emit::eval(&s, x) + Sub { r: RAX, v: Operand::Const(immediate::n(1)) }
     }
 
     /// Is the expression a fixnum?
@@ -799,7 +799,7 @@ pub mod primitives {
     pub fn fixnump(s: &State, expr: &AST) -> ASM {
         emit::eval(&s, expr)
             + emit::mask()
-            + Cmp {r: RAX, with: immediate::NUM}
+            + Cmp { r: RAX, with: immediate::NUM }
             + emit::cmp_bool()
     }
 
@@ -807,7 +807,7 @@ pub mod primitives {
     pub fn booleanp(s: &State, expr: &AST) -> ASM {
         emit::eval(&s, expr)
             + emit::mask()
-            + Cmp {r: RAX, with: immediate::BOOL}
+            + Cmp { r: RAX, with: immediate::BOOL }
             + emit::cmp_bool()
     }
 
@@ -815,28 +815,28 @@ pub mod primitives {
     pub fn charp(s: &State, expr: &AST) -> ASM {
         emit::eval(&s, expr)
             + emit::mask()
-            + Cmp {r: RAX, with: immediate::CHAR}
+            + Cmp { r: RAX, with: immediate::CHAR }
             + emit::cmp_bool()
     }
 
     /// Is the expression null?
     pub fn nullp(s: &State, expr: &AST) -> ASM {
         emit::eval(&s, expr)
-            + Cmp {r: RAX, with: immediate::NIL}
+            + Cmp { r: RAX, with: immediate::NIL }
             + emit::cmp_bool()
     }
 
     /// Is the expression zero?
     pub fn zerop(s: &State, expr: &AST) -> ASM {
         emit::eval(&s, expr)
-            + Cmp {r: RAX, with: immediate::NUM}
+            + Cmp { r: RAX, with: immediate::NUM }
             + emit::cmp_bool()
     }
 
     /// Logical not
     pub fn not(s: &State, expr: &AST) -> ASM {
         emit::eval(&s, expr)
-            + Cmp {r: RAX, with: immediate::FALSE}
+            + Cmp { r: RAX, with: immediate::FALSE }
             + emit::cmp_bool()
     }
 
@@ -849,8 +849,7 @@ pub mod primitives {
 
     /// Add `x` and `y` and move result to register RAX
     pub fn plus(s: &State, x: &AST, y: &AST) -> ASM {
-        binop(&s, &x, &y)
-            + Add {r: RAX, v: Operand::Stack(s.si)}
+        binop(&s, &x, &y) + Add { r: RAX, v: Operand::Stack(s.si) }
     }
 
     /// Subtract `x` from `y` and move result to register RAX
@@ -860,7 +859,7 @@ pub mod primitives {
     // back. Reverse the order and fix it up.
     pub fn minus(s: &State, x: &AST, y: &AST) -> ASM {
         binop(&s, &x, &y)
-            + Sub {r: RAX, v: Operand::Stack(s.si)}
+            + Sub { r: RAX, v: Operand::Stack(s.si) }
             + Load { r: RAX, si: s.si }
     }
 
@@ -870,8 +869,8 @@ pub mod primitives {
     // size quantifier
     pub fn mul(s: &State, x: &AST, y: &AST) -> ASM {
         binop(&s, &x, &y)
-        + Shr {r: RAX, v: immediate::SHIFT}
-        + Mul {v: Operand::Stack(s.si)}
+            + Shr { r: RAX, v: immediate::SHIFT }
+            + Mul { v: Operand::Stack(s.si) }
     }
 
     /// Divide `x` by `y` and move result to register RAX
@@ -952,8 +951,12 @@ pub mod immediate {
                 (i64::from(*c) << SHIFT) | CHAR
             }
             AST::Nil => NIL,
-            AST::Identifier(..) => unimplemented!("immediate repr is undefined for identifiers"),
-            AST::List(..) => unimplemented!("immediate repr is undefined for lists"),
+            AST::Identifier(..) => {
+                unimplemented!("immediate repr is undefined for identifiers")
+            }
+            AST::List(..) => {
+                unimplemented!("immediate repr is undefined for lists")
+            }
         }
     }
 
@@ -1021,9 +1024,7 @@ impl FromStr for AST {
             // Ok((_rest, _ast)) => Err(Error {
             //     message: String::from("All of input not consumed"),
             // }),
-            Err(e) => Err(Error {
-                message: format!("{}", e),
-            }),
+            Err(e) => Err(Error { message: format!("{}", e) }),
         }
     }
 }
