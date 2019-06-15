@@ -351,6 +351,19 @@ pub mod parser {
             assert_eq!(ok('j'.into()), program(S(b"#\\j")));
             assert_eq!(ok('^'.into()), program(S(b"#\\^")));
         }
+
+        #[test]
+        fn let_binding() {
+            let prog = S(b"(let ((x 1) (y 2)) (+ x y))");
+
+            let x = AST::List(vec!["x".into(), 1.into()]);
+            let y = AST::List(vec!["y".into(), 2.into()]);
+            let vars = AST::List(vec![x, y]);
+            let body = AST::List(vec!["+".into(), "x".into(), "y".into()]);
+            let exp = AST::List(vec!["let".into(), vars, body]);
+
+            assert_eq!(ok(exp), program(prog));
+        }
     }
 }
 
