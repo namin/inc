@@ -503,10 +503,17 @@ pub mod x86 {
         }
     }
 
-    /// Convert a raw string to ASM
+    /// Convert a String to ASM
     impl From<String> for ASM {
         fn from(s: String) -> Self {
             ASM { 0: vec![Ins::Slice(s)] }
+        }
+    }
+
+    /// Convert a string literal to ASM
+    impl From<&str> for ASM {
+        fn from(s: &str) -> Self {
+            ASM { 0: vec![Ins::Slice(s.to_string())] }
         }
     }
 
