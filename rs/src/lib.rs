@@ -803,11 +803,11 @@ pub mod emit {
         /// Check if a variable exists in the env
         fn find(&self, i: &str) -> Option<i64> {
             for Binding(name, index) in self.0.iter() {
-                if name == &i {
+                if name == i {
                     return Some(*index);
                 }
             }
-            return None;
+            None
         }
     }
 
@@ -840,11 +840,7 @@ pub mod emit {
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
 
-    pub fn binding(
-        s: &State,
-        bindings: &Vec<(String, AST)>,
-        body: &Vec<AST>,
-    ) -> ASM {
+    pub fn binding(s: &State, bindings: &[(String, AST)], body: &[AST]) -> ASM {
         let mut ctx = String::new();
         let mut env = s.env.clone();
         let mut index = s.si;
@@ -855,12 +851,12 @@ pub mod emit {
             // TODO: Use something like index * WORDSIZE
             // here instead of mutating index.
             env.grow(name.to_string(), index);
-            index = index - WORDSIZE;
+            index -= WORDSIZE;
 
             ctx.push_str(&x.to_string());
         }
 
-        let s2 = State { si: index, asm: s.asm.clone(), env: env };
+        let s2 = State { si: index, asm: s.asm.clone(), env };
         let x = eval(&s2, &body[0]);
 
         ctx.push_str(&x.to_string());
@@ -884,7 +880,7 @@ pub mod emit {
 
             AST::Let { bindings, body } => binding(&s, bindings, body),
 
-            AST::List(l) => match l.as_slice() {
+            AST::List(list) => match list.as_slice() {
                 [AST::Identifier(i), arg] => match &i[..] {
                     "inc" => primitives::inc(&s, arg),
                     "dec" => primitives::dec(&s, arg),
@@ -897,7 +893,7 @@ pub mod emit {
                     n => panic!("Unknown unary primitive: {}", n),
                 },
 
-                [AST::Identifier(i), x, y] => match &i[..] {
+                [AST::Identifier(name), x, y] => match &name[..] {
                     "+" => primitives::plus(&s, x, y),
                     "-" => primitives::minus(&s, x, y),
                     "*" => primitives::mul(&s, x, y),
@@ -1100,7 +1096,7 @@ pub mod immediate {
     pub const NIL: i64 = 4;
 
     pub const SHIFT: i64 = 3;
-    pub const MASK: i64 = 0b00000111;
+    pub const MASK: i64 = 0b0000_0111;
 
     pub const FALSE: i64 = (0 << SHIFT) | BOOL;
     pub const TRUE: i64 = (1 << SHIFT) | BOOL;
