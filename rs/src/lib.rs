@@ -718,11 +718,12 @@ pub mod emit {
     pub struct State {
         pub si: i64,
         pub asm: ASM,
+        pub env: Env,
     }
 
     impl Default for State {
         fn default() -> Self {
-            State { si: -WORDSIZE, asm: ASM(vec![]) }
+            State { si: -WORDSIZE, asm: ASM(vec![]), env: Env(vec![]) }
         }
     }
 
@@ -731,7 +732,43 @@ pub mod emit {
         //
         //TODO: This function is pretty inefficient
         pub fn next(&self) -> State {
-            State { asm: self.asm.clone(), si: self.si - WORDSIZE }
+            State {
+                asm: self.asm.clone(),
+                si: self.si - WORDSIZE,
+                env: self.env.clone(),
+            }
+        }
+    }
+
+    // NOTE: Bindings and env would be a really good candidate for a new module
+    // which hides implementation details.
+
+    /// A binding maps an Identifier to a stack index.
+    // TODO: Binding should *NOT* have an owned identifier, use a borrowed
+    // reference here that doesn't outlive the real variable.
+    #[derive(Debug, Clone)]
+    pub struct Binding(String, i64);
+
+    /// Environment is an *ordered* list of bindings.
+    // A pair of (name, value) is a crappy data structure for an env, a list of
+    // maps would be safer and idiomatic.
+    #[derive(Debug, Clone)]
+    pub struct Env(pub Vec<Binding>);
+
+    impl Env {
+        /// Grow an environment by pushing a new binding.
+        fn grow(&mut self, i: String, index: i64) {
+            self.0.push(Binding(i.to_string(), index));
+        }
+
+        /// Check if a variable exists in the env
+        fn find(&self, i: &str) -> Option<i64> {
+            for Binding(name, index) in self.0.iter() {
+                if name == &i {
+                    return Some(*index);
+                }
+            }
+            return None;
         }
     }
 
@@ -755,10 +792,76 @@ pub mod emit {
             .into()
     }
 
+    /// Emit code for a let expression
+    ///
+    /// A new environment is created to hold the bindings, which map the name to
+    /// a stack index. All the space allocated by the let expression for local
+    /// variables can be freed at the end of the body. This implies the `si`
+    /// stays the same before and after a let expression. There is no need to
+    /// keep track of the amount of space allocated inside the let expression
+    /// and free it afterwards.
+    pub fn binding(s: &State, bindings: &AST, body: &AST) -> ASM {
+        let mut ctx = String::new();
+        let mut env = s.env.clone();
+        let mut index = s.si;
+
+        // ⚠ Its really messy trying to work with regular lists here, parse to
+        // better types if syntactically validated.
+        //
+        // tldr; Mixing syntax check and code generation is a pretty stupid
+        // idea.
+
+        // (let ((x 1) (y 2))  (+ x y))
+        // bindings =  ((x 1) (y 2))
+        // pairs =  AST::List[vec((x 1) (y 2))
+        // pair =  (x 1)
+
+        match bindings {
+            AST::List(pairs) => {
+                for pair in pairs.iter() {
+                    // pair => (x 1), fail for: (let not-pair 2)
+                    match pair {
+                        AST::List(realpair) => {
+                            match realpair.as_slice() {
+                                [AST::Identifier(i), val] => {
+                                    let x = eval(&s, val)
+                                        + Save { r: RAX, si: index };
+
+                                    // TODO: Use something like index * WORDSIZE
+                                    // here instead of mutating index.
+                                    env.grow(i.to_string(), index);
+                                    index = index - WORDSIZE;
+
+                                    ctx.push_str(&x.to_string());
+                                }
+                                _ => panic!(
+                                    "binding {:?} isn't a 2 tuple",
+                                    realpair
+                                ),
+                            }
+                        }
+                        _ => panic!("binding {:?} isn't a list", pair),
+                    }
+                }
+            }
+            _ => panic!("bindings {:?} isn't a list", bindings),
+        }
+
+        let s2 = State { si: index, asm: s.asm.clone(), env: env };
+        let x = eval(&s2, body);
+
+        ctx.push_str(&x.to_string());
+        ctx.into()
+    }
+
     /// Evaluate an expression into RAX
     ///
     /// If the expression fits in a machine word, immediately return with the
     /// immediate repr, recurse for anything else till the base case.
+    ///
+    // TODO: eval should dispatch based on first atom alone, not necessarily
+    // care about arity here. `let` and other variadic syntax forms won't fit
+    // into any specific branch here.
     pub fn eval(s: &State, prog: &AST) -> ASM {
         match prog {
             AST::List(l) => match l.as_slice() {
@@ -775,16 +878,27 @@ pub mod emit {
                 },
 
                 [AST::Identifier(i), x, y] => match &i[..] {
+                    // Syntax forms should have a higher precedence than
+                    // primitive functions
+                    "let" => binding(&s, x, y),
+
                     "+" => primitives::plus(&s, x, y),
                     "-" => primitives::minus(&s, x, y),
                     "*" => primitives::mul(&s, x, y),
                     "/" => primitives::quotient(&s, x, y),
                     "%" => primitives::remainder(&s, x, y),
+
                     n => panic!("Unknown binary primitive: {}", n),
                 },
 
                 l => panic!("Unknown expression: {:?}", l),
             },
+
+            AST::Identifier(i) => match s.env.find(i) {
+                Some(i) => Ins::Load { r: Register::RAX, si: i }.into(),
+                None => panic!("Undefined variable {}", i),
+            },
+
             _ => Mov {
                 to: Operand::Reg(RAX),
                 from: Operand::Const(immediate::to(&prog)),
@@ -999,9 +1113,10 @@ pub mod immediate {
                 (i64::from(*c) << SHIFT) | CHAR
             }
             AST::Nil => NIL,
-            AST::Identifier(..) => {
-                unimplemented!("immediate repr is undefined for identifiers")
-            }
+            AST::Identifier(i) => unimplemented!(
+                "immediate repr is undefined for identifier {}",
+                i
+            ),
             AST::List(..) => {
                 unimplemented!("immediate repr is undefined for lists")
             }
