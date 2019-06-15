@@ -53,6 +53,11 @@ pub enum AST {
     /// indirection here with `Vec<>` for recursive types. In this context, Vec
     /// is just a convenient way to have a `Box<[AST]>`
     List(Vec<AST>),
+
+    Let {
+        bindings: Vec<(String, AST)>,
+        body: Vec<AST>,
+    },
 }
 
 /// Idiomatic type conversions from the primitive types to AST
@@ -208,7 +213,35 @@ pub mod parser {
         char!(')') >>
         (d)));
 
-    named!(pub program <S, AST>, alt!(datum | list));
+    named!(pub program <S, AST>, alt!(let_syntax | datum));
+
+    // named → (name value)
+    named!(binding <S, (String, AST)>, do_parse!(
+        opt!(many0!(space)) >>
+        char!('(') >>
+        opt!(many0!(space)) >>
+        name: identifier >>
+        opt!(many0!(space)) >>
+        value: datum >>
+        opt!(many0!(space)) >>
+        char!(')') >>
+        opt!(many0!(space)) >>
+        ((name, value))));
+
+    // (let-syntax (<syntax binding>*) <expression>+)
+    named!(let_syntax <S, AST>, do_parse!(
+        char!('(') >>
+        opt!(many0!(space)) >>
+        tag!("let") >>
+        opt!(many0!(space)) >>
+        char!('(') >>
+        b: many0!(binding) >>
+        char!(')') >>
+        opt!(many0!(space)) >>
+        e: many1!(program) >>
+        opt!(many0!(space)) >>
+        char!(')') >>
+      (AST::Let{bindings: b, body: e})));
 
     #[cfg(test)]
     mod tests {
@@ -356,11 +389,17 @@ pub mod parser {
         fn let_binding() {
             let prog = S(b"(let ((x 1) (y 2)) (+ x y))");
 
-            let x = AST::List(vec!["x".into(), 1.into()]);
-            let y = AST::List(vec!["y".into(), 2.into()]);
-            let vars = AST::List(vec![x, y]);
-            let body = AST::List(vec!["+".into(), "x".into(), "y".into()]);
-            let exp = AST::List(vec!["let".into(), vars, body]);
+            let exp = AST::Let {
+                bindings: vec![
+                    ("x".to_string(), AST::Number(1)),
+                    ("y".to_string(), AST::Number(2)),
+                ],
+                body: vec![AST::List(vec![
+                    AST::Identifier("+".to_string()),
+                    AST::Identifier("x".to_string()),
+                    AST::Identifier("y".to_string()),
+                ])],
+            };
 
             assert_eq!(ok(exp), program(prog));
         }
@@ -800,55 +839,29 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-    pub fn binding(s: &State, bindings: &AST, body: &AST) -> ASM {
+
+    pub fn binding(
+        s: &State,
+        bindings: &Vec<(String, AST)>,
+        body: &Vec<AST>,
+    ) -> ASM {
         let mut ctx = String::new();
         let mut env = s.env.clone();
         let mut index = s.si;
 
-        // ⚠ Its really messy trying to work with regular lists here, parse to
-        // better types if syntactically validated.
-        //
-        // tldr; Mixing syntax check and code generation is a pretty stupid
-        // idea.
+        for (name, expr) in bindings.iter() {
+            let x = eval(&s, expr) + Save { r: RAX, si: index };
 
-        // (let ((x 1) (y 2))  (+ x y))
-        // bindings =  ((x 1) (y 2))
-        // pairs =  AST::List[vec((x 1) (y 2))
-        // pair =  (x 1)
+            // TODO: Use something like index * WORDSIZE
+            // here instead of mutating index.
+            env.grow(name.to_string(), index);
+            index = index - WORDSIZE;
 
-        match bindings {
-            AST::List(pairs) => {
-                for pair in pairs.iter() {
-                    // pair => (x 1), fail for: (let not-pair 2)
-                    match pair {
-                        AST::List(realpair) => {
-                            match realpair.as_slice() {
-                                [AST::Identifier(i), val] => {
-                                    let x = eval(&s, val)
-                                        + Save { r: RAX, si: index };
-
-                                    // TODO: Use something like index * WORDSIZE
-                                    // here instead of mutating index.
-                                    env.grow(i.to_string(), index);
-                                    index = index - WORDSIZE;
-
-                                    ctx.push_str(&x.to_string());
-                                }
-                                _ => panic!(
-                                    "binding {:?} isn't a 2 tuple",
-                                    realpair
-                                ),
-                            }
-                        }
-                        _ => panic!("binding {:?} isn't a list", pair),
-                    }
-                }
-            }
-            _ => panic!("bindings {:?} isn't a list", bindings),
+            ctx.push_str(&x.to_string());
         }
 
         let s2 = State { si: index, asm: s.asm.clone(), env: env };
-        let x = eval(&s2, body);
+        let x = eval(&s2, &body[0]);
 
         ctx.push_str(&x.to_string());
         ctx.into()
@@ -864,6 +877,13 @@ pub mod emit {
     // into any specific branch here.
     pub fn eval(s: &State, prog: &AST) -> ASM {
         match prog {
+            AST::Identifier(i) => match s.env.find(i) {
+                Some(i) => Ins::Load { r: Register::RAX, si: i }.into(),
+                None => panic!("Undefined variable {}", i),
+            },
+
+            AST::Let { bindings, body } => binding(&s, bindings, body),
+
             AST::List(l) => match l.as_slice() {
                 [AST::Identifier(i), arg] => match &i[..] {
                     "inc" => primitives::inc(&s, arg),
@@ -878,10 +898,6 @@ pub mod emit {
                 },
 
                 [AST::Identifier(i), x, y] => match &i[..] {
-                    // Syntax forms should have a higher precedence than
-                    // primitive functions
-                    "let" => binding(&s, x, y),
-
                     "+" => primitives::plus(&s, x, y),
                     "-" => primitives::minus(&s, x, y),
                     "*" => primitives::mul(&s, x, y),
@@ -892,11 +908,6 @@ pub mod emit {
                 },
 
                 l => panic!("Unknown expression: {:?}", l),
-            },
-
-            AST::Identifier(i) => match s.env.find(i) {
-                Some(i) => Ins::Load { r: Register::RAX, si: i }.into(),
-                None => panic!("Undefined variable {}", i),
             },
 
             _ => Mov {
@@ -1119,6 +1130,9 @@ pub mod immediate {
             ),
             AST::List(..) => {
                 unimplemented!("immediate repr is undefined for lists")
+            }
+            AST::Let { .. } => {
+                unimplemented!("immediate repr is undefined for let binding")
             }
         }
     }
