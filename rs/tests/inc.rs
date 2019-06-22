@@ -223,7 +223,7 @@ mod bindings {
         use super::super::*;
 
         #[test]
-        fn most_trivial_let_bindings() {
+        fn simple() {
             let tests = [
                 ("(let ((x 5)) x)", "5"),
                 ("(let ((x 5) (y 4)) (+ x y))", "9"),

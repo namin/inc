@@ -736,6 +736,84 @@ pub mod x86 {
     }
 }
 
+/// Environment is an *ordered* list of bindings.
+mod env {
+    use std::collections::HashMap;
+
+    #[derive(Debug)]
+    pub struct Env(Vec<HashMap<String, i64>>);
+
+    pub fn new() -> Env {
+        Default::default()
+    }
+
+    impl Default for Env {
+        fn default() -> Self {
+            Env(vec![HashMap::new()])
+        }
+    }
+
+    impl Env {
+        pub fn enter(&mut self) {
+            self.0.insert(0, HashMap::new());
+        }
+
+        pub fn leave(&mut self) {
+            self.0.remove(0);
+        }
+
+        pub fn set(&mut self, i: &str, index: i64) {
+            self.0
+                .first_mut()
+                .map(|binding| binding.insert(i.to_string(), index));
+        }
+
+        pub fn get(&mut self, i: &str) -> Option<i64> {
+            for bindings in self.0.iter() {
+                if let Some(t) = bindings.get(i) {
+                    return Some(*t);
+                }
+            }
+            None
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn t() {
+            let mut e = new();
+            assert_eq!(e.0.len(), 1);
+
+            // default global scope
+            e.set("x", -8);
+            assert_eq!(e.get("x"), Some(-8));
+
+            // overwrite in current scope
+            e.set("x", -16);
+            assert_eq!(e.get("x"), Some(-16));
+
+            e.enter();
+            assert_eq!(e.0.len(), 2);
+            // read variables from parent scope
+            assert_eq!(e.get("x"), Some(-16));
+
+            e.set("y", -24);
+            // local variable shadows global
+            e.set("x", -32);
+            assert_eq!(e.get("x"), Some(-32));
+
+            e.leave();
+
+            assert_eq!(e.0.len(), 1);
+            assert_eq!(e.get("y"), None);
+            assert_eq!(e.get("x"), Some(-16));
+        }
+    }
+}
+
 /// Emit machine code for inc AST.
 ///
 /// This module implements bulk of the compiler and is a good place to start
@@ -744,6 +822,7 @@ pub mod x86 {
 /// anything generic goes into `x86` module.
 pub mod emit {
     use super::{
+        env::Env,
         immediate,
         x86::{Ins::*, Operand::*, Register::*, *},
         *,
@@ -764,52 +843,15 @@ pub mod emit {
 
     impl Default for State {
         fn default() -> Self {
-            State { si: -WORDSIZE, asm: ASM(vec![]), env: Env(vec![]) }
+            State { si: -WORDSIZE, asm: ASM(vec![]), env: env::new() }
         }
     }
 
     impl State {
-        /// Get the next stack index for allocation
-        //
-        //TODO: This function is pretty inefficient
-        pub fn next(&self) -> State {
-            State {
-                asm: self.asm.clone(),
-                si: self.si - WORDSIZE,
-                env: self.env.clone(),
-            }
-        }
-    }
-
-    // NOTE: Bindings and env would be a really good candidate for a new module
-    // which hides implementation details.
-
-    /// A binding maps an Identifier to a stack index.
-    // TODO: Binding should *NOT* have an owned identifier, use a borrowed
-    // reference here that doesn't outlive the real variable.
-    #[derive(Debug, Clone)]
-    pub struct Binding(String, i64);
-
-    /// Environment is an *ordered* list of bindings.
-    // A pair of (name, value) is a crappy data structure for an env, a list of
-    // maps would be safer and idiomatic.
-    #[derive(Debug, Clone)]
-    pub struct Env(pub Vec<Binding>);
-
-    impl Env {
-        /// Grow an environment by pushing a new binding.
-        fn grow(&mut self, i: String, index: i64) {
-            self.0.push(Binding(i.to_string(), index));
-        }
-
-        /// Check if a variable exists in the env
-        fn find(&self, i: &str) -> Option<i64> {
-            for Binding(name, index) in self.0.iter() {
-                if name == i {
-                    return Some(*index);
-                }
-            }
-            None
+        /// Allocate a word on the stack
+        pub fn alloc(&mut self) -> &mut Self {
+            self.si -= WORDSIZE;
+            self
         }
     }
 
@@ -842,29 +884,31 @@ pub mod emit {
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
 
-    pub fn binding(s: &State, bindings: &[(String, AST)], body: &[AST]) -> ASM {
+    pub fn binding(
+        s: &mut State,
+        bindings: &[(String, AST)],
+        body: &[AST],
+    ) -> ASM {
         let mut ctx = String::new();
-        let mut env = s.env.clone();
-        let mut index = s.si;
+        s.env.enter();
 
         for (name, expr) in bindings.iter() {
-            let x = eval(&s, expr) + Save { r: RAX, si: index };
+            let x = eval(s, expr) + Save { r: RAX, si: s.si };
 
             // TODO: Use something like index * WORDSIZE
             // here instead of mutating index.
-            env.grow(name.to_string(), index);
-            index -= WORDSIZE;
+            s.env.set(name, s.si);
+            s.alloc();
 
             ctx.push_str(&x.to_string());
         }
-
-        let s2 = State { si: index, asm: s.asm.clone(), env };
 
         for b in body.iter() {
-            let x = eval(&s2, &b);
+            let x = eval(s, &b);
             ctx.push_str(&x.to_string());
         }
 
+        s.env.leave();
         ctx.into()
     }
 
@@ -876,34 +920,34 @@ pub mod emit {
     // TODO: eval should dispatch based on first atom alone, not necessarily
     // care about arity here. `let` and other variadic syntax forms won't fit
     // into any specific branch here.
-    pub fn eval(s: &State, prog: &AST) -> ASM {
+    pub fn eval(s: &mut State, prog: &AST) -> ASM {
         match prog {
-            AST::Identifier(i) => match s.env.find(i) {
+            AST::Identifier(i) => match s.env.get(i) {
                 Some(i) => Ins::Load { r: Register::RAX, si: i }.into(),
                 None => panic!("Undefined variable {}", i),
             },
 
-            AST::Let { bindings, body } => binding(&s, bindings, body),
+            AST::Let { bindings, body } => binding(s, bindings, body),
 
             AST::List(list) => match list.as_slice() {
                 [AST::Identifier(i), arg] => match &i[..] {
-                    "inc" => primitives::inc(&s, arg),
-                    "dec" => primitives::dec(&s, arg),
-                    "null?" => primitives::nullp(&s, arg),
-                    "zero?" => primitives::zerop(&s, arg),
-                    "not" => primitives::not(&s, arg),
-                    "fixnum?" => primitives::fixnump(&s, arg),
-                    "boolean?" => primitives::booleanp(&s, arg),
-                    "char?" => primitives::charp(&s, arg),
+                    "inc" => primitives::inc(s, arg),
+                    "dec" => primitives::dec(s, arg),
+                    "null?" => primitives::nullp(s, arg),
+                    "zero?" => primitives::zerop(s, arg),
+                    "not" => primitives::not(s, arg),
+                    "fixnum?" => primitives::fixnump(s, arg),
+                    "boolean?" => primitives::booleanp(s, arg),
+                    "char?" => primitives::charp(s, arg),
                     n => panic!("Unknown unary primitive: {}", n),
                 },
 
                 [AST::Identifier(name), x, y] => match &name[..] {
-                    "+" => primitives::plus(&s, x, y),
-                    "-" => primitives::minus(&s, x, y),
-                    "*" => primitives::mul(&s, x, y),
-                    "/" => primitives::quotient(&s, x, y),
-                    "%" => primitives::remainder(&s, x, y),
+                    "+" => primitives::plus(s, x, y),
+                    "-" => primitives::minus(s, x, y),
+                    "*" => primitives::mul(s, x, y),
+                    "/" => primitives::quotient(s, x, y),
+                    "%" => primitives::remainder(s, x, y),
 
                     n => panic!("Unknown binary primitive: {}", n),
                 },
@@ -921,10 +965,10 @@ pub mod emit {
 
     /// Top level interface to the emit module
     pub fn program(prog: &AST) -> String {
-        let s: State = Default::default();
+        let mut s: State = Default::default();
         let gen = x86::function_header("init")
             + Ins::Enter
-            + eval(&s, prog)
+            + eval(&mut s, prog)
             + Ins::Leave;
 
         gen.to_string()
@@ -944,13 +988,13 @@ pub mod primitives {
     // Unary Primitives
 
     /// Increment number by 1
-    pub fn inc(s: &State, x: &AST) -> ASM {
-        emit::eval(&s, x) + Add { r: RAX, v: Operand::Const(immediate::n(1)) }
+    pub fn inc(s: &mut State, x: &AST) -> ASM {
+        emit::eval(s, x) + Add { r: RAX, v: Operand::Const(immediate::n(1)) }
     }
 
     /// Decrement by 1
-    pub fn dec(s: &State, x: &AST) -> ASM {
-        emit::eval(&s, x) + Sub { r: RAX, v: Operand::Const(immediate::n(1)) }
+    pub fn dec(s: &mut State, x: &AST) -> ASM {
+        emit::eval(s, x) + Sub { r: RAX, v: Operand::Const(immediate::n(1)) }
     }
 
     /// Is the expression a fixnum?
@@ -961,46 +1005,46 @@ pub mod primitives {
     /// (fixnum? 42) => #t
     /// (fixnum? "hello") => #f
     /// ```
-    pub fn fixnump(s: &State, expr: &AST) -> ASM {
-        emit::eval(&s, expr)
+    pub fn fixnump(s: &mut State, expr: &AST) -> ASM {
+        emit::eval(s, expr)
             + emit::mask()
             + Cmp { r: RAX, with: immediate::NUM }
             + emit::cmp_bool()
     }
 
     /// Is the expression a boolean?
-    pub fn booleanp(s: &State, expr: &AST) -> ASM {
-        emit::eval(&s, expr)
+    pub fn booleanp(s: &mut State, expr: &AST) -> ASM {
+        emit::eval(s, expr)
             + emit::mask()
             + Cmp { r: RAX, with: immediate::BOOL }
             + emit::cmp_bool()
     }
 
     /// Is the expression a char?
-    pub fn charp(s: &State, expr: &AST) -> ASM {
-        emit::eval(&s, expr)
+    pub fn charp(s: &mut State, expr: &AST) -> ASM {
+        emit::eval(s, expr)
             + emit::mask()
             + Cmp { r: RAX, with: immediate::CHAR }
             + emit::cmp_bool()
     }
 
     /// Is the expression null?
-    pub fn nullp(s: &State, expr: &AST) -> ASM {
-        emit::eval(&s, expr)
+    pub fn nullp(s: &mut State, expr: &AST) -> ASM {
+        emit::eval(s, expr)
             + Cmp { r: RAX, with: immediate::NIL }
             + emit::cmp_bool()
     }
 
     /// Is the expression zero?
-    pub fn zerop(s: &State, expr: &AST) -> ASM {
-        emit::eval(&s, expr)
+    pub fn zerop(s: &mut State, expr: &AST) -> ASM {
+        emit::eval(s, expr)
             + Cmp { r: RAX, with: immediate::NUM }
             + emit::cmp_bool()
     }
 
     /// Logical not
-    pub fn not(s: &State, expr: &AST) -> ASM {
-        emit::eval(&s, expr)
+    pub fn not(s: &mut State, expr: &AST) -> ASM {
+        emit::eval(s, expr)
             + Cmp { r: RAX, with: immediate::FALSE }
             + emit::cmp_bool()
     }
@@ -1008,13 +1052,13 @@ pub mod primitives {
     // Binary Primitives
 
     /// Evaluate arguments for a binary primitive and store them in stack
-    fn binop(s: &emit::State, x: &AST, y: &AST) -> ASM {
-        emit::eval(&s, x) + Save { r: RAX, si: s.si } + emit::eval(&s.next(), y)
+    fn binop(s: &mut State, x: &AST, y: &AST) -> ASM {
+        emit::eval(s, x) + Save { r: RAX, si: s.si } + emit::eval(s, y)
     }
 
     /// Add `x` and `y` and move result to register RAX
-    pub fn plus(s: &State, x: &AST, y: &AST) -> ASM {
-        binop(&s, &x, &y) + Add { r: RAX, v: Operand::Stack(s.si) }
+    pub fn plus(s: &mut State, x: &AST, y: &AST) -> ASM {
+        binop(s, &x, &y) + Add { r: RAX, v: Operand::Stack(s.si) }
     }
 
     /// Subtract `x` from `y` and move result to register RAX
@@ -1022,8 +1066,8 @@ pub mod primitives {
     // `sub` Subtracts the 2nd op from the first and stores the result in the
     // 1st. This is pretty inefficient to update result in stack and load it
     // back. Reverse the order and fix it up.
-    pub fn minus(s: &State, x: &AST, y: &AST) -> ASM {
-        binop(&s, &x, &y)
+    pub fn minus(s: &mut State, x: &AST, y: &AST) -> ASM {
+        binop(s, &x, &y)
             + Sub { r: RAX, v: Operand::Stack(s.si) }
             + Load { r: RAX, si: s.si }
     }
@@ -1032,8 +1076,8 @@ pub mod primitives {
     // The destination operand is of `mul` is an implied operand located in
     // register AX. GCC throws `Error: ambiguous operand size for `mul'` without
     // size quantifier
-    pub fn mul(s: &State, x: &AST, y: &AST) -> ASM {
-        binop(&s, &x, &y)
+    pub fn mul(s: &mut State, x: &AST, y: &AST) -> ASM {
+        binop(s, &x, &y)
             + Sar { r: RAX, v: immediate::SHIFT }
             + Mul { v: Operand::Stack(s.si) }
     }
@@ -1048,15 +1092,15 @@ pub mod primitives {
     //
     // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
     // argument. the quotient is stored in RAX and the remainder in RDX.
-    fn div(s: &State, x: &AST, y: &AST) -> ASM {
+    fn div(s: &mut State, x: &AST, y: &AST) -> ASM {
         let mut ctx = String::new();
 
-        ctx.push_str(&(emit::eval(&s, y).to_string()));
+        ctx.push_str(&(emit::eval(s, y).to_string()));
         ctx.push_str(
             &Ins::Sar { r: Register::RAX, v: immediate::SHIFT }.to_string(),
         );
         ctx.push_str("    mov rcx, rax \n");
-        ctx.push_str(&emit::eval(&s, x).to_string());
+        ctx.push_str(&emit::eval(s, x).to_string());
         ctx.push_str(
             &Ins::Sar { r: Register::RAX, v: immediate::SHIFT }.to_string(),
         );
@@ -1066,12 +1110,12 @@ pub mod primitives {
         ctx.into()
     }
 
-    pub fn quotient(s: &State, x: &AST, y: &AST) -> ASM {
-        div(&s, x, y) + Sal { r: Register::RAX, v: immediate::SHIFT }
+    pub fn quotient(s: &mut State, x: &AST, y: &AST) -> ASM {
+        div(s, x, y) + Sal { r: Register::RAX, v: immediate::SHIFT }
     }
 
-    pub fn remainder(s: &State, x: &AST, y: &AST) -> ASM {
-        div(&s, x, y)
+    pub fn remainder(s: &mut State, x: &AST, y: &AST) -> ASM {
+        div(s, x, y)
             + Mov {
                 to: Operand::Reg(Register::RAX),
                 from: Operand::Reg(Register::RDX),
