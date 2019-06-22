@@ -213,7 +213,9 @@ pub mod parser {
         char!(')') >>
         (d)));
 
-    named!(pub program <S, AST>, alt!(let_syntax | datum));
+    named!(pub program <S, AST>, do_parse!(
+        e: alt!(let_syntax | datum) >>
+        opt!(many0!(space)) >> (e)));
 
     // named → (name value)
     named!(binding <S, (String, AST)>, do_parse!(
@@ -857,9 +859,12 @@ pub mod emit {
         }
 
         let s2 = State { si: index, asm: s.asm.clone(), env };
-        let x = eval(&s2, &body[0]);
 
-        ctx.push_str(&x.to_string());
+        for b in body.iter() {
+            let x = eval(&s2, &b);
+            ctx.push_str(&x.to_string());
+        }
+
         ctx.into()
     }
 

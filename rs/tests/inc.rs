@@ -217,6 +217,46 @@ mod binary {
     }
 }
 
+// Step 5: Let bindings
+mod bindings {
+    mod unit {
+        use super::super::*;
+
+        #[test]
+        fn most_trivial_let_bindings() {
+            let tests = [
+                ("(let ((x 5)) x)", "5"),
+                ("(let ((x 5) (y 4)) (+ x y))", "9"),
+                ("(let ((x (+ 1 2))) x)", "3"),
+            ];
+
+            for (inp, out) in tests.iter() {
+                test1(inp, out);
+            }
+        }
+
+        #[test]
+        fn nested_scopes() {
+            let tests =
+                [("(let ((x (+ 1 2))) (let ((y (+ 3 4))) (+ x y)))", "10")];
+
+            for (inp, out) in tests.iter() {
+                test1(inp, out);
+            }
+        }
+
+        #[test]
+        fn shadow() {
+            let tests = [("(let ((x 1)) (let ((x 2)) #t) x)", "1")];
+
+            for (inp, out) in tests.iter() {
+                test1(inp, out);
+            }
+        }
+    }
+
+}
+
 // Get a test config with program as input
 fn config(program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
