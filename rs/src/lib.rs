@@ -736,21 +736,65 @@ pub mod x86 {
     }
 }
 
-/// Environment is an *ordered* list of bindings.
-mod env {
+/// State for the code generator
+mod state {
+    use super::x86::{ASM, WORDSIZE};
     use std::collections::HashMap;
 
-    #[derive(Debug)]
-    pub struct Env(Vec<HashMap<String, i64>>);
-
-    pub fn new() -> Env {
-        Default::default()
+    /// State for the code generator; easier to bundle it all into a struct than
+    /// pass several arguments in.
+    ///
+    /// Stack index points to the current available empty slot. Use and then
+    /// decrement the index to add a new variable. Default to `-word size`
+    ///
+    /// State should also implement some form of register allocation.
+    pub struct State {
+        pub si: i64,
+        pub asm: ASM,
+        env: Env,
     }
 
-    impl Default for Env {
+    impl Default for State {
         fn default() -> Self {
-            Env(vec![HashMap::new()])
+            State { si: -WORDSIZE, asm: ASM(vec![]), env: new() }
         }
+    }
+
+    impl State {
+        pub fn enter(&mut self) {
+            self.env.enter();
+        }
+
+        pub fn leave(&mut self) {
+            let unwind = self.env.0.first().expect("unexpected empty env").len()
+                as i64
+                * WORDSIZE;
+            self.si += unwind;
+            self.env.leave()
+        }
+
+        pub fn get(&mut self, i: &str) -> Option<i64> {
+            self.env.get(i)
+        }
+
+        // Set a new binding in the current local environment
+        pub fn set(&mut self, i: &str, index: i64) {
+            self.env.set(i, index);
+            self.alloc();
+        }
+
+        /// Allocate a word on the stack
+        fn alloc(&mut self) {
+            self.si -= WORDSIZE;
+        }
+    }
+
+    // Environment is an *ordered* list of bindings.
+    #[derive(Debug)]
+    struct Env(Vec<HashMap<String, i64>>);
+
+    fn new() -> Env {
+        Env(vec![HashMap::new()])
     }
 
     impl Env {
@@ -822,38 +866,11 @@ mod env {
 /// anything generic goes into `x86` module.
 pub mod emit {
     use super::{
-        env::Env,
         immediate,
+        state::State,
         x86::{Ins::*, Operand::*, Register::*, *},
         *,
     };
-
-    /// State for the code generator; easier to bundle it all into a struct than
-    /// pass several arguments in.
-    ///
-    /// Stack index points to the current available empty slot. Use and then
-    /// decrement the index to add a new variable. Default to `-word size`
-    ///
-    /// State should also implement some form of register allocation.
-    pub struct State {
-        pub si: i64,
-        pub asm: ASM,
-        pub env: Env,
-    }
-
-    impl Default for State {
-        fn default() -> Self {
-            State { si: -WORDSIZE, asm: ASM(vec![]), env: env::new() }
-        }
-    }
-
-    impl State {
-        /// Allocate a word on the stack
-        pub fn alloc(&mut self) -> &mut Self {
-            self.si -= WORDSIZE;
-            self
-        }
-    }
 
     /// Clear (mask) all except the least significant 3 tag bits
     pub fn mask() -> Ins {
@@ -890,16 +907,12 @@ pub mod emit {
         body: &[AST],
     ) -> ASM {
         let mut ctx = String::new();
-        s.env.enter();
+
+        s.enter();
 
         for (name, expr) in bindings.iter() {
             let x = eval(s, expr) + Save { r: RAX, si: s.si };
-
-            // TODO: Use something like index * WORDSIZE
-            // here instead of mutating index.
-            s.env.set(name, s.si);
-            s.alloc();
-
+            s.set(name, s.si);
             ctx.push_str(&x.to_string());
         }
 
@@ -908,7 +921,7 @@ pub mod emit {
             ctx.push_str(&x.to_string());
         }
 
-        s.env.leave();
+        s.leave();
         ctx.into()
     }
 
@@ -922,7 +935,7 @@ pub mod emit {
     // into any specific branch here.
     pub fn eval(s: &mut State, prog: &AST) -> ASM {
         match prog {
-            AST::Identifier(i) => match s.env.get(i) {
+            AST::Identifier(i) => match s.get(i) {
                 Some(i) => Ins::Load { r: Register::RAX, si: i }.into(),
                 None => panic!("Undefined variable {}", i),
             },
@@ -981,7 +994,7 @@ pub mod emit {
 /// assembly rather than in scheme. All of them live in this module.
 pub mod primitives {
 
-    use super::emit::State;
+    use super::state::State;
     use super::x86::{Ins::*, Register::*, *};
     use super::*;
 
