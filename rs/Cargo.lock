@@ -47,7 +47,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "inc"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "nom 4.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "quickcheck 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",

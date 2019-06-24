@@ -1,8 +1,13 @@
 [package]
-name = "inc"
-version = "0.1.0"
-authors = ["Jaseem Abid <jaseemabid@gmail.com>"]
-edition = "2018"
+name        = "inc"
+version     = "0.1.1"
+authors     = ["Jaseem Abid <jaseemabid@gmail.com>"]
+edition     = "2018"
+license     = "MIT"
+description = "Incremental approach to compiler construction"
+repository  = "https://github.com/jaseemabid/inc"
+categories  = []
+keywords    = ["compiler", "x86", "scheme"]
 
 [dependencies]
 nom = "^4.2"
