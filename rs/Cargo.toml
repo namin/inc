@@ -10,7 +10,7 @@ categories  = []
 keywords    = ["compiler", "x86", "scheme"]
 
 [dependencies]
-nom = "^4.2"
+nom = "^5.0"
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
 uuid = { version = "0.7", features = ["serde", "v4"] }

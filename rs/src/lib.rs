@@ -3,7 +3,6 @@
 //! Incremental approach to compiler construction.
 //!
 //!
-use nom::types::CompleteByteSlice as S;
 use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
@@ -99,9 +98,40 @@ impl From<&str> for AST {
 pub mod parser {
 
     use super::*;
-    use nom::types::CompleteByteSlice as S;
-    use nom::{self, *};
+    use nom::{
+        branch::alt,
+        bytes::complete::tag,
+        character::complete::*,
+        combinator::{map, opt, value},
+        multi::*,
+        sequence::*,
+        IResult,
+    };
     use std::str;
+
+    pub fn program(i: &str) -> IResult<&str, AST> {
+        delimited(multispace0, alt((let_syntax, datum)), multispace0)(i)
+    }
+
+    // (let-syntax (<syntax binding>*) <expression>+)
+    fn let_syntax(i: &str) -> IResult<&str, AST> {
+        let (i, _) =
+            tuple((char('('), multispace0, tag("let"), multispace1))(i)?;
+        let (i, b) = delimited(char('('), many0(binding), char(')'))(i)?;
+        let (i, e) = delimited(multispace0, many1(program), multispace0)(i)?;
+        let (i, _) = char(')')(i)?;
+
+        Ok((i, AST::Let { bindings: b, body: e }))
+    }
+
+    // named → (name value)
+    fn binding(i: &str) -> IResult<&str, (String, AST)> {
+        let (i, _) = delimited(multispace0, char('('), multispace0)(i)?;
+        let (i, (name, _, value)) = tuple((identifier, multispace0, datum))(i)?;
+        let (i, _) = delimited(multispace0, char(')'), multispace0)(i)?;
+
+        Ok((i, (name, value)))
+    }
 
     // Identifiers may denote variables, keywords, or symbols, depending upon
     // context. They are formed from sequences of letters, digits, and special
@@ -116,26 +146,37 @@ pub mod parser {
     // <subsequent> → <initial> | <digit> | . | + | -
     // <letter>     → a | b | ... | z
     // <digit>      → 0 | 1 | ... | 9
-    //
-    named!(identifier <S , String>, alt!(
-        value!(String::from("+"), tag!("+"))
-      | value!(String::from("-"), tag!("-"))
-      | value!(String::from("..."), tag!("..."))
-      | do_parse!(
-          i: initial >>
-          s: many0!(subsequent) >>
-          (format!("{}{}", i, s.into_iter().collect::<String>())))
-    ));
 
-    named!(initial <S, char>, alt!(letter | symbol));
+    fn identifier(i: &str) -> IResult<&str, String> {
+        alt((
+            value(String::from("+"), tag("+")),
+            value(String::from("-"), tag("-")),
+            value(String::from("..."), tag("...")),
+            map(tuple((initial, many0(subsequent))), |(i, s)| {
+                format!("{}{}", i, s.into_iter().collect::<String>())
+            }),
+        ))(i)
+    }
 
-    named!(subsequent <S, char>, alt!(initial | digit | one_of!(".+-")));
+    fn initial(i: &str) -> IResult<&str, char> {
+        alt((letter, symbol))(i)
+    }
 
-    named!(symbol <S, char>, one_of!("!$%&*/:<=>?~_^"));
+    fn subsequent(i: &str) -> IResult<&str, char> {
+        alt((initial, digit, one_of(".+-")))(i)
+    }
 
-    named!(letter <S, char>, one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"));
+    fn symbol(i: &str) -> IResult<&str, char> {
+        one_of("!$%&*/:<=>?~_^")(i)
+    }
 
-    named!(digit <S, char>, one_of!("0123456789"));
+    fn letter(i: &str) -> IResult<&str, char> {
+        one_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")(i)
+    }
+
+    fn digit(i: &str) -> IResult<&str, char> {
+        one_of("0123456789")(i)
+    }
 
     // Data include booleans, numbers, characters, strings, symbols, lists, and
     // vectors. Case is insignificant in the syntax for booleans, numbers, and
@@ -156,180 +197,136 @@ pub mod parser {
     // <abbreviation>     →  ' <datum> | ` <datum> | , <datum> | ,@ <datum>
     // <vector>           → #(<datum>*)
 
-    named!(sign <S, i64>, alt!(
-        tag!("-") => { |_| -1 } |
-        tag!("+") => { |_|  1 }));
+    fn datum(i: &str) -> IResult<&str, AST> {
+        alt((
+            (map(tag("()"), { |_| AST::Nil })),
+            (map(boolean, { |b| AST::Boolean(b) })),
+            (map(ascii, { |c| AST::Char(c) })),
+            (map(number, { |i| AST::Number(i) })),
+            (map(identifier, { |i| AST::Identifier(i) })),
+            list,
+        ))(i)
+    }
 
-    named!(boolean <S, bool>, alt!(
-        tag!("#t") => { |_| true } |
-        tag!("#f") => { |_| false }));
+    fn boolean(i: &str) -> IResult<&str, bool> {
+        alt((value(true, tag("#t")), value(false, tag("#f"))))(i)
+    }
+
+    fn sign(i: &str) -> IResult<&str, i64> {
+        alt((value(-1, tag("-")), value(1, tag("+"))))(i)
+    }
+
+    fn number(i: &str) -> IResult<&str, i64> {
+        let (i, s) = opt(sign)(i)?;
+        let (i, n) = digit1(i)?;
+
+        // TODO: Propagate this error up rather than panic
+        let n = n.parse::<i64>().expect(
+            &format!("Failed to parse digits into i64: `{:?}`\n", n)[..],
+        );
+
+        Ok((i, s.unwrap_or(1) * n))
+    }
 
     // ASCII Characters for now
-    named!(ascii <S, u8>, alt!(
-
+    fn ascii(i: &str) -> IResult<&str, u8> {
         // $ man ascii
-        value!(9  as u8, tag!(r"#\tab")) |
-        value!(10 as u8, tag!(r"#\newline")) |
-        value!(13 as u8, tag!(r"#\return")) |
-        value!(32 as u8, tag!(r"#\space")) |
-
-        // Picking the first byte is quite unsafe, fix for UTF8
-        preceded!(tag!(r"#\"), map!(take!(1), { |e: S| e.0[0] }))
-    ));
-
-    // This isn't quite right
-    named!(number <S, i64>, do_parse!(
-        s: opt!(sign) >>
-        n: map!(take_while1!(is_digit),
-                { |e: S| str::from_utf8(e.0)
-                   .expect("Failed to parse string into UTF-8")
-                   .parse::<i64>()
-                   .expect(&format!("Failed to parse digits into i64: `{:?}`\n", e.0)[..])
-                }) >>
-            (s.unwrap_or(1) * n)
-    ));
-
-    named!(datum <S, AST>, alt!(
-        value!(AST::Nil, tag!("()"))            |
-        boolean    => { |b| AST::Boolean(b) }   |
-        ascii      => { |c| AST::Char(c) }      |
-        number     => { |i| AST::Number(i) }    |
-        identifier => { |i| AST::Identifier(i) }|
-        list
-    ));
+        alt((
+            value(9 as u8, tag(r"#\tab")),
+            value(10 as u8, tag(r"#\newline")),
+            value(13 as u8, tag(r"#\return")),
+            value(32 as u8, tag(r"#\space")),
+            // Picking the first byte is quite unsafe, fix for UTF8
+            preceded(tag(r"#\"), map(anychar, { |c: char| c as u8 })),
+        ))(i)
+    }
 
     // <list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
-    named!(list <S, AST>, do_parse!(
-        char!('(') >>
-        opt!(many0!(space)) >>
-        d: map!(separated_list!(space, datum),
-                {|ls: Vec<AST> |
-                 if ls.is_empty() {
-                     AST::Nil
-                 } else {
-                     AST::List(ls)
-                 }}) >>
-        opt!(many0!(space)) >>
-        char!(')') >>
-        (d)));
+    fn list(i: &str) -> IResult<&str, AST> {
+        let (i, _) = tuple((char('('), multispace0))(i)?;
+        let (i, elems) = separated_list(multispace1, datum)(i)?;
+        let (i, _) = tuple((multispace0, char(')')))(i)?;
 
-    named!(pub program <S, AST>, do_parse!(
-        e: alt!(let_syntax | datum) >>
-        opt!(many0!(space)) >> (e)));
-
-    // named → (name value)
-    named!(binding <S, (String, AST)>, do_parse!(
-        opt!(many0!(space)) >>
-        char!('(') >>
-        opt!(many0!(space)) >>
-        name: identifier >>
-        opt!(many0!(space)) >>
-        value: datum >>
-        opt!(many0!(space)) >>
-        char!(')') >>
-        opt!(many0!(space)) >>
-        ((name, value))));
-
-    // (let-syntax (<syntax binding>*) <expression>+)
-    named!(let_syntax <S, AST>, do_parse!(
-        char!('(') >>
-        opt!(many0!(space)) >>
-        tag!("let") >>
-        opt!(many0!(space)) >>
-        char!('(') >>
-        b: many0!(binding) >>
-        char!(')') >>
-        opt!(many0!(space)) >>
-        e: many1!(program) >>
-        opt!(many0!(space)) >>
-        char!(')') >>
-      (AST::Let{bindings: b, body: e})));
+        if elems.is_empty() {
+            Ok((i, AST::Nil))
+        } else {
+            Ok((i, AST::List(elems)))
+        }
+    }
 
     #[cfg(test)]
     mod tests {
         use super::*;
 
-        // The complete input is parsed and there is nothing left.
-        const EMPTY: S<'static> = S(b"");
-
         // OK consumes all of the input and succeeds
-        fn ok<T>(t: T) -> Result<(S<'static>, T), nom::Err<S<'static>, u32>> {
-            partial(EMPTY, t)
+        fn ok<T, E>(t: T) -> IResult<&'static str, T, E> {
+            Ok(("", t))
         }
 
         // Partial consumes some of the input and succeeds
-        fn partial<T>(
-            unconsumed: S<'static>,
-            t: T,
-        ) -> Result<(S<'_>, T), nom::Err<S<'_>, u32>> {
-            Ok((unconsumed, t))
+        fn partial<T, E>(rest: &str, t: T) -> IResult<&str, T, E> {
+            Ok((rest, t))
         }
 
         // Fail denotes a parser failing without consuming any of its input
-        fn fail<T>(unconsumed: S<'_>) -> Result<(S<'_>, T), nom::Err<S, u32>> {
-            Err(Err::Error(Context::Code(unconsumed, ErrorKind::Alt)))
+        fn fail<T>(i: &str) -> IResult<&str, T, (&str, nom::error::ErrorKind)> {
+            Err(nom::Err::Error((i, nom::error::ErrorKind::Tag)))
         }
 
         #[test]
         fn assorted() {
-            assert_eq!(ok(true), boolean(S(b"#t")));
-            assert_eq!(ok(false), boolean(S(b"#f")));
-            assert_eq!(fail(S(b"A")), boolean(S(b"A")));
+            assert_eq!(ok(true), boolean("#t"));
+            assert_eq!(ok(false), boolean("#f"));
+            assert_eq!(fail("A"), boolean("A"));
 
-            assert_eq!(ok('?'), symbol(S(b"?")));
+            assert_eq!(ok('?'), symbol("?"));
 
-            assert_eq!(ok(42), number(S(b"42")));
-            assert_eq!(ok(-42), number(S(b"-42")));
+            assert_eq!(ok(42), number("42"));
+            assert_eq!(ok(-42), number("-42"));
 
-            assert_eq!(ok('j' as u8), ascii(S(b"#\\j")));
-            assert_eq!(ok('^' as u8), ascii(S(b"#\\^")));
+            assert_eq!(ok('j' as u8), ascii("#\\j"));
+            assert_eq!(ok('^' as u8), ascii("#\\^"));
 
             // Character parser must not consume anything unless it starts with
             // an explicit tag.
-            assert_eq!(fail(S(b"test")), ascii(S(b"test")));
+            assert_eq!(fail("test"), ascii("test"));
         }
 
         #[test]
         fn identifiers() {
-            assert_eq!(ok(String::from("x")), identifier(S(b"x")));
-            assert_eq!(ok(String::from("one")), identifier(S(b"one")));
-            assert_eq!(ok(String::from("!bang")), identifier(S(b"!bang")));
-            assert_eq!(ok(String::from("a->b")), identifier(S(b"a->b")));
-            assert_eq!(ok(String::from("+")), identifier(S(b"+")));
-            assert_eq!(ok(String::from("-")), identifier(S(b"-")));
-            assert_eq!(ok(String::from("i64")), identifier(S(b"i64")));
+            assert_eq!(ok(String::from("x")), identifier("x"));
+            assert_eq!(ok(String::from("one")), identifier("one"));
+            assert_eq!(ok(String::from("!bang")), identifier("!bang"));
+            assert_eq!(ok(String::from("a->b")), identifier("a->b"));
+            assert_eq!(ok(String::from("+")), identifier("+"));
+            assert_eq!(ok(String::from("-")), identifier("-"));
+            assert_eq!(ok(String::from("i64")), identifier("i64"));
 
             // -> is not an identifier, consume the - as an id and return the >
-            assert_eq!(
-                partial(S(b">"), String::from("-")),
-                identifier(S(b"->"))
-            );
+            assert_eq!(partial(">", String::from("-")), identifier("->"));
 
             // Identifiers must split at space and not consume anything
             // afterwards
-            assert_eq!(
-                partial(S(b" b"), String::from("a")),
-                identifier(S(b"a b"))
-            );
+            assert_eq!(partial(" b", String::from("a")), identifier("a b"));
         }
 
         // #[test]
         // fn unicode() {
-        //     assert_eq!(fail(S(b"അ")), identifier(S(b"അ")))
+        //     assert_eq!(fail(("അ")), identifier(("അ")))
         // }
 
         #[test]
         fn data() {
-            assert_eq!(ok(AST::Nil), datum(S(b"()")));
-            assert_eq!(ok("one".into()), datum(S(b"one")));
-            assert_eq!(ok(42.into()), datum(S(b"42")))
+            assert_eq!(ok(AST::Nil), datum("()"));
+            assert_eq!(ok("one".into()), datum("one"));
+            assert_eq!(ok(42.into()), datum("42"))
         }
 
         #[test]
         fn lists() {
             assert_eq!(
                 ok(AST::List(vec!["+".into(), 1.into()])),
-                list(S(b"(+ 1)"))
+                list("(+ 1)")
             );
 
             assert_eq!(
@@ -341,7 +338,7 @@ pub mod parser {
                     "b".into(),
                     "c".into()
                 ])),
-                list(S(b"(1 2 3 a b c)"))
+                list("(1 2 3 a b c)")
             );
 
             assert_eq!(
@@ -349,18 +346,18 @@ pub mod parser {
                     "inc".into(),
                     AST::List(vec!["inc".into(), 42.into()]),
                 ],)),
-                list(S(b"(inc (inc 42))"))
+                list("(inc (inc 42))")
             );
 
             // Lists should throw away all spaces in between
-            assert_eq!(program(S(b"(   +   1 )")), program(S(b"(+ 1)")));
+            assert_eq!(program("(   +   1 )"), program("(+ 1)"));
         }
 
         #[test]
         fn binary() {
             assert_eq!(
                 ok(AST::List(vec!["+".into(), "x".into(), 1776.into()])),
-                list(S(b"(+ x 1776)"))
+                list("(+ x 1776)")
             );
 
             assert_eq!(
@@ -369,27 +366,27 @@ pub mod parser {
                     "x".into(),
                     AST::List(vec!["*".into(), "a".into(), "b".into()],),
                 ],)),
-                list(S(b"(+ x (* a b))"))
+                list("(+ x (* a b))")
             );
         }
 
         #[test]
         fn top() {
-            assert_eq!(ok(true.into()), program(S(b"#t")));
-            assert_eq!(ok(false.into()), program(S(b"#f")));
+            assert_eq!(ok(true.into()), program("#t"));
+            assert_eq!(ok(false.into()), program("#f"));
 
-            assert_eq!(ok('?'.into()), program(S(b"#\\?")));
+            assert_eq!(ok('?'.into()), program("#\\?"));
 
-            assert_eq!(ok(42.into()), program(S(b"42")));
-            assert_eq!(ok((-42).into()), program(S(b"-42")));
+            assert_eq!(ok(42.into()), program("42"));
+            assert_eq!(ok((-42).into()), program("-42"));
 
-            assert_eq!(ok('j'.into()), program(S(b"#\\j")));
-            assert_eq!(ok('^'.into()), program(S(b"#\\^")));
+            assert_eq!(ok('j'.into()), program("#\\j"));
+            assert_eq!(ok('^'.into()), program("#\\^"));
         }
 
         #[test]
         fn let_binding() {
-            let prog = S(b"(let ((x 1) (y 2)) (+ x y))");
+            let prog = "(let ((x 1) (y 2)) (+ x y))";
 
             let exp = AST::Let {
                 bindings: vec![
@@ -1253,13 +1250,13 @@ impl FromStr for AST {
     type Err = Error;
 
     fn from_str(program: &str) -> Result<Self, Error> {
-        match parser::program(S(program.as_bytes())) {
+        match parser::program(program) {
             Ok((_rest, ast)) => Ok(ast),
             // Ok((parser::EMPTY, ast)) => Ok(ast),
             // Ok((_rest, _ast)) => Err(Error {
             //     message: String::from("All of input not consumed"),
             // }),
-            Err(e) => Err(Error { message: format!("{}", e) }),
+            Err(e) => Err(Error { message: format!("{:?}", e) }),
         }
     }
 }
