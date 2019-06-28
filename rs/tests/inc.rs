@@ -2,7 +2,7 @@
 extern crate inc;
 
 use inc::*;
-use std::{fs, process::Command};
+use std::fs;
 use uuid::Uuid;
 
 #[cfg(test)]
@@ -268,23 +268,9 @@ fn config(program: String) -> Config {
 }
 
 // Build an executable with generated asm
-fn build(mut config: &mut Config) -> bool {
-    inc::compile(&mut config).unwrap();
-
-    Command::new("clang")
-        .arg("-m64")
-        .arg("-g3")
-        .arg("-ggdb3")
-        .arg("-fomit-frame-pointer")
-        .arg("-fno-asynchronous-unwind-tables")
-        .arg("-O0")
-        .arg("runtime.c")
-        .arg(&config.asm())
-        .arg("-o")
-        .arg(&config.output)
-        .status()
-        .expect("Failed to compile binary")
-        .success()
+fn build(config: &Config) -> bool {
+    inc::cli::compile(&config).unwrap();
+    inc::cli::build(&config)
 }
 
 // Run a single test, assert everything and cleanup afterwards
@@ -296,16 +282,7 @@ fn test1(input: &str, output: &str) {
     assert!(build(&mut config));
 
     // Run the generated binary and assert output
-    let proc = Command::new(&config.output)
-        .output()
-        .expect(&format!("Failed to run binary `{}`", &config.output));
-
-    assert!(
-        &proc.status.success(),
-        format!("Failed to run binary `{}`", &config.output)
-    );
-
-    assert_eq!(String::from_utf8(proc.stdout).unwrap().trim(), output);
+    assert_eq!(inc::cli::run(&config).unwrap(), output);
 
     // Clean up all the intermediary files generated
     fs::remove_file(&config.asm())
