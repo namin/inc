@@ -210,9 +210,9 @@ impl fmt::Display for Ins {
                     };
                 write!(f, "{}", op)
             }
-            Ins::Je(l) => writeln!(f, "    je {}", l),
-            Ins::Jmp(l) => writeln!(f, "    jmp {}", l),
-            Ins::Label(l) => writeln!(f, "{}", label(l)),
+            Ins::Je(l) => writeln!(f, "    je {}", label(l)),
+            Ins::Jmp(l) => writeln!(f, "    jmp {}", label(l)),
+            Ins::Label(l) => writeln!(f, "{}:", label(l)),
             Ins::Leave => {
                 let op = Ins::Pop(Register::RBP) + Ins::Ret;
                 writeln!(f, "{}", op)
@@ -304,12 +304,12 @@ impl Add<Ins> for Ins {
 /// Label is a target to jump to
 #[cfg(target_os = "macos")]
 fn label(label: &str) -> String {
-    format!("_{}:", label)
+    format!("_{}", label)
 }
 
 #[cfg(target_os = "linux")]
 fn label(label: &str) -> String {
-    format!("{}:", label)
+    format!("{}", label)
 }
 
 /// Stack address relative to base pointer
