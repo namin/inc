@@ -30,7 +30,7 @@ pub fn parse() -> Config {
     Config { program, output }
 }
 
-/// Top level API for the compiler to be used by main
+/// Compile the program and write the assembly to target
 pub fn compile(config: &Config) -> Result<(), std::io::Error> {
     let prog: AST =
         config.program.parse::<AST>().expect("Failed to parse input program");
@@ -41,6 +41,7 @@ pub fn compile(config: &Config) -> Result<(), std::io::Error> {
     handler.write_all(emit::program(&prog).as_bytes())
 }
 
+/// Build the generated ASM with clang into executable binary
 pub fn build(config: &Config) -> bool {
     Command::new("clang")
         .arg("-m64")
@@ -58,7 +59,7 @@ pub fn build(config: &Config) -> bool {
         .success()
 }
 
-// Run the generated binary and assert output
+/// Run the generated binary and return output
 pub fn run(config: &Config) -> Result<String, std::io::Error> {
     let proc = Command::new(&config.output)
         .output()

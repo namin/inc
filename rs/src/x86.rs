@@ -1,38 +1,66 @@
 //! A thin wrapper around x86 assembly.
 //!
-//! This module should be a general purpose x86 library without importing
-//! anything else from the rest of the compiler.
-
+//! A general purpose x86 library without importing anything else from the rest
+//! of the compiler.
+//!
+//! # Getting started
+//!
+//! The easiest way to learn assembly is to write very simple C programs and
+//! look at the generated code. Clang and GCC support `-S` flag to output the
+//! assembly instead of a binary executable.
+//!
+//! # Syntax
+//!
+//! Intel syntax is used everywhere instead of AT&T, which is so much more
+//! painful to read.
+//!
+//! 1. [x86 assembly language | Syntax](https://en.wikipedia.org/wiki/X86_assembly_language#Syntax)
+//! 2. [AT&T Syntax versus Intel Syntax](https://www.cs.cmu.edu/afs/cs/academic/class/15213-f01/docs/gas-notes.txt)
+//!
+//! # Portability
+//!
+//! This should work on osx and Linux. Platform specific code is annotated and
+//! picked at compile time where possible.
+//!
+//! 1. [Writing 64 Bit Assembly on Mac OS X](https://www.idryman.org/blog/2014/12/02/writing-64-bit-assembly-on-mac-os-x)
+//!
 use std::fmt;
 use std::ops::{Add, AddAssign};
 
-/// ASM is a list of instructions.
-///
-/// `Display` trait converts this type to valid code that can be compiled
-/// and executed. For now this is pretty dumb, but over time this could be
-/// made into something a lot smarter and safe rather than concatenating so
-/// many tiny strings together.
+/// Word size of the architecture
+pub const WORDSIZE: i64 = 8;
+
+/// ASM represents a list of instructions
 #[derive(Clone)]
 pub struct ASM(pub Vec<Ins>);
 
-pub const WORDSIZE: i64 = 8;
-
+/// An x86 register
+///
+/// See [X86 Assembly/X86
+/// Architecture](https://en.wikibooks.org/wiki/X86_Assembly/X86_Architecture)
+/// for docs.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Register {
+    /// Accumulator (AX)
     RAX,
+    /// Base Register (BX)
     RBX,
+    /// Counter register (CX)
     RCX,
+    /// Data register (DX)
     RDX,
+    /// Stack Pointer (SP)
     RSP,
+    /// Stack Base Pointer (BP)
     RBP,
 }
 
-/// Operand is a register, address or a constant; the argument to several
-/// instructions.
+/// Operand is a register, address or a constant; the argument to instructions
+/// that work with memory references
 ///
-/// This is an extremely simplified view of the reality; `mov` alone with
-/// the address access semantics x86 supports is Turning Complete.
-/// https://esolangs.org/wiki/Mov
+/// Mirrors the equivalent LLVM construct. This is an *extremely* simplified
+/// view of the reality; `mov` alone with the address access semantics x86
+/// supports is Turning Complete. https://esolangs.org/wiki/Mov
 #[derive(Debug, Clone)]
 pub enum Operand {
     Const(i64),
@@ -40,7 +68,7 @@ pub enum Operand {
     Stack(i64),
 }
 
-/// Each x86 instruction this compiler understands.
+/// Each x86 instruction this compiler understands
 ///
 /// This type fundamentally limits what code can be generated and ideally no
 /// other part of the compiler should generate ASM with strings.
@@ -208,7 +236,12 @@ impl fmt::Display for Ins {
     }
 }
 
-/// Collect all the bits and pieces together into valid assembly
+/// `Display` trait converts `ASM` to valid x86 assembly that can be compiled
+/// and executed.
+///
+/// For now this is pretty dumb, but over time this could be made into something
+/// a lot smarter and safe rather than concatenating so many tiny strings
+/// together.
 impl fmt::Display for ASM {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut ctx = String::new();
@@ -268,6 +301,7 @@ impl Add<Ins> for Ins {
 
 // ¶ Module helpers
 
+/// Label is a target to jump to
 #[cfg(target_os = "macos")]
 fn label(label: &str) -> String {
     format!("_{}:", label)
@@ -278,7 +312,7 @@ fn label(label: &str) -> String {
     format!("{}:", label)
 }
 
-/// Stack gives stack address relative to base pointer
+/// Stack address relative to base pointer
 pub fn stack(si: i64) -> String {
     match si {
         index if index > 0 => format!("[rbp + {}]", index),

@@ -1,25 +1,28 @@
 //! Core types shared by most of the program
 
-/// The LISP AST
-///
-/// The canonical type to represent lisp programs. The parser parses the input
-/// program to generate an AST. See tests for several examples.
-//
+/// The canonical type to represent a lisp program.
+
+/// The parser parses the input program to generate an AST. See tests for
+/// several examples.
 // TODO: Implement `Display` trait to pretty print the AST
 #[derive(Debug, PartialEq)]
 pub enum AST {
+    /// An empty list `()`
     Nil,
+    /// 61b number with a 3bit tag
     Number(i64),
+    /// #t & #f
     Boolean(bool),
     /// A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     /// word; so this implementation makes sense only for ASCII.
     Char(u8),
+    /// Scheme Identifiers
     Identifier(String),
     /// Since Rust needs to know the size of the AST type upfront, we need an
     /// indirection here with `Vec<>` for recursive types. In this context, Vec
     /// is just a convenient way to have a `Box<[AST]>`
     List(Vec<AST>),
-
+    /// Variable bindings
     Let {
         bindings: Vec<(String, AST)>,
         body: Vec<AST>,

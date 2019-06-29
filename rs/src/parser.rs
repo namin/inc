@@ -1,10 +1,12 @@
 //! A scheme parser in nom.
 //!
-//! See http://www.scheme.com/tspl2d/grammar.html for formal grammar
-//! specification. This module tries to describe this BNF grammar in Rust as
-//! closely as posible using the nom parser combinator library.
+//! Describes the [formal BNF
+//! grammar](http://www.scheme.com/tspl2d/grammar.html) in Rust as closely as
+//! possible using the nom parser combinator library.
 //!
-//! Ported from https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs
+//! See
+//! [lisper](https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs)
+//! for a similar Haskell implementation.
 //!
 use super::core::*;
 use nom::{
