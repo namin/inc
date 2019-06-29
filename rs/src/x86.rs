@@ -261,6 +261,13 @@ impl AddAssign<Ins> for ASM {
     }
 }
 
+/// Syntax sugar for concatenating two ASM objects Ex: `asm += asm`
+impl AddAssign<ASM> for ASM {
+    fn add_assign(&mut self, asm: ASM) {
+        self.0.extend(asm.0.clone())
+    }
+}
+
 /// Add operations to ASM with overloaded `asm' = asm + op`.
 ///
 /// NOTE: This is pretty inefficient due to copying of self.
