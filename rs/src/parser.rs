@@ -167,6 +167,7 @@ fn list(i: &str) -> IResult<&str, AST> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::AST::*;
 
     // OK consumes all of the input and succeeds
     fn ok<T, E>(t: T) -> IResult<&'static str, T, E> {
@@ -227,17 +228,17 @@ mod tests {
 
     #[test]
     fn data() {
-        assert_eq!(ok(AST::Nil), datum("()"));
+        assert_eq!(ok(Nil), datum("()"));
         assert_eq!(ok("one".into()), datum("one"));
         assert_eq!(ok(42.into()), datum("42"))
     }
 
     #[test]
     fn lists() {
-        assert_eq!(ok(AST::List(vec!["+".into(), 1.into()])), list("(+ 1)"));
+        assert_eq!(ok(List(vec!["+".into(), 1.into()])), list("(+ 1)"));
 
         assert_eq!(
-            ok(AST::List(vec![
+            ok(List(vec![
                 1.into(),
                 2.into(),
                 3.into(),
@@ -249,10 +250,7 @@ mod tests {
         );
 
         assert_eq!(
-            ok(AST::List(vec![
-                "inc".into(),
-                AST::List(vec!["inc".into(), 42.into()]),
-            ],)),
+            ok(List(vec!["inc".into(), List(vec!["inc".into(), 42.into()]),],)),
             list("(inc (inc 42))")
         );
 
@@ -263,15 +261,15 @@ mod tests {
     #[test]
     fn binary() {
         assert_eq!(
-            ok(AST::List(vec!["+".into(), "x".into(), 1776.into()])),
+            ok(List(vec!["+".into(), "x".into(), 1776.into()])),
             list("(+ x 1776)")
         );
 
         assert_eq!(
-            ok(AST::List(vec![
+            ok(List(vec![
                 "+".into(),
                 "x".into(),
-                AST::List(vec!["*".into(), "a".into(), "b".into()],),
+                List(vec!["*".into(), "a".into(), "b".into()],),
             ],)),
             list("(+ x (* a b))")
         );
@@ -295,20 +293,34 @@ mod tests {
     fn let_binding() {
         let prog = "(let ((x 1) (y 2)) (+ x y))";
 
-        let exp = AST::Let {
+        let exp = Let {
             bindings: vec![
-                ("x".to_string(), AST::Number(1)),
-                ("y".to_string(), AST::Number(2)),
+                ("x".to_string(), Number(1)),
+                ("y".to_string(), Number(2)),
             ],
-            body: vec![AST::List(vec![
-                AST::Identifier("+".to_string()),
-                AST::Identifier("x".to_string()),
-                AST::Identifier("y".to_string()),
+            body: vec![List(vec![
+                Identifier("+".to_string()),
+                Identifier("x".to_string()),
+                Identifier("y".to_string()),
             ])],
         };
 
         assert_eq!(ok(exp), program(prog));
     }
+
+    #[test]
+    fn if_syntax() {
+        let prog = "(if #t 12 13)";
+        let exp = List(vec![
+            Identifier(String::from("if")),
+            Boolean(true),
+            Number(12),
+            Number(13),
+        ]);
+
+        assert_eq!(ok(exp), program(prog));
+    }
+
 }
 
 /// Parse the input from user into the form the top level of the compiler

@@ -23,10 +23,7 @@ pub enum AST {
     /// is just a convenient way to have a `Box<[AST]>`
     List(Vec<AST>),
     /// Variable bindings
-    Let {
-        bindings: Vec<(String, AST)>,
-        body: Vec<AST>,
-    },
+    Let { bindings: Vec<(String, AST)>, body: Vec<AST> },
 }
 
 /// Idiomatic type conversions from the primitive types to AST
