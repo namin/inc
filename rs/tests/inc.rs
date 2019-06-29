@@ -257,6 +257,54 @@ mod bindings {
 
 }
 
+// Step 6. Conditionals
+mod cond {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let tests = [
+            ("(if #t 12 13)", "12"),
+            ("(if #f 12 13)", "13"),
+            ("(if 0 12 13)", "12"),
+            ("(if () 43 ())", "43"),
+            ("(if #t (if 12 13 4) 17)", "13"),
+            ("(if #f 12 (if #f 13 4))", "4"),
+            ("(if #\\X (if 1 2 3) (if 4 5 6))", "2"),
+            ("(if (not (boolean? #t)) 15 (boolean? #f))", "#t"),
+            (
+                "(if (if (char? #\\a) (boolean? #\\b) (fixnum? #\\c)) 119 -23)",
+                "-23",
+            ),
+            ("(if (if (if (not 1) (not 2) (not 3)) 4 5) 6 7)", "6"),
+            ("(if (not (if (if (not 1) (not 2) (not 3)) 4 5)) 6 7)", "7"),
+            (
+                "(not (if (not (if (if (not 1) (not 2) (not 3)) 4 5)) 6 7))",
+                "#f",
+            ),
+            ("(if (char? 12) 13 14)", "14"),
+            ("(if (char? #\\a) 13 14)", "13"),
+            ("(inc (if (dec 1) (dec 13) 14))", "13"),
+            // conditionals
+            ("(if (= 12 13) 12 13)", "13"),
+            ("(if (= 12 12) 13 14)", "13"),
+            ("(if (< 12 13) 12 13)", "12"),
+            ("(if (< 12 12) 13 14)", "14"),
+            ("(if (< 13 12) 13 14)", "14"),
+            ("(if (<= 12 13) 12 13)", "12"),
+            ("(if (<= 12 12) 12 13)", "12"),
+            ("(if (<= 13 12) 13 14)", "14"),
+            ("(if (> 12 13) 12 13)", "13"),
+            ("(if (> 12 12) 12 13)", "13"),
+            ("(if (> 13 12) 13 14)", "13"),
+            ("(if (>= 12 13) 12 13)", "13"),
+            ("(if (>= 12 12) 12 13)", "12"),
+            ("(if (>= 13 12) 13 14)", "13"),
+        ];
+        test_many(&tests)
+    }
+}
+
 // Get a test config with program as input
 fn config(program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
@@ -273,6 +321,12 @@ fn build(config: &Config) -> bool {
     inc::cli::build(&config)
 }
 
+fn test_many(tests: &[(&str, &str)]) {
+    for (inp, out) in tests.iter() {
+        test1(inp, out);
+    }
+}
+
 // Run a single test, assert everything and cleanup afterwards
 fn test1(input: &str, output: &str) {
     // Create a fresh config per run, this should allow for parallelism later.
@@ -282,7 +336,13 @@ fn test1(input: &str, output: &str) {
     assert!(build(&mut config));
 
     // Run the generated binary and assert output
-    assert_eq!(inc::cli::run(&config).unwrap(), output);
+    assert_eq!(
+        inc::cli::run(&config).unwrap(),
+        output,
+        "Failed: {} != {}",
+        input,
+        output
+    );
 
     // Clean up all the intermediary files generated
     fs::remove_file(&config.asm())

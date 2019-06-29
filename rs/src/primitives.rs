@@ -34,50 +34,41 @@ pub fn dec(s: &mut State, x: &AST) -> ASM {
 pub fn fixnump(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
-        + Cmp { r: RAX, with: immediate::NUM }
-        + emit::cmp_bool()
+        + compare(Reg(RAX), Const(immediate::NUM), "sete")
 }
 
 /// Is the expression a boolean?
 pub fn booleanp(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
-        + Cmp { r: RAX, with: immediate::BOOL }
-        + emit::cmp_bool()
+        + compare(Reg(RAX), Const(immediate::BOOL), "sete")
 }
 
 /// Is the expression a char?
 pub fn charp(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
-        + Cmp { r: RAX, with: immediate::CHAR }
-        + emit::cmp_bool()
+        + compare(Reg(RAX), Const(immediate::CHAR), "sete")
 }
 
 /// Is the expression null?
 pub fn nullp(s: &mut State, expr: &AST) -> ASM {
-    emit::eval(s, expr)
-        + Cmp { r: RAX, with: immediate::NIL }
-        + emit::cmp_bool()
+    emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NIL), "sete")
 }
 
 /// Is the expression zero?
 pub fn zerop(s: &mut State, expr: &AST) -> ASM {
-    emit::eval(s, expr)
-        + Cmp { r: RAX, with: immediate::NUM }
-        + emit::cmp_bool()
+    emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NUM), "sete")
 }
 
 /// Logical not
 pub fn not(s: &mut State, expr: &AST) -> ASM {
-    emit::eval(s, expr)
-        + Cmp { r: RAX, with: immediate::FALSE }
-        + emit::cmp_bool()
+    emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::FALSE), "sete")
 }
 
 // Binary Primitives
 
-/// Evaluate arguments for a binary primitive and store them in stack
+/// Evaluate arguments and store the first argument in stack and second in `RAX`
 fn binop(s: &mut State, x: &AST, y: &AST) -> ASM {
     emit::eval(s, x) + Save { r: RAX, si: s.si } + emit::eval(s, y)
 }
@@ -140,4 +131,45 @@ pub fn remainder(s: &mut State, x: &AST, y: &AST) -> ASM {
     div(s, x, y)
         + Mov { to: Reg(RAX), from: Reg(RDX) }
         + Sal { r: RAX, v: immediate::SHIFT }
+}
+
+/// Compares the first operand with the second with `SETcc`
+// See `Ins::Cmp` to see how the compare instruction works.
+//
+// `SETcc` sets the destination operand to 0 or 1 depending on the settings of
+// the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
+//
+// `MOVZX` copies the contents of the source operand (register or memory
+// location) to the destination operand (register) and zero extends the value.
+fn compare(a: Operand, b: Operand, setcc: &str) -> ASM {
+    Cmp { a, b }
+        + Slice(format!("    {} al\n", setcc))
+        + Slice("    movzx rax, al\n".to_string())
+        + Slice(format!("    sal al, {}\n", immediate::SHIFT))
+        + Slice(format!("    or al, {}\n", immediate::BOOL))
+}
+
+/// Logical eq
+pub fn eq(s: &mut State, x: &AST, y: &AST) -> ASM {
+    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "sete")
+}
+
+/// Logical <
+pub fn lt(s: &mut State, x: &AST, y: &AST) -> ASM {
+    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setl")
+}
+
+/// Logical >
+pub fn gt(s: &mut State, x: &AST, y: &AST) -> ASM {
+    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setg")
+}
+
+/// Logical <=
+pub fn lte(s: &mut State, x: &AST, y: &AST) -> ASM {
+    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setle")
+}
+
+/// Logical >=
+pub fn gte(s: &mut State, x: &AST, y: &AST) -> ASM {
+    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setge")
 }

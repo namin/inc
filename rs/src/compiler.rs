@@ -15,12 +15,13 @@ pub mod state {
     pub struct State {
         pub si: i64,
         pub asm: ASM,
+        li: u64,
         env: Env,
     }
 
     impl Default for State {
         fn default() -> Self {
-            State { si: -WORDSIZE, asm: ASM(vec![]), env: new() }
+            State { si: -WORDSIZE, asm: ASM(vec![]), li: 0, env: new() }
         }
     }
 
@@ -51,8 +52,13 @@ pub mod state {
         fn alloc(&mut self) {
             self.si -= WORDSIZE;
         }
-    }
 
+        /// Generate a unique label for jump targets.
+        pub fn gen_label(&mut self) -> String {
+            self.li += 1;
+            format!("L_{}", self.li)
+        }
+    }
     // Environment is an *ordered* list of bindings.
     #[derive(Debug)]
     struct Env(Vec<HashMap<String, i64>>);
@@ -147,21 +153,6 @@ pub mod emit {
         And { r: RAX, v: Const(immediate::MASK) }
     }
 
-    /// Convert the result in RAX into a boolean
-    pub fn cmp_bool() -> ASM {
-        // SETE sets the destination operand to 0 or 1 depending on the settings
-        // of the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
-        (String::from("    sete al \n") +
-
-         // MOVZX copies the contents of the source operand (register or
-         // memory location) to the destination operand (register) and zero
-         // extends the value.
-         "    movzx rax, al \n" +
-         &format!("    sal al, {} \n", immediate::SHIFT) +
-         &format!("    or al, {} \n", immediate::BOOL))
-            .into()
-    }
-
     /// Emit code for a let expression
     ///
     /// A new environment is created to hold the bindings, which map the name to
@@ -170,7 +161,6 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-
     pub fn binding(
         s: &mut State,
         bindings: &[(String, AST)],
@@ -193,6 +183,21 @@ pub mod emit {
 
         s.leave();
         ctx.into()
+    }
+
+    /// Emit code for a conditional expression
+    pub fn cond(s: &mut State, predicate: &AST, then: &AST, alt: &AST) -> ASM {
+        let alt_label = s.gen_label();
+        let exit_label = s.gen_label();
+
+        eval(s, predicate)
+            + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
+            + Ins::Je(alt_label.clone())
+            + eval(s, then)
+            + Ins::Jmp(exit_label.clone())
+            + Ins::Label(alt_label)
+            + eval(s, alt)
+            + Ins::Label(exit_label)
     }
 
     /// Evaluate an expression into RAX
@@ -231,8 +236,17 @@ pub mod emit {
                     "*" => primitives::mul(s, x, y),
                     "/" => primitives::quotient(s, x, y),
                     "%" => primitives::remainder(s, x, y),
-
+                    "=" => primitives::eq(s, x, y),
+                    ">" => primitives::gt(s, x, y),
+                    "<" => primitives::lt(s, x, y),
+                    ">=" => primitives::gte(s, x, y),
+                    "<=" => primitives::lte(s, x, y),
                     n => panic!("Unknown binary primitive: {}", n),
+                },
+
+                [Identifier(name), x, y, z] => match &name[..] {
+                    "if" => cond(s, x, y, z),
+                    n => panic!("Unknown ternary primitive: {}", n),
                 },
 
                 l => panic!("Unknown expression: {:?}", l),
