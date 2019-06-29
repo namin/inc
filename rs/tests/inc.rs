@@ -1,7 +1,7 @@
 // Integration tests
 extern crate inc;
 
-use inc::*;
+use inc::core::*;
 use std::fs;
 use uuid::Uuid;
 
