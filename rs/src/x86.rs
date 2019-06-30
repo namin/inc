@@ -169,24 +169,25 @@ impl From<&str> for Ins {
     }
 }
 
+impl From<String> for Ins {
+    fn from(s: String) -> Self {
+        Ins::Slice(s)
+    }
+}
+
+/// Concat Ins to get ASM; `asm = op + op`
+impl Add<Ins> for Ins {
+    type Output = ASM;
+
+    fn add(self, op: Ins) -> ASM {
+        ASM { 0: vec![self, op] }
+    }
+}
+
 /// Convert a single operation to ASM
 impl From<Ins> for ASM {
     fn from(op: Ins) -> Self {
         ASM { 0: vec![op] }
-    }
-}
-
-/// Convert a String to ASM
-impl From<String> for ASM {
-    fn from(s: String) -> Self {
-        ASM { 0: vec![Ins::Slice(s)] }
-    }
-}
-
-/// Convert a string literal to ASM
-impl From<&str> for ASM {
-    fn from(s: &str) -> Self {
-        ASM { 0: vec![Ins::Slice(s.to_string())] }
     }
 }
 
@@ -306,17 +307,6 @@ impl Add<ASM> for ASM {
     }
 }
 
-/// Concat Ins to get ASM; `asm = op + op`
-///
-/// NOTE: This is pretty inefficient due to copying both arguments.
-impl Add<Ins> for Ins {
-    type Output = ASM;
-
-    fn add(self, op: Ins) -> ASM {
-        ASM { 0: vec![self, op] }
-    }
-}
-
 // ¶ Module helpers
 
 /// Label is a target to jump to
@@ -341,25 +331,19 @@ pub fn stack(si: i64) -> String {
 
 #[cfg(target_os = "macos")]
 pub fn function_header(name: &str) -> ASM {
-    let mut ctx = String::new();
-
-    ctx.push_str("    .section __TEXT,__text\n");
-    ctx.push_str("    .intel_syntax noprefix\n");
-    ctx.push_str(&format!("    .globl _{}\n", &name));
-    ctx.push_str(&Ins::Label(String::from(name)).to_string());
-    ctx.into()
+    Ins::from("    .section __TEXT,__text\n")
+        + Ins::from("    .intel_syntax noprefix\n")
+        + Ins::from(format!("    .globl _{}\n", &name))
+        + Ins::Label(name.to_string())
 }
 
 #[cfg(target_os = "linux")]
 pub fn function_header(name: &str) -> ASM {
-    let mut ctx = String::new();
-
-    ctx.push_str("    .text\n");
-    ctx.push_str("    .intel_syntax noprefix\n");
-    ctx.push_str(&format!("    .globl {}\n", &name));
-    ctx.push_str(&format!("    .type {}, @function\n", &name));
-    ctx.push_str(&Ins::Label(String::from(name)).to_string());
-    ctx.into()
+    Ins::from("    .text\n")
+        + Ins::from("    .intel_syntax noprefix\n")
+        + Ins::from(format!("    .globl {}\n", &name))
+        + Ins::from(format!("    .type {}, @function\n", &name))
+        + Ins::Label(name.to_string())
 }
 
 #[cfg(test)]

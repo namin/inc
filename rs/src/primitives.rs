@@ -110,17 +110,14 @@ pub fn mul(s: &mut State, x: &AST, y: &AST) -> ASM {
 // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
 // argument. the quotient is stored in RAX and the remainder in RDX.
 fn div(s: &mut State, x: &AST, y: &AST) -> ASM {
-    let mut ctx = String::new();
-
-    ctx.push_str(&(emit::eval(s, y).to_string()));
-    ctx.push_str(&Ins::Sar { r: RAX, v: immediate::SHIFT }.to_string());
-    ctx.push_str("    mov rcx, rax \n");
-    ctx.push_str(&emit::eval(s, x).to_string());
-    ctx.push_str(&Ins::Sar { r: RAX, v: immediate::SHIFT }.to_string());
-    ctx.push_str("    mov rdx, 0 \n");
-    ctx.push_str("    cqo \n");
-    ctx.push_str("    idiv rcx \n");
-    ctx.into()
+    emit::eval(s, y)
+        + Ins::Sar { r: RAX, v: immediate::SHIFT }
+        + Ins::Mov { to: Reg(RCX), from: Reg(RAX) }
+        + emit::eval(s, x)
+        + Ins::Sar { r: RAX, v: immediate::SHIFT }
+        + Ins::Mov { to: Reg(RDX), from: Const(0) }
+        + Ins::from("    cqo \n")
+        + Ins::from("    idiv rcx \n")
 }
 
 pub fn quotient(s: &mut State, x: &AST, y: &AST) -> ASM {
@@ -143,10 +140,10 @@ pub fn remainder(s: &mut State, x: &AST, y: &AST) -> ASM {
 // location) to the destination operand (register) and zero extends the value.
 fn compare(a: Operand, b: Operand, setcc: &str) -> ASM {
     Cmp { a, b }
-        + Slice(format!("    {} al\n", setcc))
-        + Slice("    movzx rax, al\n".to_string())
-        + Slice(format!("    sal al, {}\n", immediate::SHIFT))
-        + Slice(format!("    or al, {}\n", immediate::BOOL))
+        + Ins::from(format!("    {} al\n", setcc))
+        + Ins::from("    movzx rax, al\n")
+        + Ins::from(format!("    sal al, {}\n", immediate::SHIFT))
+        + Ins::from(format!("    or al, {}\n", immediate::BOOL))
 }
 
 /// Logical eq

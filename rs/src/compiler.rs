@@ -161,28 +161,22 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-    pub fn binding(
-        s: &mut State,
-        bindings: &[(String, AST)],
-        body: &[AST],
-    ) -> ASM {
-        let mut ctx = String::new();
+    pub fn binding(s: &mut State, vars: &[(String, AST)], body: &[AST]) -> ASM {
+        let mut asm = ASM(vec![]);
 
         s.enter();
 
-        for (name, expr) in bindings.iter() {
-            let x = eval(s, expr) + Save { r: RAX, si: s.si };
+        for (name, expr) in vars.iter() {
+            asm += eval(s, expr) + Save { r: RAX, si: s.si };
             s.set(name, s.si);
-            ctx.push_str(&x.to_string());
         }
 
         for b in body.iter() {
-            let x = eval(s, &b);
-            ctx.push_str(&x.to_string());
+            asm += eval(s, &b);
         }
 
         s.leave();
-        ctx.into()
+        asm
     }
 
     /// Emit code for a conditional expression
