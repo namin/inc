@@ -305,6 +305,51 @@ mod cond {
     }
 }
 
+// Step 7: Pairs in heap
+mod heap {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let tests = [
+            ("(pair? (cons 1 2))", "#t"),
+            ("(pair? (cons 1 2))", "#t"),
+            ("(pair? 12)", "#f"),
+            ("(pair? #t)", "#f"),
+            ("(pair? #f)", "#f"),
+            ("(pair? ())", "#f"),
+            ("(fixnum? (cons 12 43))", "#f"),
+            ("(boolean? (cons 12 43))", "#f"),
+            ("(null? (cons 12 43))", "#f"),
+            ("(not (cons 12 43))", "#f"),
+            ("(if (cons 12 43) 32 43)", "32"),
+            ("(car (cons 1 23))", "1"),
+            ("(cdr (cons 43 123))", "123"),
+            ("(car (car (cons (cons 12 3) (cons #t #f))))", "12"),
+            ("(cdr (car (cons (cons 12 3) (cons #t #f))))", "3"),
+            ("(car (cdr (cons (cons 12 3) (cons #t #f))))", "#t"),
+            ("(cdr (cdr (cons (cons 12 3) (cons #t #f))))", "#f"),
+            ("(let
+                 ((x (let
+                        ((y (+ 1 2)))
+                       (* y y))))
+                (cons x (+ x x)))", "(9 . 18)"),
+
+            ("(let ((t (cons 1 2))) (let ((t t)) (let ((t t)) (let ((t t)) t))))",  "(1 . 2)"),
+
+            ("(let ((t (let ((t (let ((t (let ((t (cons 1 2))) t))) t))) t))) t)", "(1 . 2)"),
+
+            ("(let ((x ()))
+                (let ((x (cons x x)))
+                  (let ((x (cons x x)))
+                    (let ((x (cons x x)))
+                      (cons x x)))))", "((((()) ()) (()) ()) ((()) ()) (()) ())")
+        ];
+
+        test_many(&tests)
+    }
+}
+
 // Get a test config with program as input
 fn config(program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which

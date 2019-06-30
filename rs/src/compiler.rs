@@ -48,9 +48,25 @@ pub mod state {
             self.alloc();
         }
 
-        /// Allocate a word on the stack
-        fn alloc(&mut self) {
+        /// Allocate a word on the stack & return reference to existing empty slot
+        ///
+        /// Since stack index points to existing free memory, it is useful to be
+        /// able to use it and increment in one go.
+        ///
+        /// # Example:
+        ///
+        /// ```ignore
+        /// Save { r: RAX, si: s.alloc() }
+        /// ```
+        pub fn alloc<'a>(&'a mut self) -> i64 {
+            let current = self.si;
             self.si -= WORDSIZE;
+            current
+        }
+
+        /// Explicitly free `n` words of memory from stack
+        pub fn dealloc<'a>(&'a mut self, count: i64)  {
+            self.si += count * WORDSIZE;
         }
 
         /// Generate a unique label for jump targets.
@@ -220,11 +236,15 @@ pub mod emit {
                     "not" => primitives::not(s, arg),
                     "fixnum?" => primitives::fixnump(s, arg),
                     "boolean?" => primitives::booleanp(s, arg),
+                    "pair?" => primitives::pairp(s, arg),
                     "char?" => primitives::charp(s, arg),
+                    "car" => primitives::car(s, arg),
+                    "cdr" => primitives::cdr(s, arg),
                     n => panic!("Unknown unary primitive: {}", n),
                 },
 
                 [Identifier(name), x, y] => match &name[..] {
+                    "cons" => primitives::cons(s, x, y),
                     "+" => primitives::plus(s, x, y),
                     "-" => primitives::minus(s, x, y),
                     "*" => primitives::mul(s, x, y),
@@ -256,6 +276,7 @@ pub mod emit {
         let gen = x86::prelude()
             + x86::func("init")
             + Enter
+            + x86::heap()
             + eval(&mut s, prog)
             + Leave;
 

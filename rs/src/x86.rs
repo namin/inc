@@ -53,6 +53,8 @@ pub enum Register {
     RSP,
     /// Stack Base Pointer (BP)
     RBP,
+    /// Stack Index (SI)
+    RSI,
 }
 
 /// Operand is a register, address or a constant; the argument to instructions
@@ -126,6 +128,9 @@ pub enum Ins {
     // register AX. GCC throws `Error: ambiguous operand size for `mul'`
     // without size quantifier
     Mul { v: Operand },
+
+    /// Logical or of `v` to register `r`
+    Or { r: Register, v: Operand },
 
     /// Pop a register `r` from stack
     Pop(Register),
@@ -234,6 +239,7 @@ impl fmt::Display for Ins {
             }
             Ins::Mov { from, to } => writeln!(f, "    mov {}, {}", to, from),
             Ins::Mul { v } => writeln!(f, "    mul qword ptr {}", v),
+            Ins::Or { r, v } => writeln!(f, "    or {}, {}", r, v),
             Ins::Pop(r) => writeln!(f, "    pop {}", r),
             Ins::Push(r) => writeln!(f, "    push {}", r),
             Ins::Ret => writeln!(f, "    ret"),
@@ -308,6 +314,11 @@ impl Add<ASM> for ASM {
 }
 
 // ¶ Module helpers
+
+/// The base address of the heap is passed in RDI and we reserve reg RSI for it.
+pub fn heap() -> Ins {
+    Ins::from("    mov rsi, rdi        # Store heap index to RSI \n")
+}
 
 /// Label is a target to jump to
 #[cfg(target_os = "macos")]

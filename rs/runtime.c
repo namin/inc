@@ -8,7 +8,7 @@
 // The default calling convention used by GCC on x86-64 seems to be System V
 // AMD64 ABI, in which arguments are passed in the registers RDI, RSI, RDX, RCX,
 // R8, R9 and the return value is passed back in RAX.
-extern int64_t init() __attribute__((noinline));
+extern int64_t init(int64_t*) __attribute__((noinline));
 
 #define numtag   0
 #define booltag  1
@@ -16,7 +16,6 @@ extern int64_t init() __attribute__((noinline));
 #define pairtag  3
 #define niltag   4
 #define strtag   5
-#define heaptag  7
 
 #define shift    3
 #define mask     0b00000111
@@ -24,7 +23,7 @@ extern int64_t init() __attribute__((noinline));
 int64_t bool_f = (0 << shift) | booltag;
 int64_t bool_t = (1 << shift) | booltag;
 
-void print(int64_t val) {
+void print(int64_t val, bool nested) {
 
     if ((val & mask) == numtag) {
         printf("%" PRId64, val >> shift);
@@ -47,6 +46,36 @@ void print(int64_t val) {
     } else if (val == niltag) {
         printf("()");
 
+    } else if ((val & mask) == pairtag) {
+        int64_t *p = (int64_t *)(val - pairtag);
+        int64_t car = *p;
+        int64_t cdr = *(p + 1);
+
+        if (!nested) printf("(");
+
+        print(car, false);
+
+        if (cdr != niltag) {
+            if ((cdr & mask) != pairtag) {
+                printf(" . ");
+                print(cdr, false);
+            } else {
+                printf(" ");
+                print(cdr, true);
+            }
+        }
+        if (!nested) printf(")");
+    } else if ((val & mask) == strtag) {
+        // This is why C is unsafe, but that is exactly what is letting me do
+        // this sort of custom memory management.
+        int64_t *len = (int64_t *)(val - strtag);
+        int64_t *str = (int64_t *)(val - strtag + 8);
+
+        printf("\"");
+        for(int i = 0; i < *len; i++) {
+            printf("%c", (char)((*(str + i) - chartag) >> shift));
+        }
+        printf("\"");
     } else {
         printf("ERROR %" PRId64, val);
     }
@@ -57,7 +86,8 @@ int main() {
     FILE *debug = getenv("DEBUG") ? stderr : fopen("/dev/null", "w");
     fprintf(debug, "%s\n\n", "The glorious incremental compiler");
 
-    int64_t val = init();
+    int64_t *heap = calloc(1024, 8);
+    int64_t val = init(heap);
 
     int64_t rsi;
 
@@ -65,6 +95,13 @@ int main() {
     // easier to spot this in the generated asm
     asm ("nop; movq %%rsi, %0" : "=r" (rsi));
 
-    print(val);
+    ptrdiff_t size = (uintptr_t)rsi - (uintptr_t)heap;
+
+    fprintf(debug, "HEAP Segment : %p -> %p \n" , heap, (int64_t *)rsi);
+    fprintf(debug, "HEAP size    : %td bytes\n", size);
+    fprintf(debug, "Result       : ");
+    print(val, false);
     printf("\n");
+
+    free(heap);
 }

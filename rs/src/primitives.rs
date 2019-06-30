@@ -4,10 +4,10 @@
 //! assembly rather than in scheme. All of them live in this module.
 
 use crate::{
-    compiler::emit,
+    compiler::emit::{self, eval},
     compiler::state::State,
     core::*,
-    immediate,
+    immediate::{self, *},
     x86::{Ins::*, Operand::*, Register::*, *},
 };
 
@@ -54,6 +54,13 @@ pub fn charp(s: &mut State, expr: &AST) -> ASM {
 /// Is the expression null?
 pub fn nullp(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NIL), "sete")
+}
+
+/// Is the expression a pair?
+pub fn pairp(s: &mut State, expr: &AST) -> ASM {
+    emit::eval(s, expr)
+        + emit::mask()
+        + compare(Reg(RAX), Const(immediate::PAIR), "sete")
 }
 
 /// Is the expression zero?
@@ -169,4 +176,53 @@ pub fn lte(s: &mut State, x: &AST, y: &AST) -> ASM {
 /// Logical >=
 pub fn gte(s: &mut State, x: &AST, y: &AST) -> ASM {
     binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setge")
+}
+
+// Allocation primitives
+
+/// Allocate a pair on heap
+pub fn cons(s: &mut State, x: &AST, y: &AST) -> ASM {
+    // 1. Evaluate the first argument and push to stack
+    // 2. Evaluate second argument
+    // 3. Write second arg to [heap + 8]
+    // 4. Fetch first argument back to RAX
+    // 5. Write first arg from RAX to [heap + 0]
+    // 6. Deallocate a word used for first arg
+    let bp = s.si;
+    let scratch = s.alloc();
+    let ctx = emit::eval(s, x)
+        + Save { r: RAX, si: scratch }
+        + emit::eval(s, y)
+        + Ins::from(format!(
+            "    mov qword ptr [rsi + 8], rax    # '(... {:?}) \n",
+            y
+        ))
+        + Mov { to: Reg(RAX), from: Stack(scratch) }
+        + Ins::from(format!(
+            "    mov qword ptr [rsi + 0], rax    # '({:?} ...) \n",
+            x
+        ))
+        + Mov { to: Reg(RAX), from: Reg(RSI) }
+        + Add { r: RSI, v: Operand::Const(WORDSIZE * 2) }
+        + Or { r: RAX, v: Operand::Const(PAIR) };
+
+    s.dealloc(1);
+    assert!(s.si == bp, "Stack space not deallocated; expected {}, found {} ", bp, s.si);
+    ctx
+}
+
+/// First half of a pair
+// Subtracting the tag from the heap pointer gets us back the real address.
+pub fn car(s: &mut State, pair: &AST) -> ASM {
+    // Assert destination is really a pair ?
+    eval(s, pair)
+        + Ins::from(format!("    mov rax, [rax - {}]    # (car ..) \n", PAIR))
+}
+
+/// Second half of a pair
+// Offset for cdr is (address - tag + 8) = 5
+pub fn cdr(s: &mut State, pair: &AST) -> ASM {
+    // Assert destination is really a pair ?
+    eval(s, pair)
+        + Ins::from(format!("    mov rax, [rax + {}]    # (cdr ...) \n", 5))
 }
