@@ -330,20 +330,26 @@ pub fn stack(si: i64) -> String {
 }
 
 #[cfg(target_os = "macos")]
-pub fn function_header(name: &str) -> ASM {
-    Ins::from("    .section __TEXT,__text\n")
-        + Ins::from("    .intel_syntax noprefix\n")
-        + Ins::from(format!("    .globl _{}\n", &name))
-        + Ins::Label(name.to_string())
+pub fn func(name: &str) -> ASM {
+    Ins::from(format!("    .globl _{}\n", &name)) + Ins::Label(name.to_string())
 }
 
 #[cfg(target_os = "linux")]
-pub fn function_header(name: &str) -> ASM {
-    Ins::from("    .text\n")
-        + Ins::from("    .intel_syntax noprefix\n")
-        + Ins::from(format!("    .globl {}\n", &name))
+pub fn func(name: &str) -> ASM {
+    Ins::from(format!("    .globl {}\n", &name))
         + Ins::from(format!("    .type {}, @function\n", &name))
         + Ins::Label(name.to_string())
+}
+
+#[cfg(target_os = "macos")]
+pub fn prelude() -> ASM {
+    Ins::from("    .section __TEXT,__text \n")
+        + Ins::from("    .intel_syntax noprefix\n")
+}
+
+#[cfg(target_os = "linux")]
+pub fn prelude() -> ASM {
+    Ins::from("    .text\n") + Ins::from("    .intel_syntax noprefix\n")
 }
 
 #[cfg(test)]

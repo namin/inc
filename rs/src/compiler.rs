@@ -253,8 +253,11 @@ pub mod emit {
     /// Top level interface to the emit module
     pub fn program(prog: &AST) -> String {
         let mut s: State = Default::default();
-        let gen =
-            x86::function_header("init") + Enter + eval(&mut s, prog) + Leave;
+        let gen = x86::prelude()
+            + x86::func("init")
+            + Enter
+            + eval(&mut s, prog)
+            + Leave;
 
         gen.to_string()
     }
