@@ -189,7 +189,7 @@ impl fmt::Display for Operand {
         match &self {
             Operand::Const(i) => write!(f, "{}", i),
             Operand::Reg(r) => write!(f, "{}", r),
-            Operand::Stack(si) => writeln!(f, "{}", &stack(*si)),
+            Operand::Stack(si) => write!(f, "{}", &stack(*si)),
         }
     }
 }
@@ -213,10 +213,7 @@ impl fmt::Display for Ins {
             Ins::Je(l) => writeln!(f, "    je {}", label(l)),
             Ins::Jmp(l) => writeln!(f, "    jmp {}", label(l)),
             Ins::Label(l) => writeln!(f, "{}:", label(l)),
-            Ins::Leave => {
-                let op = Ins::Pop(Register::RBP) + Ins::Ret;
-                writeln!(f, "{}", op)
-            }
+            Ins::Leave => write!(f, "{}", Ins::Pop(Register::RBP) + Ins::Ret),
             Ins::Load { r, si } => {
                 writeln!(f, "    mov {}, {}", r, &stack(*si))
             }
@@ -248,7 +245,7 @@ impl fmt::Display for ASM {
         for op in self.0.iter() {
             ctx.push_str(&op.to_string());
         }
-        writeln!(f, "{}", ctx)
+        write!(f, "{}", ctx)
     }
 }
 
