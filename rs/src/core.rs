@@ -60,6 +60,8 @@ pub struct Config {
     pub program: String,
     /// Name of the generated asm and executable, stdout otherwise
     pub output: String,
+    /// Execute?
+    pub exec: bool,
 }
 
 impl Config {

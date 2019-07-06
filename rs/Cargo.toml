@@ -11,6 +11,7 @@ keywords    = ["compiler", "x86", "scheme"]
 
 [dependencies]
 nom = "^5.0"
+getopts = "0.2"
 
 [dev-dependencies]
 quickcheck = "0.8"

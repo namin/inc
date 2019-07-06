@@ -11,7 +11,24 @@ Ghuloum.
 
     $ cargo build
     $ cargo test
-    $ echo "(let ((a 1) (b 2)) (+ a b)) | cargo run -q
+    $ echo "(let ((a 1) (b 2)) (+ a b))" | cargo run -q
+
+The generated assembly is usually easy to read
+
+    $ echo "(let ((a 1) (b 2)) (+ a b))" | cargo run -q -- -S
+
+## Usage
+
+```txt
+$ inc -h
+
+Usage: ./inc [options]
+
+Options:
+    -o FILE             Output file name
+    -S                  Print generated asm
+    -h, --help          print this help menu
+```
 
 ## Docs
 

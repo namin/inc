@@ -310,9 +310,9 @@ fn config(program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
     // made multiple tests write to the same file concurrently completely
     // messing things up.
-    let output = format!("/tmp/inc-{:?}", Uuid::new_v4());
+    let output = format!("inc-{:?}", Uuid::new_v4());
 
-    Config { program, output }
+    Config { program, output, exec: true }
 }
 
 // Build an executable with generated asm

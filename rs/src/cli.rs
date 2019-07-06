@@ -2,33 +2,9 @@
 
 use crate::{compiler::emit, core::Config, core::AST};
 
-use std::env;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::Write;
 use std::process::Command;
-
-/// Parse the command line arguments to a Config object
-///
-/// CLI expects the program in stdin, writes generated assembly to file name
-/// specified as first argument or defaults to stdout.
-pub fn parse() -> Config {
-    let args: Vec<String> = env::args().collect();
-
-    let mut program = String::new();
-
-    io::stdin()
-        .read_to_string(&mut program)
-        .expect("Expected a program in stdin");
-
-    // impl Writer
-    let output = if args.len() == 1 {
-        String::from("/dev/stdout")
-    } else {
-        args[1].clone()
-    };
-
-    Config { program, output }
-}
 
 /// Compile the program and write the assembly to target
 pub fn compile(config: &Config) -> Result<(), std::io::Error> {
@@ -61,7 +37,7 @@ pub fn build(config: &Config) -> bool {
 
 /// Run the generated binary and return output
 pub fn run(config: &Config) -> Result<String, std::io::Error> {
-    let proc = Command::new(&config.output)
+    let proc = Command::new(format!("./{}", &config.output))
         .output()
         .expect(&format!("Failed to run binary `{}`", &config.output));
 
