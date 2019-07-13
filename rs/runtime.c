@@ -1,8 +1,10 @@
 #include <inttypes.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 
 // The default calling convention used by GCC on x86-64 seems to be System V
@@ -81,15 +83,42 @@ void print(int64_t val, bool nested) {
     }
 }
 
+void set_handler(void (*handler)(int,siginfo_t *,void *)) {
+    struct sigaction action;
+    action.sa_flags = SA_SIGINFO;
+    action.sa_sigaction = handler;
+
+    if (sigaction(SIGSEGV, &action, NULL) == -1) {
+        perror("sigsegv: sigaction");
+        _exit(1);
+    }
+}
+
+void handler(int signo, siginfo_t *info,   __attribute__((unused)) void *extra) {
+    printf("Program crashed due to unexpected error \n");
+    printf("Signal number        : %d \n", signo);
+    printf("SIGSEGV at address   : 0x%lx \n",(long) info->si_addr);
+    abort();
+}
+
 int main() {
 
     FILE *debug = getenv("DEBUG") ? stderr : fopen("/dev/null", "w");
     fprintf(debug, "%s\n\n", "The glorious incremental compiler");
 
-    int64_t *heap = calloc(1024, 8);
-    int64_t val = init(heap);
+    set_handler(handler);
 
-    int64_t rsi;
+    int64_t rsi, rsp;
+    int64_t *heap = calloc(1024, 8);
+
+    // Read current stack pointer into local variable for diagnostics
+    asm ("nop; movq %%rsp, %0" : "=r" (rsp));
+
+    fprintf(debug, "Heap initialized at : %p  \n", heap);
+    fprintf(debug, "Stack begins at     : %p  \n", (uintptr_t *)rsp );
+
+    // Execute all of the generated ASM; this could return a value or segfault
+    int64_t val = init(heap);
 
     // Copy the value of RSI into a local variable. The nop instruction makes it
     // easier to spot this in the generated asm
@@ -97,9 +126,11 @@ int main() {
 
     ptrdiff_t size = (uintptr_t)rsi - (uintptr_t)heap;
 
-    fprintf(debug, "HEAP Segment : %p -> %p \n" , heap, (int64_t *)rsi);
-    fprintf(debug, "HEAP size    : %td bytes\n", size);
-    fprintf(debug, "Result       : ");
+    fprintf(debug, "HEAP Segment        : %p -> %p \n" , heap, (int64_t *)rsi);
+    fprintf(debug, "HEAP size           : %td bytes\n", size);
+    fprintf(debug, "Result              : ");
+    fflush(stdout);
+
     print(val, false);
     printf("\n");
 
