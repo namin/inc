@@ -37,7 +37,7 @@ fn let_syntax(i: &str) -> IResult<&str, AST> {
 // named → (name value)
 fn binding(i: &str) -> IResult<&str, (String, AST)> {
     let (i, _) = delimited(multispace0, char('('), multispace0)(i)?;
-    let (i, (name, _, value)) = tuple((identifier, multispace0, datum))(i)?;
+    let (i, (name, _, value)) = tuple((identifier, multispace0, program))(i)?;
     let (i, _) = delimited(multispace0, char(')'), multispace0)(i)?;
 
     Ok((i, (name, value)))
@@ -306,6 +306,8 @@ mod tests {
         };
 
         assert_eq!(ok(exp), program(prog));
+
+        assert!(program("(let ((x (let ((y 3)) (* y y)))) (cons x (+ x x)))").is_ok());
     }
 
     #[test]
