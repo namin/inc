@@ -19,7 +19,6 @@ pub const CHAR: i64 = 2;
 pub const PAIR: i64 = 3;
 pub const NIL: i64 = 4;
 pub const STR: i64 = 5;
-pub const HEAP: i64 = 7;
 
 pub const SHIFT: i64 = 3;
 pub const MASK: i64 = 0b0000_0111;
