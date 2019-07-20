@@ -70,16 +70,18 @@ void print(int64_t val, bool nested) {
     } else if ((val & mask) == strtag) {
         // This is why C is unsafe, but that is exactly what is letting me do
         // this sort of custom memory management.
-        int64_t *len = (int64_t *)(val - strtag);
-        int64_t *str = (int64_t *)(val - strtag + 8);
+        //
+        // A string in memory is a pair of length and a pointer to a blob of
+        // bytes - ideally guaranteed by the compiler to be valid UTF-8. See
+        // compiler module for documentation on the layout.
+        int64_t *p = (int64_t *)(val - strtag);
+        int64_t len = *(p + 0);
+        int64_t str = *(p + 1);
 
-        printf("\"");
-        for(int i = 0; i < *len; i++) {
-            printf("%c", (char)((*(str + i) - chartag) >> shift));
-        }
-        printf("\"");
+        fwrite((void *)str, 1, len, stdout);
+
     } else {
-        printf("ERROR %" PRId64, val);
+        printf("ERROR; unknown value at reference %p \n", (uintptr_t *)val);
     }
 }
 

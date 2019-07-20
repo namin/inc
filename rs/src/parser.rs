@@ -11,7 +11,7 @@
 use super::core::*;
 use nom::{
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{is_not, tag},
     character::complete::*,
     combinator::{map, opt, value},
     multi::*,
@@ -88,6 +88,13 @@ fn digit(i: &str) -> IResult<&str, char> {
     one_of("0123456789")(i)
 }
 
+fn string(i: &str) -> IResult<&str, String> {
+    let q = "\"";
+    let (i, s) = delimited(tag(q), is_not(q), tag(q))(i)?;
+
+    Ok((i, s.to_string()))
+}
+
 // Data include booleans, numbers, characters, strings, symbols, lists, and
 // vectors. Case is insignificant in the syntax for booleans, numbers, and
 // character names, but it is significant in other character constants and
@@ -114,6 +121,7 @@ fn datum(i: &str) -> IResult<&str, AST> {
         (map(ascii, { |c| AST::Char(c) })),
         (map(number, { |i| AST::Number(i) })),
         (map(identifier, { |i| AST::Identifier(i) })),
+        (map(string, { |i| AST::Str(i) })),
         list,
     ))(i)
 }
@@ -230,7 +238,20 @@ mod tests {
     fn data() {
         assert_eq!(ok(Nil), datum("()"));
         assert_eq!(ok("one".into()), datum("one"));
-        assert_eq!(ok(42.into()), datum("42"))
+        assert_eq!(ok(42.into()), datum("42"));
+    }
+
+    #[test]
+    fn strings() {
+        assert_eq!(ok(Str("hello world".into())), datum("\"hello world\""));
+        assert_eq!(
+            ok(Str("മലയാളം".into())),
+            datum("\"മലയാളം\"")
+        );
+        assert_eq!(
+            ok(Str("Unicode 😱 ⌘".into())),
+            datum("\"Unicode 😱 ⌘\"")
+        )
     }
 
     #[test]
@@ -307,7 +328,8 @@ mod tests {
 
         assert_eq!(ok(exp), program(prog));
 
-        assert!(program("(let ((x (let ((y 3)) (* y y)))) (cons x (+ x x)))").is_ok());
+        assert!(program("(let ((x (let ((y 3)) (* y y)))) (cons x (+ x x)))")
+            .is_ok());
     }
 
     #[test]

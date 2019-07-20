@@ -11,17 +11,30 @@ pub mod state {
     /// Stack index points to the current available empty slot. Use and then
     /// decrement the index to add a new variable. Default to `-word size`
     ///
+    /// `li` is label index, a counter used to generate unique labels. See
+    /// `gen_label`
+    ///
+    /// `symbols` is a list of all strings known at compile time, so that they
+    /// can be allocated in the binary instead of heap.
+    ///
     /// State should also implement some form of register allocation.
     pub struct State {
         pub si: i64,
         pub asm: ASM,
         li: u64,
+        pub symbols: HashMap<String, usize>,
         env: Env,
     }
 
     impl Default for State {
         fn default() -> Self {
-            State { si: -WORDSIZE, asm: ASM(vec![]), li: 0, env: new() }
+            State {
+                si: -WORDSIZE,
+                asm: ASM(vec![]),
+                li: 0,
+                symbols: HashMap::new(),
+                env: new(),
+            }
         }
     }
 
@@ -65,7 +78,7 @@ pub mod state {
         }
 
         /// Explicitly free `n` words of memory from stack
-        pub fn dealloc<'a>(&'a mut self, count: i64)  {
+        pub fn dealloc<'a>(&'a mut self, count: i64) {
             self.si += count * WORDSIZE;
         }
 
@@ -144,6 +157,106 @@ pub mod state {
     }
 }
 
+/// Strings are a pair of length and a pointer to a blob of UTF-8 encoded bytes.
+///
+/// The raw data bytes can be allocated in stack, heap or statically in the
+/// generated binary. Static strings found in the source code is retained as it
+/// is in the generated binary and a label is used for dereference. Strings
+/// generated at runtime must be allocated in the heap.
+///
+/// Example memory layout:
+///
+/// A literal "hello world" gets statically allocated at offset 4000. A string
+/// object will be allocated in the heap at address 8000 as a pair `(11, 4000)`.
+/// A reference to this object as a local variable in stack at address 12000
+/// would be an immediately tagged pointer 8005. `(8000 | string tag)`
+///
+/// ```txt
+///  -------------------------
+/// | Address | Value         |
+///  -------------------------
+/// | 4000    | "hello world" |
+/// |         |               |
+/// | 8000    | 11            |
+/// | 8008    | 4000          |
+/// |         |               |
+/// | 12000   | 8005          |
+///  -------------------------
+/// ```
+///
+/// The C runtime would get the value 8005 and would identify it as a string
+/// `(8005 & mask == strtag)`. The raw pointer is obtained by removing the tag
+/// `(p = val - strtag)` and length is found at the base addresses `(*p)` and
+/// the pointer to raw blob is found at the next addresses `(*p + 1)`. fwrite
+/// can safely print the exact number of bytes using the length and pointer.
+pub mod string {
+
+    use crate::{
+        compiler::state::State,
+        core::AST::{self, *},
+        immediate,
+        x86::{Ins::*, Operand::*, Register::*, ASM, WORDSIZE},
+    };
+    use std::convert::TryFrom;
+
+    pub fn eval(s: &State, data: &str) -> ASM {
+        let index = s.symbols.get(data);
+        let index = index
+            .expect(&format!("String `{}` not found in symbol table", data));
+
+        let len = i64::try_from(data.len()).unwrap();
+
+        Lea { r: RDI, of: format!("inc_str_{}", index) }
+            + Mov { to: Heap(0), from: Const(len) }
+            + Mov { to: Heap(8), from: Reg(RDI) }
+            + Mov { to: Reg(RAX), from: Reg(RSI) }
+            + Or { r: RAX, v: Const(immediate::STR) }
+            + Add { r: RSI, v: Const(2 * WORDSIZE) }
+    }
+
+    fn label(index: &usize) -> String {
+        format!("inc_str_{}", index)
+    }
+
+    pub fn emit_symbols(s: &State) -> ASM {
+        let mut asm = ASM(vec![]);
+
+        for (symbol, index) in s.symbols.iter() {
+            asm += Label(label(index));
+            asm += Slice(format!("    .ascii \"{}\" \n", symbol))
+        }
+
+        asm
+    }
+
+    pub fn lift(s: &mut State, prog: &AST) {
+        match prog {
+            Str(reference) => {
+                if !s.symbols.contains_key(reference) {
+                    s.symbols.insert(reference.clone(), s.symbols.len());
+                }
+            }
+
+            Let { bindings, body } => {
+                for (_name, expr) in bindings.iter() {
+                    lift(s, expr);
+                }
+
+                for b in body.iter() {
+                    lift(s, b)
+                }
+            }
+
+            List(list) => {
+                for l in list.iter() {
+                    lift(s, l);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Emit machine code for inc AST.
 ///
 /// This module implements bulk of the compiler and is a good place to start
@@ -153,6 +266,7 @@ pub mod state {
 pub mod emit {
     use crate::{
         compiler::state::State,
+        compiler::string,
         core::AST::{self, *},
         immediate, primitives,
         x86::{
@@ -225,6 +339,9 @@ pub mod emit {
                 None => panic!("Undefined variable {}", i),
             },
 
+            // Find the symbol index and return and reference in RAX
+            Str(data) => string::eval(&s, &data),
+
             Let { bindings, body } => binding(s, bindings, body),
 
             List(list) => match list.as_slice() {
@@ -273,12 +390,14 @@ pub mod emit {
     /// Top level interface to the emit module
     pub fn program(prog: &AST) -> String {
         let mut s: State = Default::default();
+        string::lift(&mut s, prog);
         let gen = x86::prelude()
             + x86::func("init")
             + Enter
             + x86::init_heap()
             + eval(&mut s, prog)
-            + Leave;
+            + Leave
+            + string::emit_symbols(&s);
 
         gen.to_string()
     }

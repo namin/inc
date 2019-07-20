@@ -59,6 +59,8 @@ pub enum Register {
     RBP,
     /// Stack Index (SI)
     RSI,
+    /// ¯\_(ツ)_/¯
+    RDI,
 }
 
 /// Operand is a register, address or a constant; the argument to instructions
@@ -123,6 +125,9 @@ pub enum Ins {
 
     /// Load a value at stack index `si` to register `r`
     Load { r: Register, si: i64 },
+
+    /// Load effective address of a `target` into register `r`
+    Lea { r: Register, of: String },
 
     /// Mov! At least one of the operands must be a register, moving from
     /// RAM to RAM isn't a valid op.
@@ -239,6 +244,9 @@ impl fmt::Display for Ins {
             Ins::Je(l) => writeln!(f, "    je {}", label(l)),
             Ins::Jmp(l) => writeln!(f, "    jmp {}", label(l)),
             Ins::Label(l) => writeln!(f, "{}:", label(l)),
+            Ins::Lea { r, of } => {
+                writeln!(f, "    lea {}, [rip + {}]", r, label(of))
+            }
             Ins::Leave => write!(f, "{}", Ins::Pop(Register::RBP) + Ins::Ret),
             Ins::Load { r, si } => {
                 writeln!(f, "    mov {}, {}", r, &stack(*si))

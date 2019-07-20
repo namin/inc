@@ -45,6 +45,9 @@ pub fn to(prog: &AST) -> i64 {
             (i64::from(*c) << SHIFT) | CHAR
         }
         AST::Nil => NIL,
+        AST::Str(i) => {
+            unimplemented!("immediate repr is undefined for string {}", i)
+        }
         AST::Identifier(i) => {
             unimplemented!("immediate repr is undefined for identifier {}", i)
         }

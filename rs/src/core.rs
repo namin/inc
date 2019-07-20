@@ -16,6 +16,8 @@ pub enum AST {
     /// A unicode char encoded in UTF-8 can take upto 4 bytes and won't fit in a
     /// word; so this implementation makes sense only for ASCII.
     Char(u8),
+    /// UTF-8 Strings
+    Str(String),
     /// Scheme Identifiers
     Identifier(String),
     /// Since Rust needs to know the size of the AST type upfront, we need an
