@@ -276,7 +276,7 @@ pub mod emit {
         let gen = x86::prelude()
             + x86::func("init")
             + Enter
-            + x86::heap()
+            + x86::init_heap()
             + eval(&mut s, prog)
             + Leave;
 

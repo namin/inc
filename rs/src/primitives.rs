@@ -193,15 +193,9 @@ pub fn cons(s: &mut State, x: &AST, y: &AST) -> ASM {
     let ctx = emit::eval(s, x)
         + Save { r: RAX, si: scratch }
         + emit::eval(s, y)
-        + Ins::from(format!(
-            "    mov qword ptr [rsi + 8], rax    # '(... {:?}) \n",
-            y
-        ))
+        + Mov { to: Heap(8), from: Reg(RAX) }
         + Mov { to: Reg(RAX), from: Stack(scratch) }
-        + Ins::from(format!(
-            "    mov qword ptr [rsi + 0], rax    # '({:?} ...) \n",
-            x
-        ))
+        + Mov { to: Heap(0), from: Reg(RAX) }
         + Mov { to: Reg(RAX), from: Reg(RSI) }
         + Add { r: RSI, v: Operand::Const(WORDSIZE * 2) }
         + Or { r: RAX, v: Operand::Const(PAIR) };

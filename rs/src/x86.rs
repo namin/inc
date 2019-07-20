@@ -72,6 +72,7 @@ pub enum Operand {
     Const(i64),
     Reg(Register),
     Stack(i64),
+    Heap(i64),
 }
 
 /// Each x86 instruction this compiler understands
@@ -125,7 +126,7 @@ pub enum Ins {
 
     /// Mov! At least one of the operands must be a register, moving from
     /// RAM to RAM isn't a valid op.
-    Mov { from: Operand, to: Operand },
+    Mov { to: Operand, from: Operand },
 
     /// Multiply register AX with value `v` and move result to register RAX
     // The destination operand is of `mul` is an implied operand located in
@@ -212,6 +213,7 @@ impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
             Operand::Const(i) => write!(f, "{}", i),
+            Operand::Heap(si) => write!(f, "{}", &heap(*si)),
             Operand::Reg(r) => write!(f, "{}", r),
             Operand::Stack(si) => write!(f, "{}", &stack(*si)),
         }
@@ -241,7 +243,17 @@ impl fmt::Display for Ins {
             Ins::Load { r, si } => {
                 writeln!(f, "    mov {}, {}", r, &stack(*si))
             }
-            Ins::Mov { from, to } => writeln!(f, "    mov {}, {}", to, from),
+            Ins::Mov { to, from } => match (to, from) {
+                (Operand::Stack(si), from) => {
+                    writeln!(f, "    mov qword ptr {}, {}", &stack(*si), from)
+                }
+
+                (Operand::Heap(si), from) => {
+                    writeln!(f, "    mov qword ptr {}, {}", &heap(*si), from)
+                }
+
+                _ => writeln!(f, "    mov {}, {}", to, from),
+            },
             Ins::Mul { v } => writeln!(f, "    mul qword ptr {}", v),
             Ins::Or { r, v } => writeln!(f, "    or {}, {}", r, v),
             Ins::Pop(r) => writeln!(f, "    pop {}", r),
@@ -320,7 +332,7 @@ impl Add<ASM> for ASM {
 // ¶ Module helpers
 
 /// The base address of the heap is passed in RDI and we reserve reg RSI for it.
-pub fn heap() -> Ins {
+pub fn init_heap() -> Ins {
     Ins::from("    mov rsi, rdi        # Store heap index to RSI \n")
 }
 
@@ -335,13 +347,21 @@ fn label(label: &str) -> String {
     format!("{}", label)
 }
 
-/// Stack address relative to base pointer
-pub fn stack(si: i64) -> String {
-    match si {
-        index if index > 0 => format!("[rbp + {}]", index),
-        index if index < 0 => format!("[rbp - {}]", (-index)),
-        _ => panic!("Effective stack index cannot be 0"),
+/// Relative address with reference to a register
+pub fn relative(r: Register, si: i64) -> String {
+    if si >= 0 {
+        format!("[{} + {}]", r, si)
+    } else {
+        format!("[{} - {}]", r, (-si))
     }
+}
+
+fn stack(si: i64) -> String {
+    relative(Register::RBP, si)
+}
+
+fn heap(si: i64) -> String {
+    relative(Register::RSI, si)
 }
 
 #[cfg(target_os = "macos")]
