@@ -36,7 +36,10 @@ Inc is reasonably well documented and is preferably read with Cargo docs.
 
     $ cargo doc --document-private-items --open
 
-## ~
+ℹ x86 module documentation contains links to a few good x86 tutorials.
+ℹ [How to C in 2016](https://matt.sh/howto-c) is a pretty good C refresher.
+
+---
 
 This project started in [Chez Scheme] but, I [ported it to Racket][rkt] and then
 again to [rust]. The old project still lives at [rkt](./rkt).

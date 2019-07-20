@@ -9,6 +9,10 @@
 //! look at the generated code. Clang and GCC support `-S` flag to output the
 //! assembly instead of a binary executable.
 //!
+//! Some reasonably good tutorials are:
+//!
+//! 1. [x86 Assembly Guide](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
+//!
 //! # Syntax
 //!
 //! Intel syntax is used everywhere instead of AT&T, which is so much more
