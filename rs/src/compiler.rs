@@ -71,14 +71,14 @@ pub mod state {
         /// ```ignore
         /// Save { r: RAX, si: s.alloc() }
         /// ```
-        pub fn alloc<'a>(&'a mut self) -> i64 {
+        pub fn alloc(&mut self) -> i64 {
             let current = self.si;
             self.si -= WORDSIZE;
             current
         }
 
         /// Explicitly free `n` words of memory from stack
-        pub fn dealloc<'a>(&'a mut self, count: i64) {
+        pub fn dealloc(&mut self, count: i64) {
             self.si += count * WORDSIZE;
         }
 
@@ -197,14 +197,15 @@ pub mod string {
 
     pub fn eval(s: &State, data: &str) -> ASM {
         let index = s.symbols.get(data);
-        let index = index
-            .expect(&format!("String `{}` not found in symbol table", data));
+        let index = index.unwrap_or_else(|| {
+            panic!("String `{}` not found in symbol table", data)
+        });
 
         Lea { r: RAX, of: format!("inc_str_{}", index), offset: immediate::STR }
             .into()
     }
 
-    fn label(index: &usize) -> String {
+    fn label(index: usize) -> String {
         format!("inc_str_{}", index)
     }
 
@@ -218,7 +219,7 @@ pub mod string {
             //
             // https://sourceware.org/binutils/docs-2.32/as/P2align.html
             asm += Slice("    .p2align 3 \n".to_string());
-            asm += Label(label(index));
+            asm += Label(label(*index));
             asm += Slice(format!("    .quad  {} \n", symbol.len()));
             asm += Slice(format!("    .ascii \"{}\" \n", symbol))
         }
@@ -374,7 +375,7 @@ pub mod emit {
 
                 [Identifier(name), x, y, z] => match &name[..] {
                     "if" => cond(s, x, y, z),
-                    n => panic!("Unknown ternary primitive: {}", n),
+                    name => panic!("Unknown ternary primitive: {}", name),
                 },
 
                 l => panic!("Unknown expression: {:?}", l),

@@ -12,7 +12,7 @@ pub fn compile(config: &Config) -> Result<(), std::io::Error> {
         config.program.parse::<AST>().expect("Failed to parse input program");
 
     let mut handler = File::create(&config.asm())
-        .expect(&format!("Failed to create {}", &config.asm()));
+        .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
 
     handler.write_all(emit::program(&prog).as_bytes())
 }
@@ -39,7 +39,9 @@ pub fn build(config: &Config) -> bool {
 pub fn run(config: &Config) -> Result<String, std::io::Error> {
     let proc = Command::new(format!("./{}", &config.output))
         .output()
-        .expect(&format!("Failed to run binary `{}`", &config.output));
+        .unwrap_or_else(|e| {
+            panic!("Failed to run binary `{}`; error: `{}`", &config.output, e)
+        });
 
     Ok(String::from_utf8(proc.stdout).unwrap().trim().to_string())
 }

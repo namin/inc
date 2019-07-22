@@ -17,13 +17,13 @@ mod integers {
 
     #[test]
     fn unit() {
-        for t in &[0, 1, -1, 10, -10, 2736, -2736, 536870911, -536870912] {
+        for t in &[0, 1, -1, 10, -10, 2736, -2736, 536_870_911, -536_870_912] {
             test1(&t.to_string(), &t.to_string());
         }
     }
 
     #[quickcheck]
-    fn quick(i: i64) -> () {
+    fn quick(i: i64) {
         test1(&i.to_string(), &i.to_string())
     }
 }
@@ -192,24 +192,24 @@ mod binary {
         use super::super::*;
 
         #[quickcheck]
-        fn plus(x: i64, y: i64) -> () {
+        fn plus(x: i64, y: i64) {
             test1(&format!("(+ {} {})", x, y), &(x + y).to_string())
         }
 
         #[quickcheck]
-        fn multiply(x: i64, y: i64) -> () {
+        fn multiply(x: i64, y: i64) {
             test1(&format!("(* {} {})", x, y), &(x * y).to_string())
         }
 
         #[quickcheck]
-        fn divide(x: i64, y: i64) -> () {
+        fn divide(x: i64, y: i64) {
             if y != 0 {
                 test1(&format!("(/ {} {})", (x * y), y), &x.to_string())
             }
         }
 
         #[quickcheck]
-        fn remainder(x: i64, y: i64) -> () {
+        fn remainder(x: i64, y: i64) {
             if y != 0 {
                 test1(&format!("(% {} {})", x, y), &((x % y).to_string()))
             }
@@ -375,10 +375,10 @@ fn test_many(tests: &[(&str, &str)]) {
 // Run a single test, assert everything and cleanup afterwards
 fn test1(input: &str, output: &str) {
     // Create a fresh config per run, this should allow for parallelism later.
-    let mut config = config(input.to_string());
+    let config = config(input.to_string());
 
     // Rebuild before every run
-    assert!(build(&mut config));
+    assert!(build(&config));
 
     // Run the generated binary and assert output
     assert_eq!(

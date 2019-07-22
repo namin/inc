@@ -79,17 +79,17 @@ mod tests {
     // than the panic in the end.
     pub fn from(val: i64) -> AST {
         if (val & MASK) == NUM {
-            return AST::Number(val >> SHIFT);
+            AST::Number(val >> SHIFT)
         } else if (val & MASK) == CHAR {
-            return AST::Char((val >> SHIFT) as u8);
+            AST::Char((val >> SHIFT) as u8)
         } else if val == TRUE {
-            return true.into();
+            true.into()
         } else if val == FALSE {
-            return false.into();
+            false.into()
         } else if val == NIL {
-            return AST::Nil;
+            AST::Nil
         } else {
-            panic!("Oops");
+            panic!("Oops")
         }
     }
 

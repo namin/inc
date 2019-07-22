@@ -203,8 +203,8 @@ mod tests {
         assert_eq!(ok(42), number("42"));
         assert_eq!(ok(-42), number("-42"));
 
-        assert_eq!(ok('j' as u8), ascii("#\\j"));
-        assert_eq!(ok('^' as u8), ascii("#\\^"));
+        assert_eq!(ok(b'j'), ascii("#\\j"));
+        assert_eq!(ok(b'^'), ascii("#\\^"));
 
         // Character parser must not consume anything unless it starts with
         // an explicit tag.

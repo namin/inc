@@ -201,7 +201,7 @@ pub fn cons(s: &mut State, x: &AST, y: &AST) -> ASM {
         + Or { r: RAX, v: Operand::Const(PAIR) };
 
     s.dealloc(1);
-    assert!(s.si == bp, "Stack space not deallocated; expected {}, found {} ", bp, s.si);
+    assert!(s.si == bp, "Stack deallocated; expected {}, found {} ", bp, s.si);
     ctx
 }
 

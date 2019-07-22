@@ -28,9 +28,9 @@ fn main() -> Result<(), std::io::Error> {
 
     let exec = !matches.opt_present("S");
     let output = if exec {
-        matches.opt_str("o").unwrap_or(String::from("inc"))
+        matches.opt_str("o").unwrap_or_else(|| String::from("inc"))
     } else {
-        matches.opt_str("o").unwrap_or(String::from("/dev/stdout"))
+        matches.opt_str("o").unwrap_or_else(|| String::from("/dev/stdout"))
     };
 
     let mut program = String::new();
@@ -48,5 +48,5 @@ fn main() -> Result<(), std::io::Error> {
         println!("{}", out);
     }
 
-    return Ok(());
+    Ok(())
 }
