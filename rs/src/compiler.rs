@@ -157,61 +157,51 @@ pub mod state {
     }
 }
 
-/// Strings are a pair of length and a pointer to a blob of UTF-8 encoded bytes.
+/// A string is a blob of UTF-8 encoded bytes prefixed with the length if it.
 ///
-/// The raw data bytes can be allocated in stack, heap or statically in the
-/// generated binary. Static strings found in the source code is retained as it
-/// is in the generated binary and a label is used for dereference. Strings
-/// generated at runtime must be allocated in the heap.
+/// Strings can be stack or heap allocated but static strings found in the
+/// source code is retained as it is in the data section.
 ///
 /// Example memory layout:
 ///
-/// A literal "hello world" gets statically allocated at offset 4000. A string
-/// object will be allocated in the heap at address 8000 as a pair `(11, 4000)`.
-/// A reference to this object as a local variable in stack at address 12000
-/// would be an immediately tagged pointer 8005. `(8000 | string tag)`
+/// A literal "hello world" gets statically allocated at offset 4000 along with
+/// the length. There is no extra allocation required for the string object
+/// after immediate tagging the address as 4005 `(4000 | strtag)`.
 ///
 /// ```txt
 ///  -------------------------
 /// | Address | Value         |
 ///  -------------------------
+/// | 4000    | 11            |
 /// | 4000    | "hello world" |
 /// |         |               |
-/// | 8000    | 11            |
-/// | 8008    | 4000          |
-/// |         |               |
-/// | 12000   | 8005          |
+/// | 8000    | 4005          |
 ///  -------------------------
 /// ```
 ///
-/// The C runtime would get the value 8005 and would identify it as a string
-/// `(8005 & mask == strtag)`. The raw pointer is obtained by removing the tag
-/// `(p = val - strtag)` and length is found at the base addresses `(*p)` and
-/// the pointer to raw blob is found at the next addresses `(*p + 1)`. fwrite
-/// can safely print the exact number of bytes using the length and pointer.
+/// The C runtime would get the value 4005 and would identify it as a string
+/// with the tag `(8005 & mask == strtag)`. The raw pointer is obtained by
+/// removing the tag `(p = val - strtag)` and length is found at the base
+/// addresses `(*p)` and the data at `(*p + 1)`. fwrite can safely print the
+/// exact number of bytes using the length and pointer.
+///
+/// TODO: Consider switching to SDS. https://github.com/antirez/sds
 pub mod string {
 
     use crate::{
         compiler::state::State,
         core::AST::{self, *},
         immediate,
-        x86::{Ins::*, Operand::*, Register::*, ASM, WORDSIZE},
+        x86::{Ins::*, Register::*, ASM},
     };
-    use std::convert::TryFrom;
 
     pub fn eval(s: &State, data: &str) -> ASM {
         let index = s.symbols.get(data);
         let index = index
             .expect(&format!("String `{}` not found in symbol table", data));
 
-        let len = i64::try_from(data.len()).unwrap();
-
-        Lea { r: RDI, of: format!("inc_str_{}", index) }
-            + Mov { to: Heap(0), from: Const(len) }
-            + Mov { to: Heap(8), from: Reg(RDI) }
-            + Mov { to: Reg(RAX), from: Reg(RSI) }
-            + Or { r: RAX, v: Const(immediate::STR) }
-            + Add { r: RSI, v: Const(2 * WORDSIZE) }
+        Lea { r: RAX, of: format!("inc_str_{}", index), offset: immediate::STR }
+            .into()
     }
 
     fn label(index: &usize) -> String {
@@ -222,7 +212,14 @@ pub mod string {
         let mut asm = ASM(vec![]);
 
         for (symbol, index) in s.symbols.iter() {
+            // `.p2align 3` aligns the address of the following target to 8
+            // bytes by setting the 3 low order bits to 0. This is necessary for
+            // the immediate tagging scheme to work correctly.
+            //
+            // https://sourceware.org/binutils/docs-2.32/as/P2align.html
+            asm += Slice("    .p2align 3 \n".to_string());
             asm += Label(label(index));
+            asm += Slice(format!("    .quad  {} \n", symbol.len()));
             asm += Slice(format!("    .ascii \"{}\" \n", symbol))
         }
 

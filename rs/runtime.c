@@ -76,7 +76,7 @@ void print(int64_t val, bool nested) {
         // compiler module for documentation on the layout.
         int64_t *p = (int64_t *)(val - strtag);
         int64_t len = *(p + 0);
-        int64_t str = *(p + 1);
+        int64_t *str = p + 1;
 
         fwrite((void *)str, 1, len, stdout);
 

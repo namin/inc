@@ -13,6 +13,10 @@
 //!
 //! 1. [x86 Assembly Guide](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
 //!
+//! 2. Lines in assembly that are indented and starts with a . like `.p2align`
+//! are GNU assembly directives. The full list is available in [GNU assembler
+//! docs](https://sourceware.org/binutils/docs-2.32/as/)
+//!
 //! # Syntax
 //!
 //! Intel syntax is used everywhere instead of AT&T, which is so much more
@@ -126,8 +130,8 @@ pub enum Ins {
     /// Load a value at stack index `si` to register `r`
     Load { r: Register, si: i64 },
 
-    /// Load effective address of a `target` into register `r`
-    Lea { r: Register, of: String },
+    /// Load effective address `of` a label into register `r` with an `offset`
+    Lea { r: Register, of: String, offset: i64 },
 
     /// Mov! At least one of the operands must be a register, moving from
     /// RAM to RAM isn't a valid op.
@@ -244,8 +248,8 @@ impl fmt::Display for Ins {
             Ins::Je(l) => writeln!(f, "    je {}", label(l)),
             Ins::Jmp(l) => writeln!(f, "    jmp {}", label(l)),
             Ins::Label(l) => writeln!(f, "{}:", label(l)),
-            Ins::Lea { r, of } => {
-                writeln!(f, "    lea {}, [rip + {}]", r, label(of))
+            Ins::Lea { r, of, offset } => {
+                writeln!(f, "    lea {}, [rip + {} + {}]", r, offset, label(of))
             }
             Ins::Leave => write!(f, "{}", Ins::Pop(Register::RBP) + Ins::Ret),
             Ins::Load { r, si } => {
