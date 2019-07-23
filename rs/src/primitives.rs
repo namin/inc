@@ -224,11 +224,11 @@ pub fn cdr(s: &mut State, pair: &AST) -> ASM {
 // String primitives
 pub mod string {
     use super::*;
-    use crate::compiler::string;
+    use crate::strings;
 
     pub fn make(s: &mut State, arg: &AST) -> ASM {
         match arg {
-            AST::Number(n) => string::make(s, *n),
+            AST::Number(n) => strings::make(s, *n),
             _ => panic!("`make-string` expected number, got {:?}", arg),
         }
     }

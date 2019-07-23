@@ -9,4 +9,5 @@ pub mod core;
 pub mod immediate;
 pub mod parser;
 pub mod primitives;
+pub mod strings;
 pub mod x86;
