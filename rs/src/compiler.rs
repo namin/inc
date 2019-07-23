@@ -243,7 +243,7 @@ pub mod string {
                 None => panic!("Undefined variable {}", i),
             },
 
-            _ => panic!(format!("expected string; got {:?}", t)),
+            _ => panic!("expected string; got {:?}", t),
         }
     }
 

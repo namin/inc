@@ -229,9 +229,7 @@ pub mod string {
     pub fn make(s: &mut State, arg: &AST) -> ASM {
         match arg {
             AST::Number(n) => string::make(s, *n),
-            _ => {
-                panic!(format!("`make-string` expected number, got {:?}", arg))
-            }
+            _ => panic!("`make-string` expected number, got {:?}", arg),
         }
     }
 }
