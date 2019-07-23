@@ -8,8 +8,10 @@ use std::process::Command;
 
 /// Compile the program and write the assembly to target
 pub fn compile(config: &Config) -> Result<(), std::io::Error> {
-    let prog: AST =
-        config.program.parse::<AST>().expect("Failed to parse input program");
+    let prog: AST = config
+        .program
+        .parse::<AST>()
+        .expect(&format!("Failed to parse input program `{}`", config.program));
 
     let mut handler = File::create(&config.asm())
         .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
