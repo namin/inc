@@ -187,29 +187,26 @@ pub mod state {
 ///
 /// TODO: Consider switching to SDS. https://github.com/antirez/sds
 pub mod string {
-
     use crate::{
         compiler::state::State,
         core::AST::{self, *},
         immediate,
-        x86::{Ins::*, Register::*, ASM},
+        x86::{
+            Ins::*,
+            Operand::*,
+            Register::{self, *},
+            ASM,
+        },
     };
+    use std::convert::TryFrom;
 
+    /// Evaluate a string object
     pub fn eval(s: &State, data: &str) -> ASM {
-        let index = s.symbols.get(data);
-        let index = index.unwrap_or_else(|| {
-            panic!("String `{}` not found in symbol table", data)
-        });
-
-        Lea { r: RAX, of: format!("inc_str_{}", index), offset: immediate::STR }
-            .into()
+        address(s, &AST::Str(data.into()), RAX)
     }
 
-    fn label(index: usize) -> String {
-        format!("inc_str_{}", index)
-    }
-
-    pub fn emit_symbols(s: &State) -> ASM {
+    /// Inline static strings in source directly into the binary
+    pub fn inline(s: &State) -> ASM {
         let mut asm = ASM(vec![]);
 
         for (symbol, index) in s.symbols.iter() {
@@ -227,6 +224,47 @@ pub mod string {
         asm
     }
 
+    /// Get the address of a string object
+    ///
+    /// If the argument is a string literal, the address is a label in the
+    /// binary, if its a variable return the heap pointer instead.
+    fn address(s: &State, t: &AST, to: Register) -> ASM {
+        match t {
+            AST::Str(tag) => {
+                let index = s.symbols.get(tag).unwrap_or_else(|| {
+                    panic!("String `{}` not found in symbol table", tag)
+                });
+
+                Lea { r: to, of: label(*index), offset: immediate::STR }.into()
+            }
+
+            AST::Identifier(i) => match s.get(&i) {
+                Some(i) => Load { r: to, si: i }.into(),
+                None => panic!("Undefined variable {}", i),
+            },
+
+            _ => panic!(format!("expected string; got {:?}", t)),
+        }
+    }
+
+    /// Label for inlining symbol
+    fn label(index: usize) -> String {
+        format!("inc_str_{}", index)
+    }
+
+    /// Allocate a string object in heap with a specific size
+    pub fn make(_: &State, size: i64) -> ASM {
+        let len = i64::try_from(size).unwrap();
+        let size = ((len + 7) / 8) * 8;
+
+        Mov { to: Heap(0), from: Const(len) }
+            + Mov { to: Reg(RAX), from: Reg(RSI) }
+            + Or { r: RAX, v: Const(immediate::STR) }
+            + Add { r: RSI, v: Const(size) }
+    }
+
+    /// Scan through the source and lift static strings into a symbol table for
+    /// inlining later.
     pub fn lift(s: &mut State, prog: &AST) {
         match prog {
             Str(reference) => {
@@ -355,6 +393,7 @@ pub mod emit {
                     "char?" => primitives::charp(s, arg),
                     "car" => primitives::car(s, arg),
                     "cdr" => primitives::cdr(s, arg),
+                    "make-string" => primitives::string::make(s, arg),
                     n => panic!("Unknown unary primitive: {}", n),
                 },
 
@@ -395,7 +434,7 @@ pub mod emit {
             + x86::init_heap()
             + eval(&mut s, prog)
             + Leave
-            + string::emit_symbols(&s);
+            + string::inline(&s);
 
         gen.to_string()
     }
