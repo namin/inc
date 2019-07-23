@@ -11,11 +11,12 @@
 //!
 //! Some reasonably good tutorials are:
 //!
-//! 1. [x86 Assembly Guide](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
+//! 1. [x86 Assembly Guide 1](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
 //!
-//! 2. Lines in assembly that are indented and starts with a . like `.p2align`
-//! are GNU assembly directives. The full list is available in [GNU assembler
-//! docs](https://sourceware.org/binutils/docs-2.32/as/)
+//! 2. [x86 Assembly Guide 2](http://flint.cs.yale.edu/cs421/papers/x86-asm/asm.html)
+//!
+//! 3. Ops like `.p2align` are not x86 instructions but GNU assembly directives.
+//! See [GNU assembler docs](https://sourceware.org/binutils/docs-2.32/as/).
 //!
 //! # Syntax
 //!
