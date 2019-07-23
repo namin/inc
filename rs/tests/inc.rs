@@ -350,6 +350,33 @@ mod heap {
     }
 }
 
+// Step 7.1: Strings
+mod strings {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let tests = [
+            ("\"Hello world !!\"", "\"Hello world !!\""),
+            ("(boolean? \"hello\")", "#f"),
+            ("(null? \"hello\")", "#f"),
+            ("(pair? \"hello\")", "#f"),
+            ("(string? \"hello\")", "#t"),
+            ("(string? #f)", "#f"),
+            ("(string? #t)", "#f"),
+            ("(string? ())", "#f"),
+            ("(string? (cons 1 2))", "#f"),
+            ("(string? 1287)", "#f"),
+            ("(make-string 0)", "\"\""),
+            ("(null? (make-string 4))", "#f"),
+            ("(string? (make-string 0))", "#t"),
+            ("(string? (make-string 4))", "#t"),
+        ];
+
+        test_many(&tests)
+    }
+}
+
 // Get a test config with program as input
 fn config(program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which

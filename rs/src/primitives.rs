@@ -63,6 +63,13 @@ pub fn pairp(s: &mut State, expr: &AST) -> ASM {
         + compare(Reg(RAX), Const(immediate::PAIR), "sete")
 }
 
+/// Is the expression a string?
+pub fn stringp(s: &mut State, expr: &AST) -> ASM {
+    emit::eval(s, expr)
+        + emit::mask()
+        + compare(Reg(RAX), Const(immediate::STR), "sete")
+}
+
 /// Is the expression zero?
 pub fn zerop(s: &mut State, expr: &AST) -> ASM {
     emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NUM), "sete")

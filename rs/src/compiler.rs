@@ -165,10 +165,9 @@ pub mod state {
 /// anything generic goes into `x86` module.
 pub mod emit {
     use crate::{
-        strings,
         compiler::state::State,
         core::AST::{self, *},
-        immediate, primitives,
+        immediate, primitives, strings,
         x86::{
             self,
             Ins::{self, *},
@@ -251,10 +250,11 @@ pub mod emit {
                     "null?" => primitives::nullp(s, arg),
                     "zero?" => primitives::zerop(s, arg),
                     "not" => primitives::not(s, arg),
-                    "fixnum?" => primitives::fixnump(s, arg),
                     "boolean?" => primitives::booleanp(s, arg),
-                    "pair?" => primitives::pairp(s, arg),
                     "char?" => primitives::charp(s, arg),
+                    "fixnum?" => primitives::fixnump(s, arg),
+                    "pair?" => primitives::pairp(s, arg),
+                    "string?" => primitives::stringp(s, arg),
                     "car" => primitives::car(s, arg),
                     "cdr" => primitives::cdr(s, arg),
                     "make-string" => primitives::string::make(s, arg),
