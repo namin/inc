@@ -90,9 +90,9 @@ fn digit(i: &str) -> IResult<&str, char> {
 
 fn string(i: &str) -> IResult<&str, String> {
     let q = "\"";
-    let (i, s) = delimited(tag(q), is_not(q), tag(q))(i)?;
+    let (i, s) = delimited(tag(q), opt(is_not(q)), tag(q))(i)?;
 
-    Ok((i, s.to_string()))
+    Ok((i, s.map_or(String::from(""), |s| s.to_string())))
 }
 
 // Data include booleans, numbers, characters, strings, symbols, lists, and
@@ -248,10 +248,13 @@ mod tests {
             ok(Str("മലയാളം".into())),
             datum("\"മലയാളം\"")
         );
+
         assert_eq!(
             ok(Str("Unicode 😱 ⌘".into())),
             datum("\"Unicode 😱 ⌘\"")
-        )
+        );
+
+        assert_eq!(ok(Str("".into())), datum("\"\""));
     }
 
     #[test]
