@@ -51,7 +51,7 @@ pub mod state {
             self.env.leave()
         }
 
-        pub fn get(&mut self, i: &str) -> Option<i64> {
+        pub fn get(&self, i: &str) -> Option<i64> {
             self.env.get(i)
         }
 
@@ -111,7 +111,7 @@ pub mod state {
                 .map(|binding| binding.insert(i.to_string(), index));
         }
 
-        pub fn get(&mut self, i: &str) -> Option<i64> {
+        pub fn get(&self, i: &str) -> Option<i64> {
             for bindings in self.0.iter() {
                 if let Some(t) = bindings.get(i) {
                     return Some(*t);
