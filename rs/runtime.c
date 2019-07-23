@@ -78,7 +78,9 @@ void print(int64_t val, bool nested) {
         int64_t len = *(p + 0);
         int64_t *str = p + 1;
 
+        printf("\"");
         fwrite((void *)str, 1, len, stdout);
+        printf("\"");
 
     } else {
         printf("ERROR; unknown value at reference %p \n", (uintptr_t *)val);
