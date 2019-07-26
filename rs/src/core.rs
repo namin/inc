@@ -24,8 +24,12 @@ pub enum AST {
     /// indirection here with `Vec<>` for recursive types. In this context, Vec
     /// is just a convenient way to have a `Box<[AST]>`
     List(Vec<AST>),
+    /// Conditional
+    Cond { pred: Box<AST>, then: Box<AST>, alt: Option<Box<AST>> },
     /// Variable bindings
     Let { bindings: Vec<(String, AST)>, body: Vec<AST> },
+    /// Functions
+    Lambda { args: Vec<String>, body: Vec<AST> },
 }
 
 /// Idiomatic type conversions from the primitive types to AST
@@ -79,6 +83,10 @@ impl Config {
 
 /// Custom error type for all of inc.
 // This might not be idiomatic Rust, revisit later.
+// https://doc.rust-lang.org/std/error/trait.Error.html
+// https://learning-rust.github.io/docs/e7.custom_error_types.html
+// https://doc.rust-lang.org/beta/rust-by-example/error/multiple_error_types/define_error_type.html
+// https://medium.com/@fredrikanderzon/custom-error-types-in-rust-and-the-operator-b499d0fb2925
 #[derive(Debug)]
 pub struct Error {
     pub message: String,

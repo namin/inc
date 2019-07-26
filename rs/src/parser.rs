@@ -1,13 +1,16 @@
 //! A scheme parser in nom.
 //!
-//! Describes the [formal BNF
-//! grammar](http://www.scheme.com/tspl2d/grammar.html) in Rust as closely as
-//! possible using the nom parser combinator library.
+//! Describes the [formal BNF grammar][grammar] in Rust as closely as possible
+//! using the nom parser combinator library.
 //!
-//! See
-//! [lisper](https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs)
-//! for a similar Haskell implementation.
+//! ✏ This module is heavily documented and the order of declaration follow the
+//! grammar; so the source best read sequentially in the declared order rather
+//! than alphabetically here.
 //!
+//! See [lisper][lisper] for a similar Haskell implementation.
+//!
+//! [grammar]: http://www.scheme.com/tspl2d/grammar.html
+//! [lisper]: https://github.com/jaseemabid/lisper/blob/master/src/Lisper/Parser.hs
 use super::core::*;
 use nom::{
     branch::alt,
@@ -18,45 +21,208 @@ use nom::{
     sequence::*,
     IResult,
 };
-use std::str::{self, FromStr};
+use std::str::{self};
 
-pub fn program(i: &str) -> IResult<&str, AST> {
-    delimited(multispace0, alt((let_syntax, datum)), multispace0)(i)
+/// A program consists of a sequence of definitions and expressions.
+///
+/// ```BNF
+/// <program>  → <form>*
+/// <form>     → <definition> | <expression>
+/// ```
+pub fn program(i: &str) -> IResult<&str, Vec<AST>> {
+    many1(form)(i)
 }
 
-// (let-syntax (<syntax binding>*) <expression>+)
+pub fn form(i: &str) -> IResult<&str, AST> {
+    alt((definition, expression))(i)
+}
+
+/// Definitions include various forms of declarations
+///
+/// Definitions include variable and syntax definitions, begin forms containing
+/// zero or more definitions, let-syntax and letrec-syntax forms expanding into
+/// zero or more definitions, and derived definitions. Derived definitions are
+/// syntactic extensions that expand into some form of definition. A transformer
+/// expression is a syntax-rules form or some other expression that produces a
+/// transformer.
+///
+/// ```BNF
+///
+/// <definition> → <variable definition>
+///              | <syntax definition>
+///              | (begin <definition>*)
+///              | (let-syntax (<syntax binding>*) <definition>*)
+///              | (letrec-syntax (<syntax binding>*) <definition>*)
+///              | <derived definition>
+///
+/// <variable definition> → (define <variable> <expression>)
+///                       | (define (<variable> <variable>*) <body>)
+///                       | (define (<variable> <variable>* . <variable>) <body>)
+///
+/// <variable>          → <identifier>
+/// <body>              → <definition>* <expression>+
+/// <syntax definition> → (define-syntax <keyword> <transformer expression>)
+/// <keyword>           → <identifier>
+/// <syntax binding>    → (<keyword> <transformer expression>)
+/// ```
+fn definition(i: &str) -> IResult<&str, AST> {
+    // TODO: expression doesn't belong here, but otherwise definition would be ∞
+    alt((let_syntax, if_syntax, expression))(i)
+}
+
+/// `(let-syntax (<syntax binding>*) <expression>+)`
 fn let_syntax(i: &str) -> IResult<&str, AST> {
-    let (i, _) = tuple((char('('), multispace0, tag("let"), multispace1))(i)?;
-    let (i, b) = delimited(char('('), many0(binding), char(')'))(i)?;
-    let (i, e) = delimited(multispace0, many1(program), multispace0)(i)?;
-    let (i, _) = char(')')(i)?;
+    let (i, _) = tuple((open, tag("let"), multispace1))(i)?;
+    let (i, bindings) = delimited(open, many0(binding), close)(i)?;
+    let (i, body) = delimited(
+        multispace0,
+        many1(terminated(definition, multispace0)),
+        multispace0,
+    )(i)?;
+    let (i, _) = close(i)?;
 
-    Ok((i, AST::Let { bindings: b, body: e }))
+    Ok((i, AST::Let { bindings, body }))
 }
 
-// named → (name value)
+/// `named → (name value)`
 fn binding(i: &str) -> IResult<&str, (String, AST)> {
-    let (i, _) = delimited(multispace0, char('('), multispace0)(i)?;
-    let (i, (name, _, value)) = tuple((identifier, multispace0, program))(i)?;
-    let (i, _) = delimited(multispace0, char(')'), multispace0)(i)?;
+    let (i, (_, name, _, value, _, _)) =
+        tuple((open, identifier, multispace1, expression, close, multispace0))(
+            i,
+        )?;
 
     Ok((i, (name, value)))
 }
 
-// Identifiers may denote variables, keywords, or symbols, depending upon
-// context. They are formed from sequences of letters, digits, and special
-// characters. With three exceptions, identifiers cannot begin with a
-// character that can also begin a number, i.e., they cannot begin with .,
-// +, -, or a digit. The three exceptions are the identifiers ..., +, and -.
-// Case is insignificant in symbols so that, for example, newspaper,
-// NewsPaper, and NEWSPAPER all represent the same identifier.
-//
-// <identifier> → <initial> <subsequent>* | + | - | ...
-// <initial>    → <letter> | ! | $ | % | & | * | / | : | < | = | > | ? | ~ | _ | ^
-// <subsequent> → <initial> | <digit> | . | + | -
-// <letter>     → a | b | ... | z
-// <digit>      → 0 | 1 | ... | 9
+/// Core expressions
+///
+/// Expressions include core expressions, let-syntax or letrec-syntax forms
+/// expanding into a sequence of one or more expressions, and derived
+/// expressions. The core expressions are self-evaluating constants, variable
+/// references, applications, and quote, lambda, if, and set! expressions.
+/// Derived expressions include and, begin, case, cond, delay, do, let, let*,
+/// letrec, or, and quasiquote expressions plus syntactic extensions that expand
+/// into some form of expression.
+///
+/// ```BNF
+/// <expression>  → <constant>
+///               | <variable>
+///               | (quote <datum>) | ' <datum>
+///               | (lambda <formals> <body>)
+///               | (if <expression> <expression> <expression>)
+///               | (if <expression> <expression>)
+///               | (set! <variable> <expression>)
+///               | <application>
+///               | (let-syntax (<syntax binding>*) <expression>+)
+///               | (letrec-syntax (<syntax binding>*) <expression>+)
+///               | <derived expression>
+///
+/// <constant>    → <boolean> | <number> | <character> | <string>
+/// <formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)
+/// <application> → (<expression> <expression>*)
+/// ```
+fn expression(i: &str) -> IResult<&str, AST> {
+    alt((constant, variable, lambda, if_syntax, let_syntax, application))(i)
+}
 
+/// `(lambda <formals> <body>)`
+fn lambda(i: &str) -> IResult<&str, AST> {
+    let (i, (_, _, args, body, _)) =
+        tuple((open, tag("lambda"), formals, body, close))(i)?;
+
+    Ok((i, AST::Lambda { args, body }))
+}
+
+/// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
+fn if_syntax(i: &str) -> IResult<&str, AST> {
+    let (i, (_, _, _, pred, _, then, _, alt, _)) = tuple((
+        open,
+        tag("if"),
+        multispace1,
+        expression,
+        multispace1,
+        expression,
+        multispace1,
+        opt(expression),
+        close,
+    ))(i)?;
+
+    let pred = Box::new(pred);
+    let then = Box::new(then);
+    let alt = alt.map(|e| Box::new(e));
+
+    Ok((i, AST::Cond { pred, then, alt }))
+}
+
+/// variable is an identifier
+fn variable(i: &str) -> IResult<&str, AST> {
+    map(identifier, { |i| AST::Identifier(i) })(i)
+}
+
+/// `<formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)`
+fn formals(i: &str) -> IResult<&str, Vec<String>> {
+    alt((
+        map(identifier, |s| vec![s]),
+        delimited(open, many1(identifier), close),
+    ))(i)
+}
+
+/// `<body> → <definition>* <expression>+`
+fn body(i: &str) -> IResult<&str, Vec<AST>> {
+    let (i, mut ds) = many0(definition)(i)?;
+    let (i, mut es) = many1(expression)(i)?;
+
+    let mut v = Vec::new();
+    v.append(&mut ds);
+    v.append(&mut es);
+
+    Ok((i, v))
+}
+
+/// `<constant> → <boolean> | <number> | <character> | <string>`
+fn constant(i: &str) -> IResult<&str, AST> {
+    alt((
+        (map(tag("()"), { |_| AST::Nil })),
+        (map(ascii, { |c| AST::Char(c) })),
+        (map(boolean, { |b| AST::Boolean(b) })),
+        (map(number, { |i| AST::Number(i) })),
+        (map(string, { |i| AST::Str(i) })),
+    ))(i)
+}
+
+/// `<application> → (<expression> <expression>*)`
+fn application(i: &str) -> IResult<&str, AST> {
+    let (i, (_, a, _, mut b, _)) = tuple((
+        open,
+        expression,
+        multispace1,
+        many1(terminated(expression, multispace0)),
+        close,
+    ))(i)?;
+
+    let mut v = vec![a];
+    v.append(&mut b);
+
+    Ok((i, AST::List(v)))
+}
+
+/// Identifiers may denote variables, keywords, or symbols depending upon
+/// context.
+///
+/// They are formed from sequences of letters, digits, and special
+/// characters. With three exceptions, identifiers cannot begin with a
+/// character that can also begin a number, i.e., they cannot begin with .,
+/// +, -, or a digit. The three exceptions are the identifiers ..., +, and -.
+/// Case is insignificant in symbols so that, for example, newspaper,
+/// NewsPaper, and NEWSPAPER all represent the same identifier.
+///
+/// ```BNF
+/// <identifier> → <initial> <subsequent>* | + | - | ...
+/// <initial>    → <letter> | ! | $ | % | & | * | / | : | < | = | > | ? | ~ | _ | ^
+/// <subsequent> → <initial> | <digit> | . | + | -
+/// <letter>     → a | b | ... | z
+/// <digit>      → 0 | 1 | ... | 9
+/// ```
 fn identifier(i: &str) -> IResult<&str, String> {
     alt((
         value(String::from("+"), tag("+")),
@@ -88,32 +254,28 @@ fn digit(i: &str) -> IResult<&str, char> {
     one_of("0123456789")(i)
 }
 
-fn string(i: &str) -> IResult<&str, String> {
-    let q = "\"";
-    let (i, s) = delimited(tag(q), opt(is_not(q)), tag(q))(i)?;
-
-    Ok((i, s.map_or(String::from(""), |s| s.to_string())))
-}
-
-// Data include booleans, numbers, characters, strings, symbols, lists, and
-// vectors. Case is insignificant in the syntax for booleans, numbers, and
-// character names, but it is significant in other character constants and
-// in strings. For example, #T is equivalent to #t, #E1E3 is equivalent to
-// #e1e3, #X2aBc is equivalent to #x2abc, and #\NewLine is equivalent to
-// #\newline; but #\A is distinct from #\a and "String" is distinct from
-// string".
-//
-// <datum>            → <boolean> | <number> | <character> | <string> | <symbol> | <list> | <vector>
-// <boolean>          → #t | #f
-// <number>           → <num 2> | <num 8> | <num 10> | <num 16>
-// <character>        → #\ <any character> | #\newline | #\space
-// <string>           → " <string character>* "
-// <string character> → \" | \\ | <any character other than" or \>
-// <symbol>           →  <identifier>
-// <list>             →  (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
-// <abbreviation>     →  ' <datum> | ` <datum> | , <datum> | ,@ <datum>
-// <vector>           → #(<datum>*)
-
+/// Data include booleans, numbers, characters, strings, symbols, lists, and
+/// vectors.
+///
+/// Case is insignificant in the syntax for booleans, numbers, and
+/// character names, but it is significant in other character constants and
+/// in strings. For example, #T is equivalent to #t, #E1E3 is equivalent to
+/// #e1e3, #X2aBc is equivalent to #x2abc, and #\NewLine is equivalent to
+/// #\newline; but #\A is distinct from #\a and "String" is distinct from
+/// string".
+///
+/// ```BNF
+/// <datum>            → <boolean> | <number> | <character> | <string> | <symbol> | <list> | <vector>
+/// <boolean>          → #t | #f
+/// <number>           → <num 2> | <num 8> | <num 10> | <num 16>
+/// <character>        → #\ <any character> | #\newline | #\space
+/// <string>           → " <string character>* "
+/// <string character> → \" | \\ | <any character other than" or \>
+/// <symbol>           →  <identifier>
+/// <list>             →  (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
+/// <abbreviation>     →  ' <datum> | ` <datum> | , <datum> | ,@ <datum>
+/// <vector>           → #(<datum>*)
+/// ```
 fn datum(i: &str) -> IResult<&str, AST> {
     alt((
         (map(tag("()"), { |_| AST::Nil })),
@@ -146,7 +308,7 @@ fn number(i: &str) -> IResult<&str, i64> {
     Ok((i, s.unwrap_or(1) * n))
 }
 
-// ASCII Characters for now
+/// ASCII Characters for now
 fn ascii(i: &str) -> IResult<&str, u8> {
     // $ man ascii
     alt((
@@ -159,7 +321,14 @@ fn ascii(i: &str) -> IResult<&str, u8> {
     ))(i)
 }
 
-// <list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>
+fn string(i: &str) -> IResult<&str, String> {
+    let q = "\"";
+    let (i, s) = delimited(tag(q), opt(is_not(q)), tag(q))(i)?;
+
+    Ok((i, s.map_or(String::from(""), |s| s.to_string())))
+}
+
+/// `<list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>`
 fn list(i: &str) -> IResult<&str, AST> {
     let (i, _) = tuple((char('('), multispace0))(i)?;
     let (i, elems) = separated_list(multispace1, datum)(i)?;
@@ -170,6 +339,16 @@ fn list(i: &str) -> IResult<&str, AST> {
     } else {
         Ok((i, AST::List(elems)))
     }
+}
+
+fn open(i: &str) -> IResult<&str, ()> {
+    let (i, _) = tuple((char('('), multispace0))(i)?;
+    Ok((i, ()))
+}
+
+fn close(i: &str) -> IResult<&str, ()> {
+    let (i, _) = tuple((multispace0, char(')')))(i)?;
+    Ok((i, ()))
 }
 
 #[cfg(test)]
@@ -301,23 +480,24 @@ mod tests {
 
     #[test]
     fn top() {
-        assert_eq!(ok(true.into()), program("#t"));
-        assert_eq!(ok(false.into()), program("#f"));
+        assert_eq!(ok(vec![true.into()]), program("#t"));
+        assert_eq!(ok(vec![false.into()]), program("#f"));
 
-        assert_eq!(ok('?'.into()), program("#\\?"));
+        assert_eq!(ok(vec!['?'.into()]), program("#\\?"));
 
-        assert_eq!(ok(42.into()), program("42"));
-        assert_eq!(ok((-42).into()), program("-42"));
+        assert_eq!(ok(vec![42.into()]), program("42"));
+        assert_eq!(ok(vec![(-42).into()]), program("-42"));
 
-        assert_eq!(ok('j'.into()), program("#\\j"));
-        assert_eq!(ok('^'.into()), program("#\\^"));
+        assert_eq!(ok(vec!['j'.into()]), program("#\\j"));
+        assert_eq!(ok(vec!['^'.into()]), program("#\\^"));
     }
 
     #[test]
-    fn let_binding() {
-        let prog = "(let ((x 1) (y 2)) (+ x y))";
+    fn let_syntax() {
+        let p1 = "(let ((x 1) (y 2)) (+ x y))";
+        let p2 = "(let ((x 1)) (let ((x 2)) #t) x)";
 
-        let exp = Let {
+        let e1 = Let {
             bindings: vec![
                 ("x".to_string(), Number(1)),
                 ("y".to_string(), Number(2)),
@@ -329,7 +509,24 @@ mod tests {
             ])],
         };
 
-        assert_eq!(ok(exp), program(prog));
+        let e2 = Let {
+            bindings: vec![("x".to_string(), Number(1))],
+            body: vec![
+                Let {
+                    bindings: vec![("x".to_string(), Number(2))],
+                    body: vec![true.into()],
+                },
+                Identifier("x".to_string()),
+            ],
+        };
+
+        assert_eq!(ok(e1), super::let_syntax(p1));
+        assert_eq!(ok(e2), super::let_syntax(p2));
+
+        assert!(program(
+            "(let ((x (let ((y (+ 1 2))) (* y y)))) (cons x (+ x x)))"
+        )
+        .is_ok());
 
         assert!(program("(let ((x (let ((y 3)) (* y y)))) (cons x (+ x x)))")
             .is_ok());
@@ -338,31 +535,25 @@ mod tests {
     #[test]
     fn if_syntax() {
         let prog = "(if #t 12 13)";
-        let exp = List(vec![
-            Identifier(String::from("if")),
-            Boolean(true),
-            Number(12),
-            Number(13),
-        ]);
+        let exp = Cond {
+            pred: Box::new(Boolean(true)),
+            then: Box::new(Number(12)),
+            alt: Some(Box::new(Number(13))),
+        };
 
-        assert_eq!(ok(exp), program(prog));
+        assert_eq!(ok(vec![exp]), program(prog));
     }
-
 }
 
 /// Parse the input from user into the form the top level of the compiler
 /// understands.
-impl FromStr for AST {
-    type Err = Error;
-
-    fn from_str(i: &str) -> Result<Self, Error> {
-        match program(i) {
-            Ok((_rest, ast)) => Ok(ast),
-            // Ok((parser::EMPTY, ast)) => Ok(ast),
-            // Ok((_rest, _ast)) => Err(Error {
-            //     message: String::from("All of input not consumed"),
-            // }),
-            Err(e) => Err(Error { message: format!("{:?}", e) }),
-        }
+pub fn parse(i: &str) -> Result<Vec<AST>, Error> {
+    match program(i) {
+        Ok((_rest, ast)) => Ok(ast),
+        // Ok((EMPTY, ast)) => Ok(ast),
+        // Ok((_rest, _ast)) => Err(Error {
+        //     message: String::from("All of input not consumed"),
+        // }),
+        Err(e) => Err(Error { message: format!("{:?}", e) }),
     }
 }

@@ -209,17 +209,32 @@ pub mod emit {
     }
 
     /// Emit code for a conditional expression
-    pub fn cond(s: &mut State, predicate: &AST, then: &AST, alt: &AST) -> ASM {
-        let alt_label = s.gen_label();
+    pub fn cond(
+        s: &mut State,
+        p: &AST,
+        then: &AST,
+        alt: &Option<Box<AST>>,
+    ) -> ASM {
         let exit_label = s.gen_label();
+        let alt_label = s.gen_label();
 
-        eval(s, predicate)
-            + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
-            + Ins::Je(alt_label.clone())
-            + eval(s, then)
-            + Ins::Jmp(exit_label.clone())
-            + Ins::Label(alt_label)
-            + eval(s, alt)
+        eval(s, p)
+            + match alt {
+                Some(e) => {
+                    Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
+                        + Ins::Je(alt_label.clone())
+                        + eval(s, then)
+                        + Ins::Jmp(exit_label.clone())
+                        + Ins::Label(alt_label)
+                        + eval(s, e)
+                }
+                None => {
+                    eval(s, p)
+                        + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
+                        + Ins::Je(exit_label.clone())
+                        + eval(s, then)
+                }
+            }
             + Ins::Label(exit_label)
     }
 
@@ -242,6 +257,8 @@ pub mod emit {
             Str(data) => strings::eval(&s, &data),
 
             Let { bindings, body } => binding(s, bindings, body),
+
+            Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
                 [Identifier(i), arg] => match &i[..] {
@@ -276,11 +293,6 @@ pub mod emit {
                     n => panic!("Unknown binary primitive: {}", n),
                 },
 
-                [Identifier(name), x, y, z] => match &name[..] {
-                    "if" => cond(s, x, y, z),
-                    name => panic!("Unknown ternary primitive: {}", name),
-                },
-
                 l => panic!("Unknown expression: {:?}", l),
             },
 
@@ -289,16 +301,21 @@ pub mod emit {
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: &AST) -> String {
+    pub fn program(prog: Vec<AST>) -> String {
         let mut s: State = Default::default();
-        strings::lift(&mut s, prog);
-        let gen = x86::prelude()
-            + x86::func("init")
-            + Enter
-            + x86::init_heap()
-            + eval(&mut s, prog)
-            + Leave
-            + strings::inline(&s);
+
+        for b in prog.iter() {
+            strings::lift(&mut s, &b);
+        }
+
+        let mut gen =
+            x86::prelude() + x86::func("init") + Enter + x86::init_heap();
+
+        for b in prog.iter() {
+            gen += eval(&mut s, &b);
+        }
+
+        gen = gen + Leave + strings::inline(&s);
 
         gen.to_string()
     }

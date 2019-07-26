@@ -57,6 +57,12 @@ pub fn to(prog: &AST) -> i64 {
         AST::Let { .. } => {
             unimplemented!("immediate repr is undefined for let binding")
         }
+        AST::Cond { .. } => {
+            unimplemented!("immediate repr is undefined for a conditional")
+        }
+        AST::Lambda { .. } => {
+            unimplemented!("immediate repr is undefined for a lambda")
+        }
     }
 }
 

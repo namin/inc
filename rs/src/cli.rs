@@ -1,6 +1,6 @@
 //! Command line interface for inc
 
-use crate::{compiler::emit, core::Config, core::AST};
+use crate::{compiler::emit, core::Config, core::AST, parser};
 
 use std::fs::File;
 use std::io::Write;
@@ -8,15 +8,13 @@ use std::process::Command;
 
 /// Compile the program and write the assembly to target
 pub fn compile(config: &Config) -> Result<(), std::io::Error> {
-    let prog: AST = config
-        .program
-        .parse::<AST>()
+    let prog: Vec<AST> = parser::parse(&config.program)
         .expect(&format!("Failed to parse input program `{}`", config.program));
 
     let mut handler = File::create(&config.asm())
         .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));
 
-    handler.write_all(emit::program(&prog).as_bytes())
+    handler.write_all(emit::program(prog).as_bytes())
 }
 
 /// Build the generated ASM with clang into executable binary
