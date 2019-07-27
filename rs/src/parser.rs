@@ -21,7 +21,7 @@ use nom::{
     sequence::*,
     IResult,
 };
-use std::str::{self};
+use std::str;
 
 /// A program consists of a sequence of definitions and expressions.
 ///
@@ -142,7 +142,7 @@ fn if_syntax(i: &str) -> IResult<&str, AST> {
         expression,
         multispace1,
         expression,
-        multispace1,
+        multispace0,
         opt(expression),
         close,
     ))(i)?;
@@ -542,7 +542,17 @@ mod tests {
         };
 
         assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(if #t 14)";
+        let exp = Cond {
+            pred: Box::new(Boolean(true)),
+            then: Box::new(Number(14)),
+            alt: None,
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
     }
+
 }
 
 /// Parse the input from user into the form the top level of the compiler

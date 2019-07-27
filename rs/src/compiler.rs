@@ -219,21 +219,14 @@ pub mod emit {
         let alt_label = s.gen_label();
 
         eval(s, p)
+            + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
+            + Ins::Je(alt_label.clone())
+            + eval(s, then)
+            + Ins::Jmp(exit_label.clone())
+            + Ins::Label(alt_label)
             + match alt {
-                Some(e) => {
-                    Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
-                        + Ins::Je(alt_label.clone())
-                        + eval(s, then)
-                        + Ins::Jmp(exit_label.clone())
-                        + Ins::Label(alt_label)
-                        + eval(s, e)
-                }
-                None => {
-                    eval(s, p)
-                        + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
-                        + Ins::Je(exit_label.clone())
-                        + eval(s, then)
-                }
+                None => eval(s, &AST::Nil),
+                Some(t) => eval(s, t),
             }
             + Ins::Label(exit_label)
     }
