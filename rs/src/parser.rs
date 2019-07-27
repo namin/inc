@@ -272,6 +272,7 @@ fn digit(i: &str) -> IResult<&str, char> {
 /// <abbreviation>     →  ' <datum> | ` <datum> | , <datum> | ,@ <datum>
 /// <vector>           → #(<datum>*)
 /// ```
+#[cfg(test)]
 fn datum(i: &str) -> IResult<&str, AST> {
     alt((
         (map(tag("()"), { |_| AST::Nil })),
@@ -325,6 +326,7 @@ fn string(i: &str) -> IResult<&str, String> {
 }
 
 /// `<list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>`
+#[cfg(test)]
 fn list(i: &str) -> IResult<&str, AST> {
     let (i, _) = tuple((char('('), space0))(i)?;
     let (i, elems) = separated_list(space1, datum)(i)?;
