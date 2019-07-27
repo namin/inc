@@ -15,7 +15,7 @@ use super::core::*;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
-    character::complete::*,
+    character::complete::{multispace0 as space0, multispace1 as space1, *},
     combinator::{map, opt, value},
     multi::*,
     sequence::*,
@@ -71,13 +71,10 @@ fn definition(i: &str) -> IResult<&str, AST> {
 
 /// `(let-syntax (<syntax binding>*) <expression>+)`
 fn let_syntax(i: &str) -> IResult<&str, AST> {
-    let (i, _) = tuple((open, tag("let"), multispace1))(i)?;
+    let (i, _) = tuple((open, tag("let"), space1))(i)?;
     let (i, bindings) = delimited(open, many0(binding), close)(i)?;
-    let (i, body) = delimited(
-        multispace0,
-        many1(terminated(expression, multispace0)),
-        multispace0,
-    )(i)?;
+    let (i, body) =
+        delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
     Ok((i, AST::Let { bindings, body }))
@@ -86,9 +83,7 @@ fn let_syntax(i: &str) -> IResult<&str, AST> {
 /// `named → (name value)`
 fn binding(i: &str) -> IResult<&str, (String, AST)> {
     let (i, (_, name, _, value, _, _)) =
-        tuple((open, identifier, multispace1, expression, close, multispace0))(
-            i,
-        )?;
+        tuple((open, identifier, space1, expression, close, space0))(i)?;
 
     Ok((i, (name, value)))
 }
@@ -128,15 +123,8 @@ fn expression(i: &str) -> IResult<&str, AST> {
 
 /// `(lambda <formals> <body>)`
 fn lambda_syntax(i: &str) -> IResult<&str, AST> {
-    let (i, (_, _, _, args, _, body, _)) = tuple((
-        open,
-        tag("lambda"),
-        multispace1,
-        formals,
-        multispace0,
-        body,
-        close,
-    ))(i)?;
+    let (i, (_, _, _, args, _, body, _)) =
+        tuple((open, tag("lambda"), space1, formals, space0, body, close))(i)?;
 
     Ok((i, AST::Lambda { args, body }))
 }
@@ -146,11 +134,11 @@ fn if_syntax(i: &str) -> IResult<&str, AST> {
     let (i, (_, _, _, pred, _, then, _, alt, _)) = tuple((
         open,
         tag("if"),
-        multispace1,
+        space1,
         expression,
-        multispace1,
+        space1,
         expression,
-        multispace0,
+        space0,
         opt(expression),
         close,
     ))(i)?;
@@ -171,7 +159,7 @@ fn variable(i: &str) -> IResult<&str, AST> {
 fn formals(i: &str) -> IResult<&str, Vec<String>> {
     alt((
         map(identifier, |s| vec![s]),
-        delimited(open, many0(terminated(identifier, multispace0)), close),
+        delimited(open, many0(terminated(identifier, space0)), close),
     ))(i)
 }
 
@@ -203,8 +191,8 @@ fn application(i: &str) -> IResult<&str, AST> {
     let (i, (_, a, _, mut b, _)) = tuple((
         open,
         expression,
-        multispace1,
-        many1(terminated(expression, multispace0)),
+        space1,
+        many1(terminated(expression, space0)),
         close,
     ))(i)?;
 
@@ -338,9 +326,9 @@ fn string(i: &str) -> IResult<&str, String> {
 
 /// `<list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>`
 fn list(i: &str) -> IResult<&str, AST> {
-    let (i, _) = tuple((char('('), multispace0))(i)?;
-    let (i, elems) = separated_list(multispace1, datum)(i)?;
-    let (i, _) = tuple((multispace0, char(')')))(i)?;
+    let (i, _) = tuple((char('('), space0))(i)?;
+    let (i, elems) = separated_list(space1, datum)(i)?;
+    let (i, _) = tuple((space0, char(')')))(i)?;
 
     if elems.is_empty() {
         Ok((i, AST::Nil))
@@ -350,12 +338,12 @@ fn list(i: &str) -> IResult<&str, AST> {
 }
 
 fn open(i: &str) -> IResult<&str, ()> {
-    let (i, _) = tuple((char('('), multispace0))(i)?;
+    let (i, _) = tuple((char('('), space0))(i)?;
     Ok((i, ()))
 }
 
 fn close(i: &str) -> IResult<&str, ()> {
-    let (i, _) = tuple((multispace0, char(')')))(i)?;
+    let (i, _) = tuple((space0, char(')')))(i)?;
     Ok((i, ()))
 }
 
