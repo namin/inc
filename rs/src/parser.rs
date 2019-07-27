@@ -66,8 +66,7 @@ pub fn form(i: &str) -> IResult<&str, AST> {
 /// <syntax binding>    → (<keyword> <transformer expression>)
 /// ```
 fn definition(i: &str) -> IResult<&str, AST> {
-    // TODO: expression doesn't belong here, but otherwise definition would be ∞
-    alt((let_syntax, if_syntax, expression))(i)
+    alt((let_syntax, if_syntax))(i)
 }
 
 /// `(let-syntax (<syntax binding>*) <expression>+)`
@@ -76,7 +75,7 @@ fn let_syntax(i: &str) -> IResult<&str, AST> {
     let (i, bindings) = delimited(open, many0(binding), close)(i)?;
     let (i, body) = delimited(
         multispace0,
-        many1(terminated(definition, multispace0)),
+        many1(terminated(expression, multispace0)),
         multispace0,
     )(i)?;
     let (i, _) = close(i)?;
@@ -122,13 +121,22 @@ fn binding(i: &str) -> IResult<&str, (String, AST)> {
 /// <application> → (<expression> <expression>*)
 /// ```
 fn expression(i: &str) -> IResult<&str, AST> {
-    alt((constant, variable, lambda, if_syntax, let_syntax, application))(i)
+    alt((constant, variable, lambda_syntax, if_syntax, let_syntax, application))(
+        i,
+    )
 }
 
 /// `(lambda <formals> <body>)`
-fn lambda(i: &str) -> IResult<&str, AST> {
-    let (i, (_, _, args, body, _)) =
-        tuple((open, tag("lambda"), formals, body, close))(i)?;
+fn lambda_syntax(i: &str) -> IResult<&str, AST> {
+    let (i, (_, _, _, args, _, body, _)) = tuple((
+        open,
+        tag("lambda"),
+        multispace1,
+        formals,
+        multispace0,
+        body,
+        close,
+    ))(i)?;
 
     Ok((i, AST::Lambda { args, body }))
 }
@@ -163,7 +171,7 @@ fn variable(i: &str) -> IResult<&str, AST> {
 fn formals(i: &str) -> IResult<&str, Vec<String>> {
     alt((
         map(identifier, |s| vec![s]),
-        delimited(open, many1(identifier), close),
+        delimited(open, many0(terminated(identifier, multispace0)), close),
     ))(i)
 }
 
@@ -553,6 +561,39 @@ mod tests {
         assert_eq!(ok(vec![exp]), program(prog));
     }
 
+    #[test]
+    fn lambda_syntax() {
+        let prog = "(lambda () 1)";
+        let exp = Lambda { args: vec![], body: vec![Number(1)] };
+
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(lambda (a b ) a)";
+        let exp = Lambda {
+            args: vec!["a".into(), "b".into()],
+            body: vec![Identifier("a".into())],
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
+        // assert_eq!(ok(exp), super::lambda_syntax(prog));
+
+        let prog = "(lambda (a b) (+ b a))";
+        let exp = Lambda {
+            args: vec!["a".into(), "b".into()],
+            body: vec![AST::List(vec!["+".into(), "b".into(), "a".into()])],
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
+        // assert_eq!(ok(exp), super::lambda_syntax(prog));
+
+        let prog = "(lambda a a)";
+        let exp = Lambda {
+            args: vec!["a".into()],
+            body: vec![Identifier("a".into())],
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
+    }
 }
 
 /// Parse the input from user into the form the top level of the compiler
