@@ -218,16 +218,19 @@ pub mod emit {
         let exit_label = s.gen_label();
         let alt_label = s.gen_label();
 
+        // A conditional without an explicit alternate should evaluate to '()
+        let t = match alt {
+            None => &AST::Nil,
+            Some(t) => t,
+        };
+
         eval(s, p)
             + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
             + Ins::Je(alt_label.clone())
             + eval(s, then)
             + Ins::Jmp(exit_label.clone())
             + Ins::Label(alt_label)
-            + match alt {
-                None => eval(s, &AST::Nil),
-                Some(t) => eval(s, t),
-            }
+            + eval(s, t)
             + Ins::Label(exit_label)
     }
 
