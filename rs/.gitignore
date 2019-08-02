@@ -1,6 +1,8 @@
-
 **/*.rs.bk
+*.dSYM
 *.s
-/a.out
-/a.out.dSYM
-/target
+a.out
+inc
+inc-*
+inc.dSYM
+target

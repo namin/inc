@@ -1,0 +1,8 @@
+.dockerignore
+.gitignore
+Dockerfile
+Makefile
+inc
+inc.dSYM
+inc.s
+target
