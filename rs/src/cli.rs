@@ -19,7 +19,7 @@ pub fn compile(config: &Config) -> Result<(), std::io::Error> {
 
 /// Build the generated ASM with clang into executable binary
 pub fn build(config: &Config) -> bool {
-    Command::new("clang")
+    Command::new("gcc")
         .arg("-m64")
         .arg("-g3")
         .arg("-ggdb3")
