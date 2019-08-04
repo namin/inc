@@ -1,6 +1,10 @@
 //! Command line interface for inc
 
-use crate::{compiler::emit, core::{Config, Expressions}, parser};
+use crate::{
+    compiler::emit,
+    core::{Config, Expressions},
+    parser,
+};
 
 use std::fs::File;
 use std::io::Write;
@@ -8,8 +12,9 @@ use std::process::Command;
 
 /// Parse the program and return an AST
 pub fn parse(config: &Config) -> Expressions {
-    parser::parse(&config.program)
-        .expect(&format!("Failed to parse input program `{}`", config.program))
+    parser::parse(&config.program).unwrap_or_else(|_| {
+        panic!("Failed to parse input program `{}`", config.program)
+    })
 }
 
 /// Compile the program and write the assembly to target

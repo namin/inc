@@ -290,7 +290,7 @@ pub mod emit {
                     n => panic!("Unknown binary primitive: {}", n),
                 },
 
-                l => panic!("Unknown expression: {:?}", l),
+                _ => panic!("Unknown expression: `{}`", prog),
             },
 
             _ => Mov { to: Reg(RAX), from: Const(immediate::to(&prog)) }.into(),

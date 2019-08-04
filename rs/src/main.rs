@@ -13,6 +13,8 @@ fn main() -> Result<(), std::io::Error> {
     let mut opts = Options::new();
     opts.optopt("o", "", "Output file name", "FILE");
     opts.optflag("S", "", "Print generated asm");
+    opts.optflag("p", "", "Print parse tree");
+    opts.optflag("P", "", "Dump raw parse tree");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -39,6 +41,20 @@ fn main() -> Result<(), std::io::Error> {
         .expect("Expected a program in stdin");
 
     let config = Config { program, output, exec };
+
+    // Dump pretty printed parse tree with `-p`
+    if matches.opt_present("p") {
+        let p = cli::parse(&config);
+        println!("{}", p);
+        return Ok(());
+    }
+
+    // Dump raw parse tree with `-P`
+    if matches.opt_present("P") {
+        let p = cli::parse(&config);
+        println!("{:?}", p);
+        return Ok(());
+    }
 
     cli::compile(&config)?;
 

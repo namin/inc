@@ -4,7 +4,8 @@
 
 /// The parser parses the input program to generate an AST. See tests for
 /// several examples.
-// TODO: Implement `Display` trait to pretty print the AST
+use std::fmt;
+
 /// Abstract Syntax Tree for a single expression
 #[derive(Debug, PartialEq)]
 pub enum AST {
@@ -34,8 +35,69 @@ pub enum AST {
 }
 
 /// Expressions wrap over `Vec<T>` so new traits can be defined on it
+#[derive(Debug)]
 pub struct Expressions(pub Vec<AST>);
+
+/// Pretty print an AST
+impl fmt::Display for AST {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AST::Nil => write!(f, "()"),
+            AST::Number(n) => write!(f, "{}", n),
+            AST::Boolean(t) => write!(f, "{}", if *t { "#t" } else { "#f" }),
+            AST::Char(c) => write!(f, "{}", c),
+            AST::Str(s) => write!(f, "\"{}\"", s),
+            AST::Identifier(i) => write!(f, "{}", i),
+            AST::List(l) => {
+                write!(f, "(")?;
+                for i in l.iter() {
+                    write!(f, "{} ", i)?;
+                }
+                write!(f, ")")
+            }
+            AST::Cond { pred, then, alt } => match alt {
+                None => write!(f, "(if {} {})", pred, then),
+                Some(t) => write!(f, "(if {} {} {})", pred, then, t),
+            },
+            AST::Let { bindings, body } => {
+                write!(f, "(let (")?;
+                for (a, b) in bindings.iter() {
+                    write!(f, "({} {}) ", a, b)?;
+                }
+                write!(f, ") ")?;
+
+                for b in body.iter() {
+                    write!(f, "{}", b)?;
+                }
+
+                write!(f, ")")
+            }
+            AST::Lambda { args, body } => {
+                write!(f, "(λ (")?;
+                for arg in args.iter() {
+                    write!(f, "{} ", arg)?;
+                }
+                write!(f, ") ")?;
+
+                for b in body.iter() {
+                    write!(f, "{}", b)?;
+                }
+
+                write!(f, ")")
+            }
+        }
+    }
 }
+
+impl fmt::Display for Expressions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for line in self.0.iter() {
+            write!(f, "{}", line).unwrap();
+        }
+        Ok(())
+    }
+}
+
 /// Idiomatic type conversions from the primitive types to AST
 ///
 /// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
