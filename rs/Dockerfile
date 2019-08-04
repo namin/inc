@@ -15,7 +15,7 @@ WORKDIR /dep
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
-RUN cargo build
+RUN cargo build --tests
 RUN rm src/*.rs
 
 RUN mkdir /inc
