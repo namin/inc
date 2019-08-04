@@ -225,7 +225,9 @@ fn identifier(i: &str) -> IResult<&str, String> {
         value(String::from("-"), tag("-")),
         value(String::from("..."), tag("...")),
         map(tuple((initial, many0(subsequent))), |(i, s)| {
-            format!("{}{}", i, s.into_iter().collect::<String>())
+            // Convert a vector of chars to string
+            // https://doc.rust-lang.org/stable/core/iter/trait.Iterator.html#method.collect
+            format!("{}{}", i, s.iter().collect::<String>())
         }),
     ))(i)
 }

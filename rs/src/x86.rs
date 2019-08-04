@@ -292,7 +292,7 @@ impl fmt::Display for Ins {
 impl fmt::Display for ASM {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut ctx = String::new();
-        for op in self.0.iter() {
+        for op in &self.0 {
             ctx.push_str(&op.to_string());
         }
         write!(f, "{}", ctx)

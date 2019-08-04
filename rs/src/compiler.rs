@@ -112,7 +112,7 @@ pub mod state {
         }
 
         pub fn get(&self, i: &str) -> Option<i64> {
-            for bindings in self.0.iter() {
+            for bindings in &self.0 {
                 if let Some(t) = bindings.get(i) {
                     return Some(*t);
                 }
@@ -196,12 +196,12 @@ pub mod emit {
 
         s.enter();
 
-        for (name, expr) in vars.iter() {
+        for (name, expr) in vars {
             asm += eval(s, expr) + Save { r: RAX, si: s.si };
             s.set(name, s.si);
         }
 
-        for b in body.iter() {
+        for b in body {
             asm += eval(s, &b);
         }
 
@@ -301,14 +301,14 @@ pub mod emit {
     pub fn program(prog: Expressions) -> String {
         let mut s: State = Default::default();
 
-        for b in prog.0.iter() {
+        for b in &prog.0 {
             strings::lift(&mut s, &b);
         }
 
         let mut gen =
             x86::prelude() + x86::func("init") + Enter + x86::init_heap();
 
-        for b in prog.0.iter() {
+        for b in &prog.0 {
             gen += eval(&mut s, &b);
         }
 

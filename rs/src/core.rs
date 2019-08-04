@@ -50,7 +50,7 @@ impl fmt::Display for AST {
             AST::Identifier(i) => write!(f, "{}", i),
             AST::List(l) => {
                 write!(f, "(")?;
-                for i in l.iter() {
+                for i in l {
                     write!(f, "{} ", i)?;
                 }
                 write!(f, ")")
@@ -61,12 +61,12 @@ impl fmt::Display for AST {
             },
             AST::Let { bindings, body } => {
                 write!(f, "(let (")?;
-                for (a, b) in bindings.iter() {
+                for (a, b) in bindings {
                     write!(f, "({} {}) ", a, b)?;
                 }
                 write!(f, ") ")?;
 
-                for b in body.iter() {
+                for b in body {
                     write!(f, "{}", b)?;
                 }
 
@@ -74,12 +74,12 @@ impl fmt::Display for AST {
             }
             AST::Lambda { args, body } => {
                 write!(f, "(λ (")?;
-                for arg in args.iter() {
+                for arg in args {
                     write!(f, "{} ", arg)?;
                 }
                 write!(f, ") ")?;
 
-                for b in body.iter() {
+                for b in body {
                     write!(f, "{}", b)?;
                 }
 
@@ -91,7 +91,7 @@ impl fmt::Display for AST {
 
 impl fmt::Display for Expressions {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for line in self.0.iter() {
+        for line in &self.0 {
             write!(f, "{}", line).unwrap();
         }
         Ok(())

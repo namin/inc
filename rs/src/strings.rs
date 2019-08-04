@@ -50,7 +50,7 @@ pub fn eval(s: &State, data: &str) -> ASM {
 pub fn inline(s: &State) -> ASM {
     let mut asm = ASM(vec![]);
 
-    for (symbol, index) in s.symbols.iter() {
+    for (symbol, index) in &s.symbols {
         // `.p2align 3` aligns the address of the following target to 8
         // bytes by setting the 3 low order bits to 0. This is necessary for
         // the immediate tagging scheme to work correctly.
@@ -115,17 +115,17 @@ pub fn lift(s: &mut State, prog: &AST) {
         }
 
         Let { bindings, body } => {
-            for (_name, expr) in bindings.iter() {
+            for (_name, expr) in bindings {
                 lift(s, expr);
             }
 
-            for b in body.iter() {
+            for b in body {
                 lift(s, b)
             }
         }
 
         List(list) => {
-            for l in list.iter() {
+            for l in list {
                 lift(s, l);
             }
         }
