@@ -145,7 +145,7 @@ fn if_syntax(i: &str) -> IResult<&str, AST> {
 
     let pred = Box::new(pred);
     let then = Box::new(then);
-    let alt = alt.map(|e| Box::new(e));
+    let alt = alt.map(Box::new);
 
     Ok((i, AST::Cond { pred, then, alt }))
 }
