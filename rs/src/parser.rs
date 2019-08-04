@@ -30,7 +30,7 @@ use std::str;
 /// <form>     → <definition> | <expression>
 /// ```
 pub fn program(i: &str) -> IResult<&str, Vec<AST>> {
-    many1(form)(i)
+    many1(delimited(space0, form, space0))(i)
 }
 
 pub fn form(i: &str) -> IResult<&str, AST> {
