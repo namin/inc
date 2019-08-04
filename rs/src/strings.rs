@@ -30,7 +30,7 @@
 
 use crate::{
     compiler::state::State,
-    core::AST::{self, *},
+    core::Expr::{self, *},
     immediate,
     x86::{
         Ins::*,
@@ -43,7 +43,7 @@ use std::convert::TryFrom;
 
 /// Evaluate a string object
 pub fn eval(s: &State, data: &str) -> ASM {
-    address(s, &AST::Str(data.into()), RAX)
+    address(s, &Expr::Str(data.into()), RAX)
 }
 
 /// Inline static strings in source directly into the binary
@@ -69,9 +69,9 @@ pub fn inline(s: &State) -> ASM {
 ///
 /// If the argument is a string literal, the address is a label in the
 /// binary, if its a variable return the heap pointer instead.
-fn address(s: &State, t: &AST, to: Register) -> ASM {
+fn address(s: &State, t: &Expr, to: Register) -> ASM {
     match t {
-        AST::Str(tag) => {
+        Expr::Str(tag) => {
             let index = s.symbols.get(tag).unwrap_or_else(|| {
                 panic!("String `{}` not found in symbol table", tag)
             });
@@ -79,7 +79,7 @@ fn address(s: &State, t: &AST, to: Register) -> ASM {
             Lea { r: to, of: label(*index), offset: immediate::STR }.into()
         }
 
-        AST::Identifier(i) => match s.get(&i) {
+        Expr::Identifier(i) => match s.get(&i) {
             Some(i) => Load { r: to, si: i }.into(),
             None => panic!("Undefined variable {}", i),
         },
@@ -106,7 +106,7 @@ pub fn make(_: &State, size: i64) -> ASM {
 
 /// Scan through the source and lift static strings into a symbol table for
 /// inlining later.
-pub fn lift(s: &mut State, prog: &AST) {
+pub fn lift(s: &mut State, prog: &Expr) {
     match prog {
         Str(reference) => {
             if !s.symbols.contains_key(reference) {

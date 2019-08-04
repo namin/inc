@@ -29,11 +29,11 @@ use std::str;
 /// <program>  → <form>*
 /// <form>     → <definition> | <expression>
 /// ```
-pub fn program(i: &str) -> IResult<&str, Vec<AST>> {
+pub fn program(i: &str) -> IResult<&str, Vec<Expr>> {
     many1(delimited(space0, form, space0))(i)
 }
 
-pub fn form(i: &str) -> IResult<&str, AST> {
+pub fn form(i: &str) -> IResult<&str, Expr> {
     alt((definition, expression))(i)
 }
 
@@ -65,23 +65,23 @@ pub fn form(i: &str) -> IResult<&str, AST> {
 /// <keyword>           → <identifier>
 /// <syntax binding>    → (<keyword> <transformer expression>)
 /// ```
-fn definition(i: &str) -> IResult<&str, AST> {
+fn definition(i: &str) -> IResult<&str, Expr> {
     alt((let_syntax, if_syntax))(i)
 }
 
 /// `(let-syntax (<syntax binding>*) <expression>+)`
-fn let_syntax(i: &str) -> IResult<&str, AST> {
+fn let_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((open, tag("let"), space1))(i)?;
     let (i, bindings) = delimited(open, many0(binding), close)(i)?;
     let (i, body) =
         delimited(space0, many1(terminated(expression, space0)), space0)(i)?;
     let (i, _) = close(i)?;
 
-    Ok((i, AST::Let { bindings, body }))
+    Ok((i, Expr::Let { bindings, body }))
 }
 
 /// `named → (name value)`
-fn binding(i: &str) -> IResult<&str, (String, AST)> {
+fn binding(i: &str) -> IResult<&str, (String, Expr)> {
     let (i, (_, name, _, value, _, _)) =
         tuple((open, identifier, space1, expression, close, space0))(i)?;
 
@@ -115,22 +115,22 @@ fn binding(i: &str) -> IResult<&str, (String, AST)> {
 /// <formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)
 /// <application> → (<expression> <expression>*)
 /// ```
-fn expression(i: &str) -> IResult<&str, AST> {
+fn expression(i: &str) -> IResult<&str, Expr> {
     alt((constant, variable, lambda_syntax, if_syntax, let_syntax, application))(
         i,
     )
 }
 
 /// `(lambda <formals> <body>)`
-fn lambda_syntax(i: &str) -> IResult<&str, AST> {
+fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, _, args, _, body, _)) =
         tuple((open, tag("lambda"), space1, formals, space0, body, close))(i)?;
 
-    Ok((i, AST::Lambda { args, body }))
+    Ok((i, Expr::Lambda { args, body }))
 }
 
 /// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
-fn if_syntax(i: &str) -> IResult<&str, AST> {
+fn if_syntax(i: &str) -> IResult<&str, Expr> {
     let (i, (_, _, _, pred, _, then, _, alt, _)) = tuple((
         open,
         tag("if"),
@@ -147,12 +147,12 @@ fn if_syntax(i: &str) -> IResult<&str, AST> {
     let then = Box::new(then);
     let alt = alt.map(Box::new);
 
-    Ok((i, AST::Cond { pred, then, alt }))
+    Ok((i, Expr::Cond { pred, then, alt }))
 }
 
 /// variable is an identifier
-fn variable(i: &str) -> IResult<&str, AST> {
-    map(identifier, { |i| AST::Identifier(i) })(i)
+fn variable(i: &str) -> IResult<&str, Expr> {
+    map(identifier, { |i| Expr::Identifier(i) })(i)
 }
 
 /// `<formals>     → <variable> | (<variable>*) | (<variable>+ . <variable>)`
@@ -164,7 +164,7 @@ fn formals(i: &str) -> IResult<&str, Vec<String>> {
 }
 
 /// `<body> → <definition>* <expression>+`
-fn body(i: &str) -> IResult<&str, Vec<AST>> {
+fn body(i: &str) -> IResult<&str, Vec<Expr>> {
     let (i, mut ds) = many0(definition)(i)?;
     let (i, mut es) = many1(expression)(i)?;
 
@@ -176,18 +176,18 @@ fn body(i: &str) -> IResult<&str, Vec<AST>> {
 }
 
 /// `<constant> → <boolean> | <number> | <character> | <string>`
-fn constant(i: &str) -> IResult<&str, AST> {
+fn constant(i: &str) -> IResult<&str, Expr> {
     alt((
-        (map(tag("()"), { |_| AST::Nil })),
-        (map(ascii, { |c| AST::Char(c) })),
-        (map(boolean, { |b| AST::Boolean(b) })),
-        (map(number, { |i| AST::Number(i) })),
-        (map(string, { |i| AST::Str(i) })),
+        (map(tag("()"), { |_| Expr::Nil })),
+        (map(ascii, { |c| Expr::Char(c) })),
+        (map(boolean, { |b| Expr::Boolean(b) })),
+        (map(number, { |i| Expr::Number(i) })),
+        (map(string, { |i| Expr::Str(i) })),
     ))(i)
 }
 
 /// `<application> → (<expression> <expression>*)`
-fn application(i: &str) -> IResult<&str, AST> {
+fn application(i: &str) -> IResult<&str, Expr> {
     let (i, (_, a, _, mut b, _)) = tuple((
         open,
         expression,
@@ -199,7 +199,7 @@ fn application(i: &str) -> IResult<&str, AST> {
     let mut v = vec![a];
     v.append(&mut b);
 
-    Ok((i, AST::List(v)))
+    Ok((i, Expr::List(v)))
 }
 
 /// Identifiers may denote variables, keywords, or symbols depending upon
@@ -275,14 +275,14 @@ fn digit(i: &str) -> IResult<&str, char> {
 /// <vector>           → #(<datum>*)
 /// ```
 #[cfg(test)]
-fn datum(i: &str) -> IResult<&str, AST> {
+fn datum(i: &str) -> IResult<&str, Expr> {
     alt((
-        (map(tag("()"), { |_| AST::Nil })),
-        (map(boolean, { |b| AST::Boolean(b) })),
-        (map(ascii, { |c| AST::Char(c) })),
-        (map(number, { |i| AST::Number(i) })),
-        (map(identifier, { |i| AST::Identifier(i) })),
-        (map(string, { |i| AST::Str(i) })),
+        (map(tag("()"), { |_| Expr::Nil })),
+        (map(boolean, { |b| Expr::Boolean(b) })),
+        (map(ascii, { |c| Expr::Char(c) })),
+        (map(number, { |i| Expr::Number(i) })),
+        (map(identifier, { |i| Expr::Identifier(i) })),
+        (map(string, { |i| Expr::Str(i) })),
         list,
     ))(i)
 }
@@ -329,15 +329,15 @@ fn string(i: &str) -> IResult<&str, String> {
 
 /// `<list> → (<datum>*) | (<datum>+ . <datum>) | <abbreviation>`
 #[cfg(test)]
-fn list(i: &str) -> IResult<&str, AST> {
+fn list(i: &str) -> IResult<&str, Expr> {
     let (i, _) = tuple((char('('), space0))(i)?;
     let (i, elems) = separated_list(space1, datum)(i)?;
     let (i, _) = tuple((space0, char(')')))(i)?;
 
     if elems.is_empty() {
-        Ok((i, AST::Nil))
+        Ok((i, Expr::Nil))
     } else {
-        Ok((i, AST::List(elems)))
+        Ok((i, Expr::List(elems)))
     }
 }
 
@@ -354,7 +354,7 @@ fn close(i: &str) -> IResult<&str, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::AST::*;
+    use crate::core::Expr::*;
 
     // OK consumes all of the input and succeeds
     fn ok<T, E>(t: T) -> IResult<&'static str, T, E> {
@@ -572,7 +572,7 @@ mod tests {
         let prog = "(lambda (a b) (+ b a))";
         let exp = Lambda {
             args: vec!["a".into(), "b".into()],
-            body: vec![AST::List(vec!["+".into(), "b".into(), "a".into()])],
+            body: vec![Expr::List(vec!["+".into(), "b".into(), "a".into()])],
         };
 
         assert_eq!(ok(vec![exp]), program(prog));

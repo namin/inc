@@ -32,35 +32,35 @@ pub const TRUE: i64 = (1 << SHIFT) | BOOL;
 /// function is partial. The caller for this function must make sure of it,
 /// rather than make this module complicated. It would be great if the type
 /// system could ensure that, but till then fail with a panic.
-pub fn to(prog: &AST) -> i64 {
+pub fn to(prog: &Expr) -> i64 {
     match prog {
-        AST::Number(i) => (i << SHIFT) | NUM,
-        AST::Boolean(true) => TRUE,
-        AST::Boolean(false) => FALSE,
+        Expr::Number(i) => (i << SHIFT) | NUM,
+        Expr::Boolean(true) => TRUE,
+        Expr::Boolean(false) => FALSE,
         // An ASCII char is a single byte, so most of these shifts should be
         // OK. This is going to go wrong pretty badly with Unicode.
-        AST::Char(c) => {
+        Expr::Char(c) => {
             // Expand u8 to i64 before shifting right, this will easily
             // overflow and give bogus results otherwise. Unit testing FTW!
             (i64::from(*c) << SHIFT) | CHAR
         }
-        AST::Nil => NIL,
-        AST::Str(i) => {
+        Expr::Nil => NIL,
+        Expr::Str(i) => {
             unimplemented!("immediate repr is undefined for string {}", i)
         }
-        AST::Identifier(i) => {
+        Expr::Identifier(i) => {
             unimplemented!("immediate repr is undefined for identifier {}", i)
         }
-        AST::List(..) => {
+        Expr::List(..) => {
             unimplemented!("immediate repr is undefined for lists")
         }
-        AST::Let { .. } => {
+        Expr::Let { .. } => {
             unimplemented!("immediate repr is undefined for let binding")
         }
-        AST::Cond { .. } => {
+        Expr::Cond { .. } => {
             unimplemented!("immediate repr is undefined for a conditional")
         }
-        AST::Lambda { .. } => {
+        Expr::Lambda { .. } => {
             unimplemented!("immediate repr is undefined for a lambda")
         }
     }
@@ -83,17 +83,17 @@ mod tests {
     //
     // TODO: Switch to match, rely on exhaustive pattern matching rather
     // than the panic in the end.
-    pub fn from(val: i64) -> AST {
+    pub fn from(val: i64) -> Expr {
         if (val & MASK) == NUM {
-            AST::Number(val >> SHIFT)
+            Expr::Number(val >> SHIFT)
         } else if (val & MASK) == CHAR {
-            AST::Char((val >> SHIFT) as u8)
+            Expr::Char((val >> SHIFT) as u8)
         } else if val == TRUE {
             true.into()
         } else if val == FALSE {
             false.into()
         } else if val == NIL {
-            AST::Nil
+            Expr::Nil
         } else {
             panic!("Oops")
         }

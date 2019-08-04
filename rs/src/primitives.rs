@@ -14,12 +14,12 @@ use crate::{
 // Unary Primitives
 
 /// Increment number by 1
-pub fn inc(s: &mut State, x: &AST) -> ASM {
+pub fn inc(s: &mut State, x: &Expr) -> ASM {
     emit::eval(s, x) + Add { r: RAX, v: Const(immediate::n(1)) }
 }
 
 /// Decrement by 1
-pub fn dec(s: &mut State, x: &AST) -> ASM {
+pub fn dec(s: &mut State, x: &Expr) -> ASM {
     emit::eval(s, x) + Sub { r: RAX, v: Const(immediate::n(1)) }
 }
 
@@ -31,64 +31,64 @@ pub fn dec(s: &mut State, x: &AST) -> ASM {
 /// (fixnum? 42) => #t
 /// (fixnum? "hello") => #f
 /// ```
-pub fn fixnump(s: &mut State, expr: &AST) -> ASM {
+pub fn fixnump(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
         + compare(Reg(RAX), Const(immediate::NUM), "sete")
 }
 
 /// Is the expression a boolean?
-pub fn booleanp(s: &mut State, expr: &AST) -> ASM {
+pub fn booleanp(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
         + compare(Reg(RAX), Const(immediate::BOOL), "sete")
 }
 
 /// Is the expression a char?
-pub fn charp(s: &mut State, expr: &AST) -> ASM {
+pub fn charp(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
         + compare(Reg(RAX), Const(immediate::CHAR), "sete")
 }
 
 /// Is the expression null?
-pub fn nullp(s: &mut State, expr: &AST) -> ASM {
+pub fn nullp(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NIL), "sete")
 }
 
 /// Is the expression a pair?
-pub fn pairp(s: &mut State, expr: &AST) -> ASM {
+pub fn pairp(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
         + compare(Reg(RAX), Const(immediate::PAIR), "sete")
 }
 
 /// Is the expression a string?
-pub fn stringp(s: &mut State, expr: &AST) -> ASM {
+pub fn stringp(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr)
         + emit::mask()
         + compare(Reg(RAX), Const(immediate::STR), "sete")
 }
 
 /// Is the expression zero?
-pub fn zerop(s: &mut State, expr: &AST) -> ASM {
+pub fn zerop(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NUM), "sete")
 }
 
 /// Logical not
-pub fn not(s: &mut State, expr: &AST) -> ASM {
+pub fn not(s: &mut State, expr: &Expr) -> ASM {
     emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::FALSE), "sete")
 }
 
 // Binary Primitives
 
 /// Evaluate arguments and store the first argument in stack and second in `RAX`
-fn binop(s: &mut State, x: &AST, y: &AST) -> ASM {
+fn binop(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     emit::eval(s, x) + Save { r: RAX, si: s.si } + emit::eval(s, y)
 }
 
 /// Add `x` and `y` and move result to register RAX
-pub fn plus(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn plus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, &x, &y) + Add { r: RAX, v: Stack(s.si) }
 }
 
@@ -97,7 +97,7 @@ pub fn plus(s: &mut State, x: &AST, y: &AST) -> ASM {
 // `sub` Subtracts the 2nd op from the first and stores the result in the
 // 1st. This is pretty inefficient to update result in stack and load it
 // back. Reverse the order and fix it up.
-pub fn minus(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn minus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, &x, &y)
         + Sub { r: RAX, v: Stack(s.si) }
         + Load { r: RAX, si: s.si }
@@ -107,7 +107,7 @@ pub fn minus(s: &mut State, x: &AST, y: &AST) -> ASM {
 // The destination operand is of `mul` is an implied operand located in
 // register AX. GCC throws `Error: ambiguous operand size for `mul'` without
 // size quantifier
-pub fn mul(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn mul(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, &x, &y)
         + Sar { r: RAX, v: immediate::SHIFT }
         + Mul { v: Stack(s.si) }
@@ -123,7 +123,7 @@ pub fn mul(s: &mut State, x: &AST, y: &AST) -> ASM {
 //
 // Dividend is passed in RDX:RAX and IDIV instruction takes the divisor as the
 // argument. the quotient is stored in RAX and the remainder in RDX.
-fn div(s: &mut State, x: &AST, y: &AST) -> ASM {
+fn div(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     emit::eval(s, y)
         + Ins::Sar { r: RAX, v: immediate::SHIFT }
         + Ins::Mov { to: Reg(RCX), from: Reg(RAX) }
@@ -134,11 +134,11 @@ fn div(s: &mut State, x: &AST, y: &AST) -> ASM {
         + Ins::from("    idiv rcx \n")
 }
 
-pub fn quotient(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn quotient(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     div(s, x, y) + Sal { r: RAX, v: immediate::SHIFT }
 }
 
-pub fn remainder(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn remainder(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     div(s, x, y)
         + Mov { to: Reg(RAX), from: Reg(RDX) }
         + Sal { r: RAX, v: immediate::SHIFT }
@@ -161,34 +161,34 @@ fn compare(a: Operand, b: Operand, setcc: &str) -> ASM {
 }
 
 /// Logical eq
-pub fn eq(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn eq(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "sete")
 }
 
 /// Logical <
-pub fn lt(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn lt(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setl")
 }
 
 /// Logical >
-pub fn gt(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn gt(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setg")
 }
 
 /// Logical <=
-pub fn lte(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn lte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setle")
 }
 
 /// Logical >=
-pub fn gte(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn gte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setge")
 }
 
 // Allocation primitives
 
 /// Allocate a pair on heap
-pub fn cons(s: &mut State, x: &AST, y: &AST) -> ASM {
+pub fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     // 1. Evaluate the first argument and push to stack
     // 2. Evaluate second argument
     // 3. Write second arg to [heap + 8]
@@ -214,7 +214,7 @@ pub fn cons(s: &mut State, x: &AST, y: &AST) -> ASM {
 
 /// First half of a pair
 // Subtracting the tag from the heap pointer gets us back the real address.
-pub fn car(s: &mut State, pair: &AST) -> ASM {
+pub fn car(s: &mut State, pair: &Expr) -> ASM {
     // Assert destination is really a pair ?
     eval(s, pair)
         + Ins::from(format!("    mov rax, [rax - {}]    # (car ..) \n", PAIR))
@@ -222,7 +222,7 @@ pub fn car(s: &mut State, pair: &AST) -> ASM {
 
 /// Second half of a pair
 // Offset for cdr is (address - tag + 8) = 5
-pub fn cdr(s: &mut State, pair: &AST) -> ASM {
+pub fn cdr(s: &mut State, pair: &Expr) -> ASM {
     // Assert destination is really a pair ?
     eval(s, pair)
         + Ins::from(format!("    mov rax, [rax + {}]    # (cdr ...) \n", 5))
@@ -233,9 +233,9 @@ pub mod string {
     use super::*;
     use crate::strings;
 
-    pub fn make(s: &mut State, arg: &AST) -> ASM {
+    pub fn make(s: &mut State, arg: &Expr) -> ASM {
         match arg {
-            AST::Number(n) => strings::make(s, *n),
+            Expr::Number(n) => strings::make(s, *n),
             _ => panic!("`make-string` expected number, got {:?}", arg),
         }
     }

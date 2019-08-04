@@ -166,8 +166,10 @@ pub mod state {
 pub mod emit {
     use crate::{
         compiler::state::State,
-        core::Expressions,
-        core::AST::{self, *},
+        core::{
+            Expr::{self, *},
+            Expressions,
+        },
         immediate, primitives, strings,
         x86::{
             self,
@@ -191,7 +193,11 @@ pub mod emit {
     /// stays the same before and after a let expression. There is no need to
     /// keep track of the amount of space allocated inside the let expression
     /// and free it afterwards.
-    pub fn binding(s: &mut State, vars: &[(String, AST)], body: &[AST]) -> ASM {
+    pub fn binding(
+        s: &mut State,
+        vars: &[(String, Expr)],
+        body: &[Expr],
+    ) -> ASM {
         let mut asm = ASM(vec![]);
 
         s.enter();
@@ -212,16 +218,16 @@ pub mod emit {
     /// Emit code for a conditional expression
     pub fn cond(
         s: &mut State,
-        p: &AST,
-        then: &AST,
-        alt: &Option<Box<AST>>,
+        p: &Expr,
+        then: &Expr,
+        alt: &Option<Box<Expr>>,
     ) -> ASM {
         let exit_label = s.gen_label();
         let alt_label = s.gen_label();
 
         // A conditional without an explicit alternate should evaluate to '()
         let t = match alt {
-            None => &AST::Nil,
+            None => &Expr::Nil,
             Some(t) => t,
         };
 
@@ -243,7 +249,7 @@ pub mod emit {
     // TODO: eval should dispatch based on first atom alone, not necessarily
     // care about arity here. `let` and other variadic syntax forms won't fit
     // into any specific branch here.
-    pub fn eval(s: &mut State, prog: &AST) -> ASM {
+    pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
             Identifier(i) => match s.get(i) {
                 Some(i) => Ins::Load { r: RAX, si: i }.into(),
