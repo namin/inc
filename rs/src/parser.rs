@@ -588,9 +588,9 @@ mod tests {
 
 /// Parse the input from user into the form the top level of the compiler
 /// understands.
-pub fn parse(i: &str) -> Result<Vec<AST>, Error> {
+pub fn parse(i: &str) -> Result<Expressions, Error> {
     match program(i) {
-        Ok((_rest, ast)) => Ok(ast),
+        Ok((_rest, expressions)) => Ok(Expressions {0: expressions }),
         // Ok((EMPTY, ast)) => Ok(ast),
         // Ok((_rest, _ast)) => Err(Error {
         //     message: String::from("All of input not consumed"),

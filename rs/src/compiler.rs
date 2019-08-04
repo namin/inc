@@ -166,6 +166,7 @@ pub mod state {
 pub mod emit {
     use crate::{
         compiler::state::State,
+        core::Expressions,
         core::AST::{self, *},
         immediate, primitives, strings,
         x86::{
@@ -297,17 +298,17 @@ pub mod emit {
     }
 
     /// Top level interface to the emit module
-    pub fn program(prog: Vec<AST>) -> String {
+    pub fn program(prog: Expressions) -> String {
         let mut s: State = Default::default();
 
-        for b in prog.iter() {
+        for b in prog.0.iter() {
             strings::lift(&mut s, &b);
         }
 
         let mut gen =
             x86::prelude() + x86::func("init") + Enter + x86::init_heap();
 
-        for b in prog.iter() {
+        for b in prog.0.iter() {
             gen += eval(&mut s, &b);
         }
 

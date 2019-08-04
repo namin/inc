@@ -1,15 +1,20 @@
 //! Command line interface for inc
 
-use crate::{compiler::emit, core::Config, core::AST, parser};
+use crate::{compiler::emit, core::{Config, Expressions}, parser};
 
 use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 
+/// Parse the program and return an AST
+pub fn parse(config: &Config) -> Expressions {
+    parser::parse(&config.program)
+        .expect(&format!("Failed to parse input program `{}`", config.program))
+}
+
 /// Compile the program and write the assembly to target
 pub fn compile(config: &Config) -> Result<(), std::io::Error> {
-    let prog: Vec<AST> = parser::parse(&config.program)
-        .expect(&format!("Failed to parse input program `{}`", config.program));
+    let prog = parse(config);
 
     let mut handler = File::create(&config.asm())
         .unwrap_or_else(|_| panic!("Failed to create {}", &config.asm()));

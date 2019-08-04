@@ -5,6 +5,7 @@
 /// The parser parses the input program to generate an AST. See tests for
 /// several examples.
 // TODO: Implement `Display` trait to pretty print the AST
+/// Abstract Syntax Tree for a single expression
 #[derive(Debug, PartialEq)]
 pub enum AST {
     /// An empty list `()`
@@ -32,6 +33,9 @@ pub enum AST {
     Lambda { args: Vec<String>, body: Vec<AST> },
 }
 
+/// Expressions wrap over `Vec<T>` so new traits can be defined on it
+pub struct Expressions(pub Vec<AST>);
+}
 /// Idiomatic type conversions from the primitive types to AST
 ///
 /// https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
