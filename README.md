@@ -24,6 +24,8 @@ Usage: ./inc [options]
 Options:
     -o FILE             Output file name
     -S                  Print generated asm
+    -p                  Print parse tree
+    -P                  Dump raw parse tree
     -h, --help          print this help menu
 ```
 
