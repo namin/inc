@@ -47,7 +47,14 @@ pub enum Expr {
         body: Vec<Expr>,
     },
     // Functions
-    Lambda { args: Vec<String>, body: Vec<Expr> },
+    Lambda {
+        // Formal arguments to the function, filled in by the parser
+        formals: Vec<String>,
+        // Free variables, added post closure conversion
+        free: Vec<String>,
+        // A body is a list of expressions evaluated in order
+        body: Vec<Expr>,
+    },
 }
 
 /// Expressions wrap over `Vec<T>` so new traits can be defined on it
@@ -88,9 +95,9 @@ impl fmt::Display for Expr {
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
             }
-            Expr::Lambda { args, body } => {
+            Expr::Lambda { formals, body, .. } => {
                 write!(f, "(λ (")?;
-                args.iter().for_each(|arg| write!(f, "{}", arg).unwrap());
+                formals.iter().for_each(|arg| write!(f, "{}", arg).unwrap());
                 write!(f, ") ")?;
                 body.iter().for_each(|b| write!(f, "{}", b).unwrap());
                 write!(f, ")")
