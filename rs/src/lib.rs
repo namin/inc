@@ -7,6 +7,7 @@ pub mod cli;
 pub mod compiler;
 pub mod core;
 pub mod immediate;
+pub mod lambda;
 pub mod parser;
 pub mod primitives;
 pub mod strings;

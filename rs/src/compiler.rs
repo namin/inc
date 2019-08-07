@@ -3,7 +3,7 @@
 /// State for the code generator
 pub mod state {
     use crate::x86::{ASM, WORDSIZE};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     /// State for the code generator; easier to bundle it all into a struct than
     /// pass several arguments in.
@@ -17,12 +17,15 @@ pub mod state {
     /// `symbols` is a list of all strings known at compile time, so that they
     /// can be allocated in the binary instead of heap.
     ///
+    /// `functions` are all user defined functions
+    ///
     /// State should also implement some form of register allocation.
     pub struct State {
         pub si: i64,
         pub asm: ASM,
         li: u64,
         pub symbols: HashMap<String, usize>,
+        pub functions: HashSet<String>,
         env: Env,
     }
 
@@ -33,6 +36,7 @@ pub mod state {
                 asm: ASM(vec![]),
                 li: 0,
                 symbols: HashMap::new(),
+                functions: HashSet::new(),
                 env: new(),
             }
         }
@@ -170,7 +174,7 @@ pub mod emit {
             Expr::{self, *},
             Expressions,
         },
-        immediate, primitives, strings,
+        immediate, lambda, primitives, strings,
         x86::{
             self,
             Ins::{self, *},
@@ -278,7 +282,13 @@ pub mod emit {
                     "car" => primitives::car(s, arg),
                     "cdr" => primitives::cdr(s, arg),
                     "make-string" => primitives::string::make(s, arg),
-                    n => panic!("Unknown unary primitive: {}", n),
+                    n => {
+                        if s.functions.contains(n) {
+                            lambda::call(s, n, &Expressions(vec![arg.clone()]))
+                        } else {
+                            panic!("Unknown unary primitive: {}", n)
+                        }
+                    }
                 },
 
                 [Identifier(name), x, y] => match &name[..] {
@@ -309,14 +319,18 @@ pub mod emit {
 
         strings::lift(&mut s, &prog);
 
+        let (codes, prog) = lambda::lift(&mut s, &prog);
+
         let mut gen =
-            x86::prelude() + x86::func("init") + Enter + x86::init_heap();
+            x86::prelude() + x86::func(&x86::init()) + Enter + x86::init_heap();
 
         for b in &prog.0 {
             gen += eval(&mut s, &b);
         }
 
-        gen = gen + Leave + strings::inline(&s);
+        gen += Leave;
+        gen += strings::inline(&s);
+        gen += lambda::code(&mut s, codes);
 
         gen.to_string()
     }

@@ -16,7 +16,7 @@
 use std::fmt;
 
 /// Abstract Syntax Tree for a single expression
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     // An empty list `()`
     Nil,
@@ -48,6 +48,8 @@ pub enum Expr {
     },
     // Functions
     Lambda {
+        // A rose by any other name would smell as sweet
+        name: Option<String>,
         // Formal arguments to the function, filled in by the parser
         formals: Vec<String>,
         // Free variables, added post closure conversion
