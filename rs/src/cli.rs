@@ -12,8 +12,11 @@ use std::process::Command;
 
 /// Parse the program and return an Expr
 pub fn parse(config: &Config) -> Expressions {
-    parser::parse(&config.program).unwrap_or_else(|_| {
-        panic!("Failed to parse input program `{}`", config.program)
+    parser::parse(&config.program).unwrap_or_else(|e| {
+        panic!(
+            "Failed to parse input program `{}`: {:?}",
+            config.program, e.message
+        )
     })
 }
 
