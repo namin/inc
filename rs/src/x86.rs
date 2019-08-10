@@ -246,11 +246,11 @@ impl fmt::Display for Ins {
                     };
                 write!(f, "{}", op)
             }
-            Ins::Je(l) => writeln!(f, "    je {}", label(l)),
-            Ins::Jmp(l) => writeln!(f, "    jmp {}", label(l)),
-            Ins::Label(l) => writeln!(f, "{}:", label(l)),
+            Ins::Je(l) => writeln!(f, "    je {}", l),
+            Ins::Jmp(l) => writeln!(f, "    jmp {}", l),
+            Ins::Label(l) => writeln!(f, "{}:", l),
             Ins::Lea { r, of, offset } => {
-                writeln!(f, "    lea {}, [rip + {} + {}]", r, offset, label(of))
+                writeln!(f, "    lea {}, [rip + {} + {}]", r, offset, of)
             }
             Ins::Leave => write!(f, "{}", Ins::Pop(Register::RBP) + Ins::Ret),
             Ins::Load { r, si } => {
@@ -349,15 +349,15 @@ pub fn init_heap() -> Ins {
     Ins::from("    mov rsi, rdi        # Store heap index to RSI \n")
 }
 
-/// Label is a target to jump to
+/// Init is a target called from C.
 #[cfg(target_os = "macos")]
-fn label(label: &str) -> String {
-    format!("_{}", label)
+pub fn init() -> String {
+    String::from("_init")
 }
 
 #[cfg(target_os = "linux")]
-fn label(label: &str) -> String {
-    format!("{}", label)
+pub fn init() -> String {
+    String::from("init")
 }
 
 /// Relative address with reference to a register
@@ -379,7 +379,8 @@ fn heap(si: i64) -> String {
 
 #[cfg(target_os = "macos")]
 pub fn func(name: &str) -> ASM {
-    Ins::from(format!("    .globl _{}\n", &name)) + Ins::Label(name.to_string())
+    Ins::from(format!("\n    .globl {}\n", &name))
+        + Ins::Label(name.to_string())
 }
 
 #[cfg(target_os = "linux")]
