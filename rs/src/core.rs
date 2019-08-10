@@ -61,6 +61,12 @@ pub enum Expr {
 #[derive(Debug)]
 pub struct Expressions(pub Vec<Expr>);
 
+impl Default for Expressions {
+    fn default() -> Self {
+        Expressions(vec![])
+    }
+}
+
 /// All the expressions and the metadata
 #[derive(Debug)]
 pub struct Program(pub Vec<Expr>);
