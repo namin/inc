@@ -108,7 +108,8 @@ impl fmt::Display for Expr {
 
 impl fmt::Display for Expressions {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Ok(self.0.iter().for_each(|e| write!(f, "{}", e).unwrap()))
+        self.0.iter().for_each(|e| write!(f, "{}", e).unwrap());
+        Ok(())
     }
 }
 
