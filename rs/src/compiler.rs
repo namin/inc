@@ -307,9 +307,7 @@ pub mod emit {
     pub fn program(prog: Expressions) -> String {
         let mut s: State = Default::default();
 
-        for b in &prog.0 {
-            strings::lift(&mut s, &b);
-        }
+        strings::lift(&mut s, &prog);
 
         let mut gen =
             x86::prelude() + x86::func("init") + Enter + x86::init_heap();
