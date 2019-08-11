@@ -34,8 +34,7 @@ use crate::{
     core::Expressions,
     immediate,
     x86::{
-        Ins::*,
-        Operand::*,
+        self, Ins,
         Register::{self, *},
         ASM,
     },
@@ -57,10 +56,11 @@ pub fn inline(s: &State) -> ASM {
         // the immediate tagging scheme to work correctly.
         //
         // https://sourceware.org/binutils/docs-2.32/as/P2align.html
-        asm += Slice("    .p2align 3 \n".to_string());
-        asm += Label(label(*index));
-        asm += Slice(format!("    .quad  {} \n", symbol.len()));
-        asm += Slice(format!("    .ascii \"{}\" \n", symbol))
+        asm += Ins::from("");
+        asm += Ins::from(".p2align 3");
+        asm += x86::label(&label(*index));
+        asm += Ins(format!(".quad  {}", symbol.len()));
+        asm += Ins(format!(".ascii \"{}\"", symbol))
     }
 
     asm
@@ -77,11 +77,11 @@ fn address(s: &State, t: &Expr, to: Register) -> ASM {
                 panic!("String `{}` not found in symbol table", tag)
             });
 
-            Lea { r: to, of: label(*index), offset: immediate::STR }.into()
+            x86::lea(to, &label(*index), immediate::STR).into()
         }
 
         Expr::Identifier(i) => match s.get(&i) {
-            Some(i) => Load { r: to, si: i }.into(),
+            Some(i) => x86::load(to, i).into(),
             None => panic!("Undefined variable {}", i),
         },
 
@@ -95,14 +95,15 @@ fn label(index: usize) -> String {
 }
 
 /// Allocate a string object in heap with a specific size
+#[allow(clippy::identity_op)]
 pub fn make(_: &State, size: i64) -> ASM {
     let len = i64::try_from(size).unwrap();
     let size = ((len + 7) / 8) * 8;
 
-    Mov { to: Heap(0), from: Const(len) }
-        + Mov { to: Reg(RAX), from: Reg(RSI) }
-        + Or { r: RAX, v: Const(immediate::STR) }
-        + Add { r: RSI, v: Const(size) }
+    x86::mov(RSI + 0, len)
+        + x86::mov(RAX, RSI)
+        + x86::or(RAX, immediate::STR)
+        + x86::add(RSI, size)
 }
 
 /// Lift static strings into a symbol table for inlining later.

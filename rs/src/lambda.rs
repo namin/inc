@@ -34,13 +34,7 @@ use crate::{
         Expr::{self, *},
         Expressions,
     },
-    x86::{
-        self,
-        Ins::{self, *},
-        Operand::*,
-        Register::*,
-        ASM, WORDSIZE,
-    },
+    x86::{self, Register::*, ASM, WORDSIZE},
 };
 
 use std::convert::TryInto;
@@ -105,7 +99,7 @@ fn lift1(s: &mut State, prog: &Expr) -> (Vec<Expr>, Expr) {
         // A literal lambda must be in an inline calling position
         Lambda { .. } => unimplemented!("inline λ"),
 
-        _ => (vec![], prog.clone())
+        _ => (vec![], prog.clone()),
     }
 }
 
@@ -145,9 +139,9 @@ pub fn code(s: &mut State, codes: Expressions) -> ASM {
                 }
 
                 for b in body {
-                    asm += Enter;
+                    asm += x86::enter();
                     asm += eval(s, b);
-                    asm += Leave
+                    asm += x86::leave()
                 }
 
                 s.leave()
@@ -171,7 +165,7 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     for (i, arg) in args.0.iter().enumerate() {
         let i: i64 = i.try_into().unwrap();
         asm += eval(s, arg);
-        asm += Save { r: RAX, si: s.si - ((i + 2) * WORDSIZE) };
+        asm += x86::save(RAX, s.si - ((i + 2) * WORDSIZE));
     }
 
     // Extend stack to hold the current local variables before creating a
@@ -180,9 +174,9 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     // reserve this space before the function gets called. Not doing this
     // will result in the called function to override this space with its
     // local variables and corrupt the stack.
-    asm += Ins::Add { r: RSP, v: Const(s.si + WORDSIZE) };
+    asm += x86::add(RSP, s.si + WORDSIZE);
 
-    asm += Ins::Call(name.to_string());
+    asm += x86::call(name);
 
     // NOTE: This is one of those big aha moments.
     //
@@ -191,7 +185,7 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     // This makes keeping track of that stack index unnecessary and life so
     // much simpler.
 
-    asm += Ins::Add { r: RSP, v: Const(-(s.si + WORDSIZE)) };
+    asm += x86::add(RSP, -(s.si + WORDSIZE));
 
     asm
 }

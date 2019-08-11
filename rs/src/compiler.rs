@@ -175,18 +175,12 @@ pub mod emit {
             Expressions,
         },
         immediate, lambda, primitives, strings,
-        x86::{
-            self,
-            Ins::{self, *},
-            Operand::*,
-            Register::*,
-            ASM,
-        },
+        x86::{self, Ins, Register::*, ASM},
     };
 
     /// Clear (mask) all except the least significant 3 tag bits
     pub fn mask() -> Ins {
-        And { r: RAX, v: Const(immediate::MASK) }
+        x86::and(RAX, immediate::MASK)
     }
 
     /// Emit code for a let expression
@@ -207,7 +201,7 @@ pub mod emit {
         s.enter();
 
         for (name, expr) in vars {
-            asm += eval(s, expr) + Save { r: RAX, si: s.si };
+            asm += eval(s, expr) + x86::save(RAX, s.si);
             s.set(name, s.si);
         }
 
@@ -236,13 +230,13 @@ pub mod emit {
         };
 
         eval(s, p)
-            + Ins::Cmp { a: Reg(RAX), b: Const(immediate::FALSE) }
-            + Ins::Je(alt_label.clone())
+            + x86::cmp(RAX, immediate::FALSE)
+            + x86::je(&alt_label)
             + eval(s, then)
-            + Ins::Jmp(exit_label.clone())
-            + Ins::Label(alt_label)
+            + x86::jmp(&exit_label)
+            + x86::label(&alt_label)
             + eval(s, t)
-            + Ins::Label(exit_label)
+            + x86::label(&exit_label)
     }
 
     /// Evaluate an expression into RAX
@@ -256,7 +250,7 @@ pub mod emit {
     pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
             Identifier(i) => match s.get(i) {
-                Some(i) => Ins::Load { r: RAX, si: i }.into(),
+                Some(i) => x86::load(RAX, i).into(),
                 None => panic!("Undefined variable {}", i),
             },
 
@@ -309,7 +303,7 @@ pub mod emit {
                 _ => panic!("Unknown expression: `{}`", prog),
             },
 
-            _ => Mov { to: Reg(RAX), from: Const(immediate::to(&prog)) }.into(),
+            _ => x86::mov(RAX, immediate::to(&prog)).into(),
         }
     }
 
@@ -321,14 +315,16 @@ pub mod emit {
 
         let (codes, prog) = lambda::lift(&mut s, &prog);
 
-        let mut gen =
-            x86::prelude() + x86::func(&x86::init()) + Enter + x86::init_heap();
+        let mut gen = x86::prelude()
+            + x86::func(&x86::init())
+            + x86::enter()
+            + x86::init_heap();
 
         for b in &prog.0 {
             gen += eval(&mut s, &b);
         }
 
-        gen += Leave;
+        gen += x86::leave();
         gen += strings::inline(&s);
         gen += lambda::code(&mut s, codes);
 

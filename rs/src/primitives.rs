@@ -1,26 +1,22 @@
-//! Scheme primitives implemented directly in the compiler
-//!
-//! Several scheme functions like `(add ...` are implemented by the compiler in
-//! assembly rather than in scheme. All of them live in this module.
-
+//! Scheme functions implemented within the compiler rather than the runtime.
 use crate::{
     compiler::emit::{self, eval},
     compiler::state::State,
     core::*,
     immediate::{self, *},
-    x86::{Ins::*, Operand::*, Register::*, *},
+    x86::{self, Register::*, *},
 };
 
 // Unary Primitives
 
 /// Increment number by 1
 pub fn inc(s: &mut State, x: &Expr) -> ASM {
-    emit::eval(s, x) + Add { r: RAX, v: Const(immediate::n(1)) }
+    emit::eval(s, x) + x86::add(RAX, immediate::n(1))
 }
 
 /// Decrement by 1
 pub fn dec(s: &mut State, x: &Expr) -> ASM {
-    emit::eval(s, x) + Sub { r: RAX, v: Const(immediate::n(1)) }
+    emit::eval(s, x) + x86::sub(RAX, immediate::n(1))
 }
 
 /// Is the expression a fixnum?
@@ -32,75 +28,65 @@ pub fn dec(s: &mut State, x: &Expr) -> ASM {
 /// (fixnum? "hello") => #f
 /// ```
 pub fn fixnump(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(Reg(RAX), Const(immediate::NUM), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX, immediate::NUM, "sete")
 }
 
 /// Is the expression a boolean?
 pub fn booleanp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(Reg(RAX), Const(immediate::BOOL), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX, immediate::BOOL, "sete")
 }
 
 /// Is the expression a char?
 pub fn charp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(Reg(RAX), Const(immediate::CHAR), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX, immediate::CHAR, "sete")
 }
 
 /// Is the expression null?
 pub fn nullp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NIL), "sete")
+    emit::eval(s, expr) + compare(RAX, immediate::NIL, "sete")
 }
 
 /// Is the expression a pair?
 pub fn pairp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(Reg(RAX), Const(immediate::PAIR), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX, immediate::PAIR, "sete")
 }
 
 /// Is the expression a string?
 pub fn stringp(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr)
-        + emit::mask()
-        + compare(Reg(RAX), Const(immediate::STR), "sete")
+    emit::eval(s, expr) + emit::mask() + compare(RAX, immediate::STR, "sete")
 }
 
 /// Is the expression zero?
 pub fn zerop(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::NUM), "sete")
+    emit::eval(s, expr) + compare(RAX, immediate::NUM, "sete")
 }
 
 /// Logical not
 pub fn not(s: &mut State, expr: &Expr) -> ASM {
-    emit::eval(s, expr) + compare(Reg(RAX), Const(immediate::FALSE), "sete")
+    emit::eval(s, expr) + compare(RAX, immediate::FALSE, "sete")
 }
 
 // Binary Primitives
 
 /// Evaluate arguments and store the first argument in stack and second in `RAX`
 fn binop(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    emit::eval(s, x) + Save { r: RAX, si: s.si } + emit::eval(s, y)
+    emit::eval(s, x) + x86::save(RAX, s.si) + emit::eval(s, y)
 }
 
 /// Add `x` and `y` and move result to register RAX
 pub fn plus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, &x, &y) + Add { r: RAX, v: Stack(s.si) }
+    binop(s, &x, &y) + x86::add(RAX, RBP + s.si)
 }
 
+
+
+
 /// Subtract `x` from `y` and move result to register RAX
-//
-// `sub` Subtracts the 2nd op from the first and stores the result in the
-// 1st. This is pretty inefficient to update result in stack and load it
-// back. Reverse the order and fix it up.
+// `sub` subtracts the 2nd op from the first and stores the result in the 1st.
+// This is pretty inefficient to update result in stack and load it back.
+// Reverse the order and fix it up.
 pub fn minus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, &x, &y)
-        + Sub { r: RAX, v: Stack(s.si) }
-        + Load { r: RAX, si: s.si }
+    binop(s, &x, &y) + x86::sub(RAX, RBP + s.si) + x86::load(RAX, s.si)
 }
 
 /// Multiply `x` and `y` and move result to register RAX
@@ -108,9 +94,7 @@ pub fn minus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 // register AX. GCC throws `Error: ambiguous operand size for `mul'` without
 // size quantifier
 pub fn mul(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, &x, &y)
-        + Sar { r: RAX, v: immediate::SHIFT }
-        + Mul { v: Stack(s.si) }
+    binop(s, &x, &y) + x86::sar(RAX, immediate::SHIFT) + x86::mul(RBP + s.si)
 }
 
 /// Divide `x` by `y` and move result to register RAX
@@ -125,69 +109,70 @@ pub fn mul(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 // argument. the quotient is stored in RAX and the remainder in RDX.
 fn div(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     emit::eval(s, y)
-        + Ins::Sar { r: RAX, v: immediate::SHIFT }
-        + Ins::Mov { to: Reg(RCX), from: Reg(RAX) }
+        + x86::sar(RAX, immediate::SHIFT)
+        + x86::mov(RCX, RAX)
         + emit::eval(s, x)
-        + Ins::Sar { r: RAX, v: immediate::SHIFT }
-        + Ins::Mov { to: Reg(RDX), from: Const(0) }
-        + Ins::from("    cqo \n")
-        + Ins::from("    idiv rcx \n")
+        + x86::sar(RAX, immediate::SHIFT)
+        + x86::mov(RDX, 0)
+        + Ins::from("cqo")
+        + Ins::from("idiv rcx")
 }
 
+/// Quotient after dividing `x` by `y`
 pub fn quotient(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    div(s, x, y) + Sal { r: RAX, v: immediate::SHIFT }
+    div(s, x, y) + x86::sal(RAX, immediate::SHIFT)
 }
 
+/// Remainder after dividing `x` by `y`
 pub fn remainder(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    div(s, x, y)
-        + Mov { to: Reg(RAX), from: Reg(RDX) }
-        + Sal { r: RAX, v: immediate::SHIFT }
+    div(s, x, y) + x86::mov(RAX, RDX) + x86::sal(RAX, immediate::SHIFT)
 }
 
 /// Compares the first operand with the second with `SETcc`
-// See `Ins::Cmp` to see how the compare instruction works.
+// See `x86::Cmp` to see how the compare instruction works.
 //
 // `SETcc` sets the destination operand to 0 or 1 depending on the settings of
 // the status flags (CF, SF, OF, ZF, and PF) in the EFLAGS register.
 //
 // `MOVZX` copies the contents of the source operand (register or memory
 // location) to the destination operand (register) and zero extends the value.
-fn compare(a: Operand, b: Operand, setcc: &str) -> ASM {
-    Cmp { a, b }
-        + Ins::from(format!("    {} al\n", setcc))
-        + Ins::from("    movzx rax, al\n")
-        + Ins::from(format!("    sal al, {}\n", immediate::SHIFT))
-        + Ins::from(format!("    or al, {}\n", immediate::BOOL))
+fn compare(a: impl Addressable, b: impl Addressable, setcc: &str) -> ASM {
+    x86::cmp(a, b)
+        + Ins(format!("{} al", setcc))
+        + Ins::from("movzx rax, al")
+        + Ins(format!("sal al, {}", immediate::SHIFT))
+        + Ins(format!("or al, {}", immediate::BOOL))
 }
 
 /// Logical eq
 pub fn eq(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "sete")
+    binop(s, x, y) + compare(RBP + s.si, RAX, "sete")
 }
 
 /// Logical <
 pub fn lt(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setl")
+    binop(s, x, y) + compare(RBP + s.si, RAX, "setl")
 }
 
 /// Logical >
 pub fn gt(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setg")
+    binop(s, x, y) + compare(RBP + s.si, RAX, "setg")
 }
 
 /// Logical <=
 pub fn lte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setle")
+    binop(s, x, y) + compare(RBP + s.si, RAX, "setle")
 }
 
 /// Logical >=
 pub fn gte(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    binop(s, x, y) + compare(Stack(s.si), Reg(RAX), "setge")
+    binop(s, x, y) + compare(RBP + s.si, RAX, "setge")
 }
 
 // Allocation primitives
 
 /// Allocate a pair on heap
+#[allow(clippy::identity_op)]
 pub fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     // 1. Evaluate the first argument and push to stack
     // 2. Evaluate second argument
@@ -198,14 +183,14 @@ pub fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     let bp = s.si;
     let scratch = s.alloc();
     let ctx = emit::eval(s, x)
-        + Save { r: RAX, si: scratch }
+        + x86::save(RAX, scratch)
         + emit::eval(s, y)
-        + Mov { to: Heap(8), from: Reg(RAX) }
-        + Mov { to: Reg(RAX), from: Stack(scratch) }
-        + Mov { to: Heap(0), from: Reg(RAX) }
-        + Mov { to: Reg(RAX), from: Reg(RSI) }
-        + Add { r: RSI, v: Operand::Const(WORDSIZE * 2) }
-        + Or { r: RAX, v: Operand::Const(PAIR) };
+        + x86::mov(RSI + 8, RAX)
+        + x86::mov(RAX, RBP + scratch)
+        + x86::mov(RSI + 0, RAX)
+        + x86::mov(RAX, RSI)
+        + x86::add(RSI, WORDSIZE * 2)
+        + x86::or(RAX, PAIR);
 
     s.dealloc(1);
     assert!(s.si == bp, "Stack deallocated; expected {}, found {} ", bp, s.si);
@@ -216,16 +201,14 @@ pub fn cons(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 // Subtracting the tag from the heap pointer gets us back the real address.
 pub fn car(s: &mut State, pair: &Expr) -> ASM {
     // Assert destination is really a pair ?
-    eval(s, pair)
-        + Ins::from(format!("    mov rax, [rax - {}]    # (car ..) \n", PAIR))
+    eval(s, pair) + Ins(format!("mov rax, [rax - {}]    # (car ..)", PAIR))
 }
 
 /// Second half of a pair
 // Offset for cdr is (address - tag + 8) = 5
 pub fn cdr(s: &mut State, pair: &Expr) -> ASM {
     // Assert destination is really a pair ?
-    eval(s, pair)
-        + Ins::from(format!("    mov rax, [rax + {}]    # (cdr ...) \n", 5))
+    eval(s, pair) + Ins(format!("mov rax, [rax + {}]    # (cdr ...)", 5))
 }
 
 // String primitives
