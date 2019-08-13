@@ -377,6 +377,33 @@ mod strings {
     }
 }
 
+// Step 8 functions
+mod functions {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let tests = [
+            ("(let ((f (lambda () 5))) 7)", "7"),
+            ("(let ((f (lambda () 5))) (let ((x 12)) x))", "12"),
+            ("(let ((f (lambda () 5))) (f))", "5"),
+            ("(let ((f (lambda () 5))) (let ((x (f))) x))", "5"),
+            ("(let ((f (lambda () 5))) (+ (f) 6))", "11"),
+            ("(let ((f (lambda () 5))) (- 20 (f)))", "15"),
+            ("(let ((f (lambda () 5))) (+ (f) (f)))", "10"),
+            ("(let ((f (lambda () (+ 5 7))) (g (lambda () 13))) (+ (f) (g))", "25"),
+            ("(let ((f (lambda (x) (+ x 12)))) (f 13)", "25"),
+            ("(let ((f (lambda (x) (+ x 12)))) (f (f 10))", "34"),
+            ("(let ((f (lambda (x) (+ x 12)))) (f (f (f 0)))", "36"),
+            ("(let ((f (lambda (x y) (+ x y))) (g (lambda (x) (+ x 12)))) (f 16 (f (g 0) (+ 1 (g 0))))", "41"),
+            ("(let ((f (lambda (x) (g x x))) (g (lambda (x y) (+ x y)))) (f 12)", "24"),
+            ("(let ((f (lambda (x) (if (zero? x) 1 (* x (f (dec x))))))) (f 5)", "120")
+        ];
+
+        test_many(&tests)
+    }
+}
+
 // Get a test config with program as input
 fn config(program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
