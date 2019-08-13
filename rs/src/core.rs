@@ -60,17 +60,11 @@ pub enum Expr {
 }
 
 /// Expressions wrap over `Vec<T>` so new traits can be defined on it
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Expressions(pub Vec<Expr>);
 
-impl Default for Expressions {
-    fn default() -> Self {
-        Expressions(vec![])
-    }
-}
-
 /// All the expressions and the metadata
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Program(pub Vec<Expr>);
 
 /// Pretty print an Expr

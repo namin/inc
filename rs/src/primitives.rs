@@ -78,9 +78,6 @@ pub fn plus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, &x, &y) + x86::add(RAX, RBP + s.si)
 }
 
-
-
-
 /// Subtract `x` from `y` and move result to register RAX
 // `sub` subtracts the 2nd op from the first and stores the result in the 1st.
 // This is pretty inefficient to update result in stack and load it back.

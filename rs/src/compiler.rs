@@ -20,6 +20,7 @@ pub mod state {
     /// `functions` are all user defined functions
     ///
     /// State should also implement some form of register allocation.
+    #[derive(Default)]
     pub struct State {
         pub si: i64,
         pub asm: ASM,
@@ -27,19 +28,6 @@ pub mod state {
         pub symbols: HashMap<String, usize>,
         pub functions: HashSet<String>,
         env: Env,
-    }
-
-    impl Default for State {
-        fn default() -> Self {
-            State {
-                si: -WORDSIZE,
-                asm: ASM(vec![]),
-                li: 0,
-                symbols: HashMap::new(),
-                functions: HashSet::new(),
-                env: new(),
-            }
-        }
     }
 
     impl State {
@@ -96,8 +84,10 @@ pub mod state {
     #[derive(Debug)]
     struct Env(Vec<HashMap<String, i64>>);
 
-    fn new() -> Env {
-        Env(vec![HashMap::new()])
+    impl Default for Env {
+        fn default() -> Self {
+            Env(vec![HashMap::new()])
+        }
     }
 
     impl Env {
@@ -131,7 +121,7 @@ pub mod state {
 
         #[test]
         fn t() {
-            let mut e = new();
+            let mut e: Env = Default::default();
             assert_eq!(e.0.len(), 1);
 
             // default global scope

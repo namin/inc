@@ -44,7 +44,7 @@ pub const WORDSIZE: i64 = 8;
 pub struct Ins(pub String);
 
 /// ASM represents a list of instructions
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct ASM(pub Vec<Ins>);
 
 /// An addressable can be used as an address in an assembly instruction.
