@@ -191,8 +191,8 @@ fn application(i: &str) -> IResult<&str, Expr> {
     let (i, (_, a, _, mut b, _)) = tuple((
         open,
         expression,
-        space1,
-        many1(terminated(expression, space0)),
+        space0,
+        many0(terminated(expression, space0)),
         close,
     ))(i)?;
 
@@ -551,6 +551,16 @@ mod tests {
         };
 
         assert_eq!(ok(vec![exp]), program(prog));
+    }
+
+    #[test]
+    fn application() {
+        assert_eq!(
+            ok(List(vec!["f".into(), "x".into()])),
+            super::application("(f x)")
+        );
+
+        assert_eq!(ok(List(vec!["f".into()])), super::application("(f)"));
     }
 
     #[test]
