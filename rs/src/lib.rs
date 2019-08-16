@@ -1,3 +1,4 @@
+#![feature(slice_patterns)]
 //! # Inc
 //!
 //! Incremental approach to compiler construction.

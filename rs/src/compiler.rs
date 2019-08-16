@@ -252,6 +252,11 @@ pub mod emit {
             Cond { pred, then, alt } => cond(s, pred, then, alt),
 
             List(list) => match list.as_slice() {
+                // User defined functions
+                [Identifier(f), args..] if s.functions.contains(f) => {
+                    lambda::call(s, f, &Expressions(args.to_vec()))
+                }
+
                 [Identifier(i), arg] => match &i[..] {
                     "inc" => primitives::inc(s, arg),
                     "dec" => primitives::dec(s, arg),
@@ -266,13 +271,7 @@ pub mod emit {
                     "car" => primitives::car(s, arg),
                     "cdr" => primitives::cdr(s, arg),
                     "make-string" => primitives::string::make(s, arg),
-                    n => {
-                        if s.functions.contains(n) {
-                            lambda::call(s, n, &Expressions(vec![arg.clone()]))
-                        } else {
-                            panic!("Unknown unary primitive: {}", n)
-                        }
-                    }
+                    n => panic!("Unknown unary primitive: {}", n),
                 },
 
                 [Identifier(name), x, y] => match &name[..] {
