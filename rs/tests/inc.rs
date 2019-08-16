@@ -2,7 +2,7 @@
 extern crate inc;
 
 use inc::core::*;
-use std::fs;
+use std::{fs, panic};
 use uuid::Uuid;
 
 #[cfg(test)]
@@ -404,17 +404,20 @@ fn test1(input: &str, output: &str) {
     // Create a fresh config per run, this should allow for parallelism later.
     let config = config(input.to_string());
 
-    // Rebuild before every run
-    assert!(build(&config));
+    let result = panic::catch_unwind(|| {
+        // Rebuild before every run
+        assert!(build(&config));
 
-    // Run the generated binary and assert output
-    assert_eq!(
-        inc::cli::run(&config).unwrap(),
-        output,
-        "Failed: {} != {}",
-        input,
-        output
-    );
+        // Run the generated binary and assert output
+        inc::cli::run(&config)
+    });
+
+    match result {
+        Err(e) => panic!("Failed to build `{}`: {:?}", input, e),
+        Ok(run) => {
+            assert_eq!(run.unwrap(), output, "Failed: {} != {}", input, output);
+        }
+    }
 
     // Clean up all the intermediary files generated
     fs::remove_file(&config.asm())
