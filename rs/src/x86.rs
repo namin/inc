@@ -30,6 +30,25 @@
 //!
 //! 1. [Writing 64 Bit Assembly on Mac OS X](https://www.idryman.org/blog/2014/12/02/writing-64-bit-assembly-on-mac-os-x)
 //!
+//! # System V AMD64 ABI
+//!
+//! The default calling convention used by GCC on x86-64 seems to be System V
+//! AMD64 ABI. User defined functions, primitives as well as FFI into C must use
+//! this convention for simplicity.
+//!
+//! ## Registers
+//!
+//! Arguments are passed in the registers RDI, RSI, RDX, RCX, R8, R9 and the
+//! return value is passed back in RAX. Functions preserve the registers RBX,
+//! RSP, RBP, R12, R13, R14, and R15; while RAX, RDI, RSI, RDX, RCX, R8, R9, R10,
+//! R11 are scratch registers.
+//!
+//! ## Reference Reading
+//!
+//! 1. [x86 calling conventions](https://en.wikipedia.org/wiki/X86_calling_conventions)
+//! 1. [System V ABI](https://wiki.osdev.org/System_V_ABI)
+//! 1. [System V Application Binary Interface](https://github.com/jaseemabid/inc/blob/master/docs/Sys%20V%20ABI.pdf)
+//!
 use std::fmt;
 use std::ops::{Add, AddAssign, Sub};
 
@@ -83,6 +102,7 @@ pub trait Addressable {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Register {
     /// Accumulator (AX)
+    // Used in arithmetic operations and returning values from functions.
     RAX,
     /// Base Register (BX)
     RBX,
@@ -94,11 +114,30 @@ pub enum Register {
     RSP,
     /// Stack Base Pointer (BP)
     RBP,
-    /// Stack Index (SI)
+    /// Source Index register
     RSI,
-    /// ¯\_(ツ)_/¯
+    /// Destination Index register
     RDI,
+    /// New 8 64-bit registers (R8 - R15)
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
 }
+
+/// Registers for argument passing
+pub const SYS_V: [Register; 6] = [
+    Register::RDI,
+    Register::RSI,
+    Register::RDX,
+    Register::RCX,
+    Register::R8,
+    Register::R9,
+];
 
 /// Relative addressing modes for memory access
 ///
