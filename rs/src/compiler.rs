@@ -253,7 +253,7 @@ pub mod emit {
 
             List(list) => match list.as_slice() {
                 // User defined functions
-                [Identifier(f), args..] if s.functions.contains(f) => {
+                [Identifier(f), args @ ..] if s.functions.contains(f) => {
                     lambda::call(s, f, &Expressions(args.to_vec()))
                 }
 
