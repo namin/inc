@@ -30,12 +30,12 @@ use std::str;
 /// <form>     → <definition> | <expression>
 /// ```
 pub fn program(i: &str) -> IResult<&str, Vec<Expr>> {
-    many1(delimited(space0, form, space0))(i)
+    many1(delimited(space0, expression, space0))(i)
 }
 
-pub fn form(i: &str) -> IResult<&str, Expr> {
-    alt((definition, expression))(i)
-}
+// pub fn form(i: &str) -> IResult<&str, Expr> {
+//     alt((definition, expression))(i)
+// }
 
 /// Definitions include various forms of declarations
 ///
@@ -65,9 +65,9 @@ pub fn form(i: &str) -> IResult<&str, Expr> {
 /// <keyword>           → <identifier>
 /// <syntax binding>    → (<keyword> <transformer expression>)
 /// ```
-fn definition(i: &str) -> IResult<&str, Expr> {
-    alt((let_syntax, if_syntax))(i)
-}
+// fn definition(i: &str) -> IResult<&str, Expr> {
+//     alt((let_syntax, if_syntax))(i)
+// }
 
 /// `(let-syntax (<syntax binding>*) <expression>+)`
 fn let_syntax(i: &str) -> IResult<&str, Expr> {
@@ -123,29 +123,37 @@ fn expression(i: &str) -> IResult<&str, Expr> {
 
 /// `(lambda <formals> <body>)`
 fn lambda_syntax(i: &str) -> IResult<&str, Expr> {
-    let (i, (_, _, _, formals, _, body, _)) =
-        tuple((open, tag("lambda"), space1, formals, space0, body, close))(i)?;
+    let (i, (_, _, _, formals, _, body, _, _)) = tuple((
+        open,
+        tag("lambda"),
+        space1,
+        formals,
+        space0,
+        body,
+        space0,
+        close,
+    ))(i)?;
 
     Ok((i, Expr::Lambda { name: None, formals, body, free: vec![] }))
 }
 
 /// `(if <expression> <expression> <expression>) | (if <expression> <expression>)`
 fn if_syntax(i: &str) -> IResult<&str, Expr> {
-    let (i, (_, _, _, pred, _, then, _, alt, _)) = tuple((
+    let (i, (_, _, _, pred, _, then, alt, _, _)) = tuple((
         open,
         tag("if"),
         space1,
         expression,
         space1,
         expression,
+        opt(tuple((space1, expression))),
         space0,
-        opt(expression),
         close,
     ))(i)?;
 
     let pred = Box::new(pred);
     let then = Box::new(then);
-    let alt = alt.map(Box::new);
+    let alt = if let Some((_, a)) = alt { Some(Box::new(a)) } else { None };
 
     Ok((i, Expr::Cond { pred, then, alt }))
 }
@@ -165,13 +173,10 @@ fn formals(i: &str) -> IResult<&str, Vec<String>> {
 
 /// `<body> → <definition>* <expression>+`
 fn body(i: &str) -> IResult<&str, Vec<Expr>> {
-    let (i, mut ds) = many0(definition)(i)?;
     let (i, mut es) = many1(expression)(i)?;
 
     let mut v = Vec::new();
-    v.append(&mut ds);
     v.append(&mut es);
-
     Ok((i, v))
 }
 
@@ -423,15 +428,9 @@ mod tests {
     #[test]
     fn strings() {
         assert_eq!(ok(Str("hello world".into())), datum("\"hello world\""));
-        assert_eq!(
-            ok(Str("മലയാളം".into())),
-            datum("\"മലയാളം\"")
-        );
+        assert_eq!(ok(Str("മലയാളം".into())), datum("\"മലയാളം\""));
 
-        assert_eq!(
-            ok(Str("Unicode 😱 ⌘".into())),
-            datum("\"Unicode 😱 ⌘\"")
-        );
+        assert_eq!(ok(Str("Unicode 😱 ⌘".into())), datum("\"Unicode 😱 ⌘\""));
 
         assert_eq!(ok(Str("".into())), datum("\"\""));
     }
@@ -551,6 +550,28 @@ mod tests {
         };
 
         assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(if (zero? x) 1 (* x (f (dec x))))";
+        let exp = Cond {
+            pred: Box::new(List(vec![
+                Identifier("zero?".into()),
+                Identifier("x".into()),
+            ])),
+            then: Box::new(Number(1)),
+            alt: Some(Box::new(List(vec![
+                Identifier("*".into()),
+                Identifier("x".into()),
+                List(vec![
+                    Identifier("f".into()),
+                    List(vec![
+                        Identifier("dec".into()),
+                        Identifier("x".into()),
+                    ]),
+                ]),
+            ]))),
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
     }
 
     #[test]
@@ -603,6 +624,47 @@ mod tests {
             formals: vec!["a".into()],
             free: vec![],
             body: vec![Identifier("a".into())],
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(lambda (x) (if #t 1 2))";
+        let exp = Lambda {
+            name: None,
+            formals: vec!["x".into()],
+            free: vec![],
+            body: vec![Cond {
+                pred: Box::new(Boolean(true)),
+                then: Box::new(Number(1)),
+                alt: Some(Box::new(Number(2))),
+            }],
+        };
+
+        assert_eq!(ok(vec![exp]), program(prog));
+
+        let prog = "(lambda (x) (if (zero? x) 1 (* x (f (dec x)))))";
+        let exp = Lambda {
+            name: None,
+            formals: vec!["x".into()],
+            free: vec![],
+            body: vec![Cond {
+                pred: Box::new(List(vec![
+                    Identifier("zero?".into()),
+                    Identifier("x".into()),
+                ])),
+                then: Box::new(Number(1)),
+                alt: Some(Box::new(List(vec![
+                    Identifier("*".into()),
+                    Identifier("x".into()),
+                    List(vec![
+                        Identifier("f".into()),
+                        List(vec![
+                            Identifier("dec".into()),
+                            Identifier("x".into()),
+                        ]),
+                    ]),
+                ]))),
+            }],
         };
 
         assert_eq!(ok(vec![exp]), program(prog));
