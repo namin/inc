@@ -174,19 +174,21 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     // reserve this space before the function gets called. Not doing this
     // will result in the called function to override this space with its
     // local variables and corrupt the stack.
-    asm += x86::add(RSP, s.si + WORDSIZE);
-
-    asm += x86::call(name);
+    let locals = s.si + WORDSIZE;
+    if locals != 0 {
+        asm += x86::add(RSP, locals);
+        asm += x86::call(name);
+        asm += x86::sub(RSP, locals);
+    } else {
+        asm += x86::call(name)
+    }
 
     // NOTE: This is one of those big aha moments.
     //
-    // There is no need to reclaim space used for function arguments because
-    // the memory would just get overridden by next variable allocation.
-    // This makes keeping track of that stack index unnecessary and life so
-    // much simpler.
-
-    asm += x86::add(RSP, -(s.si + WORDSIZE));
-
+    // There is no need to reclaim/cleanup space used for function arguments
+    // because the memory would just get overridden by next variable allocation.
+    // This makes keeping track of that stack index unnecessary and life so much
+    // simpler.
     asm
 }
 
