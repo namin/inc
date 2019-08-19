@@ -20,7 +20,6 @@ pub mod state {
     /// `functions` are all user defined functions
     ///
     /// State should also implement some form of register allocation.
-    #[derive(Default)]
     pub struct State {
         pub si: i64,
         pub asm: ASM,
@@ -28,6 +27,19 @@ pub mod state {
         pub symbols: HashMap<String, usize>,
         pub functions: HashSet<String>,
         env: Env,
+    }
+
+    impl Default for State {
+        fn default() -> Self {
+            State {
+                si: -WORDSIZE,
+                asm: Default::default(),
+                li: 0,
+                symbols: HashMap::new(),
+                functions: HashSet::new(),
+                env: Default::default(),
+            }
+        }
     }
 
     impl State {
