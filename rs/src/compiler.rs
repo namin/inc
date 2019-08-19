@@ -237,6 +237,8 @@ pub mod emit {
     // TODO: eval should dispatch based on first atom alone, not necessarily
     // care about arity here. `let` and other variadic syntax forms won't fit
     // into any specific branch here.
+
+    #[allow(clippy::redundant_pattern)]
     pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
             Identifier(i) => match s.get(i) {
