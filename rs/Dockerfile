@@ -27,4 +27,3 @@ RUN mkdir /inc
 WORKDIR /inc
 ADD . /inc
 RUN cargo build --tests
-RUN cargo test
