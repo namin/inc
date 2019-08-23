@@ -66,32 +66,44 @@ pub struct Ins(pub String);
 #[derive(Default, Clone)]
 pub struct ASM(pub Vec<Ins>);
 
-/// An addressable can be used as an address in an assembly instruction.
+/// A Reference is a valid address to an x86 instruction.
 ///
-/// A prior version used explicit verbose indirection via an `Operand` type but
-/// trait bounds makes this API far more usable.
+/// A large number of instructions (for example add and mov) takes both
+/// registers, addresses and constants as operands and an explicit type that
+/// covers it all is quite useful.
 ///
-/// Registers can be addressed directly.
+/// A prior version used trait objects for this. Even though trait objects made
+/// the API a lot cleaner for the callers, (`x86::mov(RAX, 42)` instead of
+/// `x86::mov(RAX.into(), 42.into())`, it turned out to be a complex thing to
+/// implement. Dynamic trait objects are quite painful to work with - its tricky
+/// to manage the lifetimes, the errors aren't easy to understand and in general
+/// its a fairly complicated under the hood.
+///
+/// This is an explicit trade off of simplicity vs verbosity that can be
+/// revisited later.
+///
+/// # Examples
+///
 /// ```
 /// # use inc::x86::{self, Register::*, *};
-/// assert_eq!(Ins::from("add rax, rax"), add(RAX, RAX))
+/// assert_eq!(Ins::from("add rax, rax"), add(RAX.into(), RAX.into()))
 /// ```
 ///
 /// Numeric literals work as constants.
 /// ```
 /// # use inc::x86::{self, Register::*, *};
-/// assert_eq!(Ins::from("add rdx, 7"), add(RDX, 7))
+/// assert_eq!(Ins::from("add rdx, 7"), add(RDX.into(), 7.into()))
 /// ```
 ///
 /// Arithmetic on registers can be used for relative addresses.
 /// ```
 /// # use inc::x86::{self, Register::*, *};
-/// assert_eq!(Ins::from("add rax, [rsi - 16]"), add(RAX, RSI - 16))
+/// assert_eq!(Ins::from("add rax, [rsi - 16]"), add(RAX.into(), Reference::from(RSI - 16)))
 /// ```
-pub trait Addressable {
-    // Required for `mov` to address references correctly.
-    fn pointer(&self) -> bool;
-    fn deref(&self) -> String;
+pub enum Reference {
+    Register(Register),
+    Relative(Relative),
+    Const(i64),
 }
 
 /// An x86 register
@@ -157,13 +169,13 @@ pub struct Relative {
 // ¶ Codegen functions
 
 /// Add `v` to register `r`
-pub fn add(r: impl Addressable, v: impl Addressable) -> Ins {
-    Ins(format!("add {}, {}", r.deref(), v.deref()))
+pub fn add(r: Reference, v: Reference) -> Ins {
+    Ins(format!("add {}, {}", r, v))
 }
 
 /// Logical and of `v` to register `r`
-pub fn and(r: impl Addressable, v: impl Addressable) -> Ins {
-    Ins(format!("and {}, {}", r.deref(), v.deref()))
+pub fn and(r: Reference, v: Reference) -> Ins {
+    Ins(format!("and {}, {}", r, v))
 }
 
 /// Unconditional function call
@@ -179,8 +191,8 @@ pub fn call(f: &str) -> Ins {
 // sign-extended to the length of the first operand. The condition codes used by
 // the Jcc, CMOVcc, and SETcc instructions are based on the results of a CMP
 // instruction.
-pub fn cmp(a: impl Addressable, b: impl Addressable) -> Ins {
-    Ins(format!("cmp {}, {}", a.deref(), b.deref()))
+pub fn cmp(a: Reference, b: Reference) -> Ins {
+    Ins(format!("cmp {}, {}", a, b))
 }
 
 /// x86 function preamble
@@ -220,11 +232,10 @@ pub fn load(r: Register, si: i64) -> Ins {
 
 /// Mov! At least one of the operands must be a register, moving from
 /// RAM to RAM isn't a valid op.
-pub fn mov(to: impl Addressable, from: impl Addressable) -> Ins {
-    if to.pointer() {
-        Ins(format!("mov qword ptr {}, {}", to.deref(), from.deref()))
-    } else {
-        Ins(format!("mov {}, {}", to.deref(), from.deref()))
+pub fn mov(to: Reference, from: Reference) -> Ins {
+    match (&to, &from) {
+        (Reference::Register(_), _) => Ins(format!("mov {}, {}", to, from)),
+        _ => Ins(format!("mov qword ptr {}, {}", to, from)),
     }
 }
 
@@ -232,23 +243,23 @@ pub fn mov(to: impl Addressable, from: impl Addressable) -> Ins {
 // The destination operand is of `mul` is an implied operand located in register
 // AX. GCC throws `Error: ambiguous operand size for `mul'` without size
 // quantifier
-pub fn mul(v: impl Addressable) -> Ins {
-    Ins(format!("mul qword ptr {}", v.deref()))
+pub fn mul(v: Reference) -> Ins {
+    Ins(format!("mul qword ptr {}", v))
 }
 
 /// Logical or of `v` to register `r`
-pub fn or(r: impl Addressable, v: impl Addressable) -> Ins {
-    Ins(format!("or {}, {}", r.deref(), v.deref()))
+pub fn or(r: Reference, v: Reference) -> Ins {
+    Ins(format!("or {}, {}", r, v))
 }
 
 /// Pop a register `r` from stack
-pub fn pop(r: impl Addressable) -> Ins {
-    Ins(format!("pop {}", r.deref()))
+pub fn pop(r: Reference) -> Ins {
+    Ins(format!("pop {}", r))
 }
 
 /// Push a register `r` to stack
-pub fn push(r: impl Addressable) -> Ins {
-    Ins(format!("push {}", r.deref()))
+pub fn push(r: Reference) -> Ins {
+    Ins(format!("push {}", r))
 }
 
 /// Return from the calling function
@@ -257,8 +268,8 @@ pub fn ret() -> Ins {
 }
 
 /// Save a register `r` to stack at index `si`
-pub fn save(r: impl Addressable, si: i64) -> Ins {
-    Ins(format!("mov {}, {}", (Register::RBP + si), r.deref()))
+pub fn save(r: Reference, si: i64) -> Ins {
+    Ins(format!("mov {}, {}", Register::RBP + si, r))
 }
 
 // Shift Operations fall into `arithmetic` (`SAR` & `SAL`) and `logical`
@@ -272,18 +283,18 @@ pub fn save(r: impl Addressable, si: i64) -> Ins {
 // logical right (`SHR`) everywhere.
 
 /// Shift register `r` left by `v` bits; `r = r * 2^v`
-pub fn sal(r: impl Addressable, v: impl Addressable) -> Ins {
-    Ins(format!("sal {}, {}", r.deref(), v.deref()))
+pub fn sal(r: Reference, v: Reference) -> Ins {
+    Ins(format!("sal {}, {}", r, v))
 }
 
 /// Shift register `r` right by `v` bits; `r = r / 2^v`
-pub fn sar(r: impl Addressable, v: impl Addressable) -> Ins {
-    Ins(format!("sar {}, {}", r.deref(), v.deref()))
+pub fn sar(r: Reference, v: Reference) -> Ins {
+    Ins(format!("sar {}, {}", r, v))
 }
 
 /// Sub `k` from register `r`
-pub fn sub(r: impl Addressable, v: impl Addressable) -> Ins {
-    Ins(format!("sub {}, {}", r.deref(), v.deref()))
+pub fn sub(r: Reference, v: Reference) -> Ins {
+    Ins(format!("sub {}, {}", r, v))
 }
 
 /// The base address of the heap is passed in RDI and we reserve reg RSI for it.
@@ -342,36 +353,6 @@ impl Sub<i64> for Register {
 
     fn sub(self, offset: i64) -> Relative {
         Relative { register: self, offset: -offset }
-    }
-}
-
-impl Addressable for Register {
-    fn pointer(&self) -> bool {
-        false
-    }
-
-    fn deref(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl Addressable for i64 {
-    fn pointer(&self) -> bool {
-        false
-    }
-
-    fn deref(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl Addressable for Relative {
-    fn pointer(&self) -> bool {
-        true
-    }
-
-    fn deref(&self) -> String {
-        self.to_string()
     }
 }
 
@@ -440,6 +421,24 @@ impl From<Ins> for ASM {
     }
 }
 
+impl From<Register> for Reference {
+    fn from(r: Register) -> Self {
+        Reference::Register(r)
+    }
+}
+
+impl From<Relative> for Reference {
+    fn from(r: Relative) -> Self {
+        Reference::Relative(r)
+    }
+}
+
+impl From<i64> for Reference {
+    fn from(i: i64) -> Self {
+        Reference::Const(i)
+    }
+}
+
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", format!("{:?}", self).to_lowercase())
@@ -454,6 +453,16 @@ impl fmt::Display for Relative {
             write!(f, "{}", format!("[{} + {}]", self.register, self.offset))
         } else {
             write!(f, "{}", format!("[{}]", self.register))
+        }
+    }
+}
+
+impl fmt::Display for Reference {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Reference::Register(r) => write!(f, "{}", r),
+            Reference::Relative(r) => write!(f, "{}", r),
+            Reference::Const(i) => write!(f, "{}", i),
         }
     }
 }
@@ -481,10 +490,14 @@ impl fmt::Display for ASM {
 
 #[cfg(test)]
 mod tests {
-    use super::{Ins, Register::*};
+    use super::{Ins, Reference, Register::*};
 
     #[test]
     fn mov() {
-        assert_eq!(Ins::from("mov rax, 16"), super::mov(RAX, 16));
+        assert_eq!(Ins::from("mov rax, 16"), super::mov(RAX.into(), 16.into()));
+        assert_eq!(
+            Ins::from("mov qword ptr [rbp + 8], 16"),
+            super::mov(Reference::from(RBP + 8), 16.into())
+        )
     }
 }

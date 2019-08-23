@@ -165,7 +165,7 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     for (i, arg) in args.0.iter().enumerate() {
         let i: i64 = i.try_into().unwrap();
         asm += eval(s, arg);
-        asm += x86::save(RAX, s.si - ((i + 2) * WORDSIZE));
+        asm += x86::save(RAX.into(), s.si - ((i + 2) * WORDSIZE));
     }
 
     // Extend stack to hold the current local variables before creating a
@@ -176,9 +176,9 @@ pub fn call(s: &mut State, name: &str, args: &Expressions) -> ASM {
     // local variables and corrupt the stack.
     let locals = s.si + WORDSIZE;
     if locals != 0 {
-        asm += x86::add(RSP, locals);
+        asm += x86::add(RSP.into(), locals.into());
         asm += x86::call(name);
-        asm += x86::sub(RSP, locals);
+        asm += x86::sub(RSP.into(), locals.into());
     } else {
         asm += x86::call(name)
     }

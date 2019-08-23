@@ -182,7 +182,7 @@ pub mod emit {
 
     /// Clear (mask) all except the least significant 3 tag bits
     pub fn mask() -> Ins {
-        x86::and(RAX, immediate::MASK)
+        x86::and(RAX.into(), immediate::MASK.into())
     }
 
     /// Emit code for a let expression
@@ -203,7 +203,7 @@ pub mod emit {
         s.enter();
 
         for (name, expr) in vars {
-            asm += eval(s, expr) + x86::save(RAX, s.si);
+            asm += eval(s, expr) + x86::save(RAX.into(), s.si);
             s.set(name, s.si);
         }
 
@@ -232,7 +232,7 @@ pub mod emit {
         };
 
         eval(s, p)
-            + x86::cmp(RAX, immediate::FALSE)
+            + x86::cmp(RAX.into(), immediate::FALSE.into())
             + x86::je(&alt_label)
             + eval(s, then)
             + x86::jmp(&exit_label)
@@ -306,7 +306,7 @@ pub mod emit {
                 _ => panic!("Unknown expression: `{}`", prog),
             },
 
-            _ => x86::mov(RAX, immediate::to(&prog)).into(),
+            _ => x86::mov(RAX.into(), immediate::to(&prog).into()).into(),
         }
     }
 

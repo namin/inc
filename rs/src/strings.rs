@@ -34,7 +34,7 @@ use crate::{
     core::Expressions,
     immediate,
     x86::{
-        self, Ins,
+        self, Ins, Reference,
         Register::{self, *},
         ASM,
     },
@@ -100,10 +100,10 @@ pub fn make(_: &State, size: i64) -> ASM {
     let len = i64::try_from(size).unwrap();
     let size = ((len + 7) / 8) * 8;
 
-    x86::mov(RSI + 0, len)
-        + x86::mov(RAX, RSI)
-        + x86::or(RAX, immediate::STR)
-        + x86::add(RSI, size)
+    x86::mov(Reference::from(RSI + 0), len.into())
+        + x86::mov(RAX.into(), RSI.into())
+        + x86::or(RAX.into(), immediate::STR.into())
+        + x86::add(RSI.into(), size.into())
 }
 
 /// Lift static strings into a symbol table for inlining later.
