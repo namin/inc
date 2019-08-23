@@ -90,12 +90,20 @@ pub fn plus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
 
 /// Subtract `x` from `y` and move result to register RAX
 // `sub` subtracts the 2nd op from the first and stores the result in the 1st.
-// This is pretty inefficient to update result in stack and load it back.
-// Reverse the order and fix it up.
+//
+// Since binop evaluates x first and then y, this is a little clumsy. A
+// temporary register RDI is used to swap the arguments before subtracting in
+// right order.
+//
+//     x: [RBP - 8], y: RAX
+//     y: RAX -> RDI
+//     x: [RBP - 8] -> RAX
+//     RAX  = RAX (x) - RDI (y)
 pub fn minus(s: &mut State, x: &Expr, y: &Expr) -> ASM {
     binop(s, &x, &y)
-        + x86::sub(RAX.into(), Reference::from(RBP + s.si))
-        + x86::load(RAX, s.si)
+        + x86::mov(RDI.into(), RAX.into())
+        + x86::mov(RAX.into(), Reference::from(RBP + s.si))
+        + x86::sub(RAX.into(), RDI.into())
 }
 
 /// Multiply `x` and `y` and move result to register RAX
