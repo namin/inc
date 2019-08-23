@@ -80,7 +80,10 @@ pub fn not(s: &mut State, expr: &Expr) -> ASM {
 
 /// Evaluate arguments and store the first argument in stack and second in `RAX`
 fn binop(s: &mut State, x: &Expr, y: &Expr) -> ASM {
-    emit::eval(s, x) + x86::save(RAX.into(), s.si) + emit::eval(s, y)
+    let t = s.alloc();
+    let ctx = emit::eval(s, x) + x86::save(RAX.into(), t) + emit::eval(s, y);
+    s.dealloc(1);
+    ctx
 }
 
 /// Add `x` and `y` and move result to register RAX
