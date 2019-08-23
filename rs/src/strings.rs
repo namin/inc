@@ -81,7 +81,7 @@ fn address(s: &State, t: &Expr, to: Register) -> ASM {
         }
 
         Expr::Identifier(i) => match s.get(&i) {
-            Some(i) => x86::load(to, i).into(),
+            Some(i) => x86::mov(to.into(), i.clone()).into(),
             None => panic!("Undefined variable {}", i),
         },
 

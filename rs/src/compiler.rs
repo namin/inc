@@ -2,7 +2,7 @@
 
 /// State for the code generator
 pub mod state {
-    use crate::x86::{ASM, WORDSIZE};
+    use crate::x86::{Reference, ASM, WORDSIZE};
     use std::collections::{HashMap, HashSet};
 
     /// State for the code generator; easier to bundle it all into a struct than
@@ -55,13 +55,13 @@ pub mod state {
             self.env.leave()
         }
 
-        pub fn get(&self, i: &str) -> Option<i64> {
+        pub fn get(&self, i: &str) -> Option<&Reference> {
             self.env.get(i)
         }
 
         // Set a new binding in the current local environment
-        pub fn set(&mut self, i: &str, index: i64) {
-            self.env.set(i, index);
+        pub fn set(&mut self, i: &str, r: Reference) {
+            self.env.set(i, r);
             self.alloc();
         }
 
@@ -93,8 +93,7 @@ pub mod state {
         }
     }
     // Environment is an *ordered* list of bindings.
-    #[derive(Debug)]
-    struct Env(Vec<HashMap<String, i64>>);
+    struct Env(Vec<HashMap<String, Reference>>);
 
     impl Default for Env {
         fn default() -> Self {
@@ -111,16 +110,14 @@ pub mod state {
             self.0.remove(0);
         }
 
-        pub fn set(&mut self, i: &str, index: i64) {
-            self.0
-                .first_mut()
-                .map(|binding| binding.insert(i.to_string(), index));
+        pub fn set(&mut self, i: &str, r: Reference) {
+            self.0.first_mut().map(|binding| binding.insert(i.to_string(), r));
         }
 
-        pub fn get(&self, i: &str) -> Option<i64> {
+        pub fn get(&self, i: &str) -> Option<&Reference> {
             for bindings in &self.0 {
                 if let Some(t) = bindings.get(i) {
-                    return Some(*t);
+                    return Some(t);
                 }
             }
             None
@@ -137,28 +134,28 @@ pub mod state {
             assert_eq!(e.0.len(), 1);
 
             // default global scope
-            e.set("x", -8);
-            assert_eq!(e.get("x"), Some(-8));
+            e.set("x", Reference::from(-8));
+            assert_eq!(e.get("x"), Some(&Reference::from(-8)));
 
             // overwrite in current scope
-            e.set("x", -16);
-            assert_eq!(e.get("x"), Some(-16));
+            e.set("x", Reference::from(Reference::from(-16)));
+            assert_eq!(e.get("x"), Some(&Reference::from(-16)));
 
             e.enter();
             assert_eq!(e.0.len(), 2);
             // read variables from parent scope
-            assert_eq!(e.get("x"), Some(-16));
+            assert_eq!(e.get("x"), Some(&Reference::from(-16)));
 
-            e.set("y", -24);
+            e.set("y", Reference::from(-24));
             // local variable shadows global
-            e.set("x", -32);
-            assert_eq!(e.get("x"), Some(-32));
+            e.set("x", Reference::from(-32));
+            assert_eq!(e.get("x"), Some(&Reference::from(-32)));
 
             e.leave();
 
             assert_eq!(e.0.len(), 1);
             assert_eq!(e.get("y"), None);
-            assert_eq!(e.get("x"), Some(-16));
+            assert_eq!(e.get("x"), Some(&Reference::from(-16)));
         }
     }
 }
@@ -177,7 +174,7 @@ pub mod emit {
             Expressions,
         },
         immediate, lambda, primitives, strings,
-        x86::{self, Ins, Register::*, ASM},
+        x86::{self, Ins, Register::*, Relative, ASM},
     };
 
     /// Clear (mask) all except the least significant 3 tag bits
@@ -204,7 +201,8 @@ pub mod emit {
 
         for (name, expr) in vars {
             asm += eval(s, expr) + x86::save(RAX.into(), s.si);
-            s.set(name, s.si);
+            let r = Relative { register: RBP, offset: s.si };
+            s.set(name, r.into());
         }
 
         for b in body {
@@ -254,7 +252,7 @@ pub mod emit {
     pub fn eval(s: &mut State, prog: &Expr) -> ASM {
         match prog {
             Identifier(i) => match s.get(i) {
-                Some(i) => x86::load(RAX, i).into(),
+                Some(i) => x86::mov(RAX.into(), i.clone()).into(),
                 None => panic!("Undefined variable {}", i),
             },
 

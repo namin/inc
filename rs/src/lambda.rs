@@ -34,7 +34,7 @@ use crate::{
         Expr::{self, *},
         Expressions,
     },
-    x86::{self, Register::*, ASM, WORDSIZE},
+    x86::{self, Reference, Register::*, ASM, WORDSIZE},
 };
 
 use std::convert::TryInto;
@@ -135,7 +135,7 @@ pub fn code(s: &mut State, codes: Expressions) -> ASM {
 
                 for (i, arg) in formals.iter().enumerate() {
                     let i: i64 = i.try_into().unwrap();
-                    s.set(&arg, -(i + 1) * WORDSIZE);
+                    s.set(&arg, Reference::from(-(i + 1) * WORDSIZE));
                 }
 
                 for b in body {

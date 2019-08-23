@@ -100,6 +100,7 @@ pub struct ASM(pub Vec<Ins>);
 /// # use inc::x86::{self, Register::*, *};
 /// assert_eq!(Ins::from("add rax, [rsi - 16]"), add(RAX.into(), Reference::from(RSI - 16)))
 /// ```
+#[derive(PartialEq, Debug, Clone)]
 pub enum Reference {
     Register(Register),
     Relative(Relative),
@@ -161,6 +162,8 @@ pub const SYS_V: [Register; 6] = [
 ///
 /// assert_eq!("[rbx]", (RBX + 0 ).to_string());
 /// ```
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct Relative {
     pub register: Register,
     pub offset: i64,
