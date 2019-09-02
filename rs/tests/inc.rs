@@ -11,6 +11,8 @@ extern crate quickcheck;
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 
+const test_folder: &str = "test_tmp";
+
 // Step 1: Integers
 mod integers {
     use super::*;
@@ -451,11 +453,11 @@ mod functions {
 }
 
 // Get a test config with program as input
-fn config(program: String) -> Config {
+fn config(base_folder: &str, program: String) -> Config {
     // Time epoch instead of UUID occasionally ran into race conditions which
     // made multiple tests write to the same file concurrently completely
     // messing things up.
-    let output = format!("inc-{:?}", Uuid::new_v4());
+    let output = format!("{}inc", base_folder);
 
     Config { program, output, exec: true }
 }
@@ -474,8 +476,12 @@ fn test_many(tests: &[(&str, &str)]) {
 
 // Run a single test, assert everything and cleanup afterwards
 fn test1(input: &str, output: &str) {
+    let base_folder = format!("{}/{:?}/", test_folder, Uuid::new_v4());
+    fs::create_dir_all(&base_folder).unwrap();
+    fs::write(format!("{}/test.lisp", base_folder), input).unwrap();
+
     // Create a fresh config per run, this should allow for parallelism later.
-    let config = config(input.to_string());
+    let config = config(&base_folder, input.to_string());
 
     let result = panic::catch_unwind(|| {
         // Rebuild before every run
@@ -496,5 +502,5 @@ fn test1(input: &str, output: &str) {
     fs::remove_file(&config.asm())
         .expect("Failed to clear generated asm files");
     fs::remove_file(&config.output).expect("Failed to clear executable");
-    fs::remove_dir_all(format!("{}.dSYM", &config.output)).unwrap_or_default()
+    fs::remove_dir_all(&base_folder).unwrap_or_default()
 }
