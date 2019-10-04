@@ -9,3 +9,12 @@ compile with continuations_.
 [1]: https://github.com/namin/inc/blob/master/docs/paper.pdf?raw=true
 [2]: https://github.com/namin/inc/blob/master/docs/tutorial.pdf?raw=true
 [3]: http://matt.might.net/articles/cps-conversion/
+
+## More on `inc`
+
+See the [src](src) directory.
+
+## Docker cheatsheet
+
+- `docker build -t=namin/inc .`
+- `docker run -i -t  namin/inc  /bin/bash`
