@@ -1,4 +1,5 @@
 (load "tests-driver.scm")
+(load "tests-6.1-req.scm")
 (define enable-cps #f)
 (when enable-cps
   (load "tests-5.3-req.scm"))
@@ -537,11 +538,13 @@
 
 (define (define? expr)
   (tagged-list 'define expr))
-;; TODO: support syntatic (define (f ...) ...) form.
 (define (define-lhs expr)
-  (cadr expr))
+  (let ((lhs (cadr expr)))
+    (if (pair? lhs) (car lhs) lhs)))
 (define (define-rhs expr)
-  (make-body (cddr expr)))
+  (let ((lhs (cadr expr))
+        (body (make-body (cddr expr))))
+    (if (pair? lhs) (list 'lambda (cdr lhs) body) body)))
 (define (macro-expand expr)
   (define (transform expr bound-vars)
     (cond
