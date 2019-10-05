@@ -17,4 +17,5 @@ See the [src](src) directory.
 ## Docker cheatsheet
 
 - `docker build -t=namin/inc .`
-- `docker run -i -t  namin/inc  /bin/bash`
+- `docker run -i -t  namin/inc /bin/bash`
+- `docker run -it -v $(pwd):/inc-live namin/inc /bin/bash`
