@@ -1,5 +1,5 @@
 (add-tests-with-string-output "remainder/modulo/quotient"
-  [#\tab => "#\\tab\n"]
+  ;;[#\tab => "#\\tab\n"]
   [(fxquotient 16 4) => "4\n"]
   [(fxquotient 5 2) => "2\n"]
   [(fxquotient -45 7) => "-6\n"]

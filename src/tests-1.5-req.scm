@@ -1,7 +1,4 @@
-
-
-
-(add-tests-with-string-output "fx+"
+(add-tests-with-string-output-noboot "fx+"
   [(fx+ 1 2) => "3\n"]
   [(fx+ 1 -2) => "-1\n"]
   [(fx+ -1 2) => "1\n"]
@@ -31,7 +28,7 @@
   [(fx+ 1 (fx+ 2 (fx+ 3 (fx+ 4 (fx+ 5 (fx+ 6 (fx+ 7 (fx+ 8 9)))))))) => "45\n"]
 )
  
-(add-tests-with-string-output "fx-"
+(add-tests-with-string-output-noboot "fx-"
   [(fx- 1 2) => "-1\n"]
   [(fx- 1 -2) => "3\n"]
   [(fx- -1 2) => "-3\n"]
@@ -68,7 +65,7 @@
   [(fx- 1 (fx- 2 (fx- 3 (fx- 4 (fx- 5 (fx- 6 (fx- 7 (fx- 8 9)))))))) => "5\n"]
 )
 
-(add-tests-with-string-output "fx*"
+(add-tests-with-string-output-noboot "fx*"
   [(fx* 2 3) => "6\n"]
   [(fx* 2 -3) => "-6\n"]
   [(fx* -2 3) => "-6\n"]

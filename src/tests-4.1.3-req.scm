@@ -1,4 +1,4 @@
-(add-tests-with-string-output "write/display"
+(add-tests-with-string-output-noboot "write/display"
   [(fx+ -536870911 -1) => "-536870912\n"]
   [(begin
      (write '(1 2 3))

@@ -13,6 +13,7 @@
 #define OUT 0
 
 #define FILENAME_MAX_LENGTH 100
+#define CMD_MAX_LENGTH 100
 
 static void print_ptr_rec(FILE* port, ptr x, int state) {
   if ((x & fx_mask) == fx_tag) {
@@ -64,21 +65,22 @@ static void print_ptr_rec(FILE* port, ptr x, int state) {
 
     fprintf(port, ")");
   } else if ((x & obj_mask) == string_tag) {
-    if (state == OUT) fprintf(port, "\"");
+    int q = state != DISPLAY;
+    if (q) fprintf(port, "\"");
 
     string* p = (string*)(x-string_tag);
     unsigned int n = p->length >> fx_shift;
     unsigned int i;
     for (i = 0; i < n; i++) {
       int c = p->buf[i];
-      if      (c == '"' ) fprintf(port, "\\\"");
-      else if (c == '\\') fprintf(port, "\\\\");
-      else                fputc(c, port);
+      if      (q && c == '"' ) fprintf(port, "\\\"");
+      else if (q && c == '\\') fprintf(port, "\\\\");
+      else                     fputc(c, port);
     }
 
-    if (state == OUT) fprintf(port, "\"");
+    if (q) fprintf(port, "\"");
   } else if ((x & obj_mask) == symbol_tag) {
-    print_ptr_rec(port, (x - symbol_tag) | string_tag, IN);
+    print_ptr_rec(port, (x - symbol_tag) | string_tag, DISPLAY);
   } else if ((x & obj_mask) == closure_tag) {
     fprintf(port, "#<procedure>");
   } else {
@@ -98,18 +100,9 @@ ptr ik_log(ptr msg) {
   return 0;
 }
 
-void ik_error(ptr x) {
+void ik_error(ptr msg) {
   fprintf(stderr, "Exception");
-  if ((x & obj_mask) == pair_tag) {
-    ptr caller = ((cell*)(x-pair_tag))->car;
-    ptr msg = ((cell*)(x-pair_tag))->cdr;
-    if (caller != bool_f) {
-      fprintf(stderr, " in ");
-      print_ptr_rec(stderr, caller, OUT);
-    }
-    fprintf(stderr, ": ");
-    print_ptr_rec(stderr, msg, IN);
-  }
+  print_ptr_rec(stderr, msg, OUT);
   fprintf(stderr, "\n");
   exit(0);
 }
@@ -120,6 +113,14 @@ static int unshift(ptr x) {
 
 static ptr shift(int x) {
   return x << fx_shift;
+}
+
+ptr s_bitwise_ior(ptr x, ptr y) {
+  return shift(unshift(x) | unshift(y));
+}
+
+ptr s_ash(ptr x, ptr y) {
+  return shift(unshift(x) << unshift(y));
 }
 
 static char* string_data(ptr x) {
@@ -179,6 +180,13 @@ ptr s_read_char(ptr fd) {
 
 ptr s_close(ptr fd) {
   return shift(close(unshift(fd)));
+}
+
+int s_system(ptr cmd) {
+  char c_cmd[CMD_MAX_LENGTH];
+  cp_str_data(cmd, c_cmd, CMD_MAX_LENGTH);
+  int r = system(c_cmd);
+  return shift(r);
 }
 
 static char* gc_next;

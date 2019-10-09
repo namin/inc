@@ -7,4 +7,8 @@
   [(let ()
      (define (f x y) (fx+ x y))
      (f 3 4))
-   => "7\n"])
+   => "7\n"]
+  [(let ()
+     (define (f x) (fx+ x x))
+     (f 3))
+   => "6\n"])

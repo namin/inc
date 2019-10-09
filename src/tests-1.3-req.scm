@@ -1,4 +1,4 @@
-(add-tests-with-string-output "fxadd1"
+(add-tests-with-string-output-noboot "fxadd1"
   [(fxadd1 0) => "1\n"]
   [(fxadd1 -1) => "0\n"]
   [(fxadd1 1) => "2\n"]
@@ -10,7 +10,7 @@
   [(fxadd1 (fxadd1 (fxadd1 (fxadd1 (fxadd1 (fxadd1 12)))))) => "18\n"]
   )
 
-(add-tests-with-string-output "fxsub1"
+(add-tests-with-string-output-noboot "fxsub1"
   [(fxsub1 0) => "-1\n"]
   [(fxsub1 -1) => "-2\n"]
   [(fxsub1 1) => "0\n"]
@@ -41,7 +41,7 @@
    [(fixnum->char (char->fixnum #\x)) => "#\\x\n"]
 )
 
-(add-tests-with-string-output "fixnum?"
+(add-tests-with-string-output-noboot "fixnum?"
    [(fixnum? 0) => "#t\n"]
    [(fixnum? 1) => "#t\n"]
    [(fixnum? -1) => "#t\n"]
@@ -118,7 +118,7 @@
   [(not (fixnum? #f)) => "#t\n"]
 )
 
-(add-tests-with-string-output "fxlognot"
+(add-tests-with-string-output-noboot "fxlognot"
  [(fxlognot 0) => "-1\n"]
  [(fxlognot -1) => "0\n"]
  [(fxlognot 1) => "-2\n"]

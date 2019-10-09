@@ -1,22 +1,25 @@
 Inc: an incrementally developed compiler
 =======================================
 
-Setup instructions for Ubuntu x86
----------------------------------
+The compiler can now compile itself.
+Do `make boot` to create a standalone repl.
+(The booted compiler supports a smaller range of fixnums due to double shifting.)
 
-- `$ sudo apt-get install chezscheme`
-- `$ sudo apt-get install libc6-dev-i386`
+The tests are now loaded in `compiler-tests.scm`.
 
-Quick instructions to run all tests
------------------------------------
-    $ scheme compiler.scm
-      > (compile-lib)     ;; just once
-      > (test-all)        ;; run all the tests
+To run all the tests, do `make test` at a shell.
+The tests can run for both the hosted and booted compiler.
+By toggling `enable-boot-tests` in `tests-driver.scm`,
+the booted compiler can be included or excluded from the tests.
 
-or just
+### possible TODOs
 
-    $ make test
+- [ ] generate code for loaded definitions in advance, as for lib primitives
 
+- [ ] understand why the booted compiler runs out of memory compiling itself,
+      and optimize accordingly
+
+- [ ] update the rust runtime for the booted compiler
 
 Full original instructions
 --------------------------

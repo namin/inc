@@ -1,0 +1,71 @@
+(add-tests-with-string-output-noboot "test compiler on tests"
+  [(let ()
+     (flush-output-port)
+     (load "self.scm")
+     (load "reader.scm")
+     (load "compiler.scm")
+     (load "tests-1.9-req.scm")
+     (load "tests-1.8-req.scm")
+     (load "tests-1.7-req.scm")
+     (load "tests-1.6-opt.scm")
+     (load "tests-1.6-req.scm")
+     (load "tests-1.4-req.scm")
+     (load "tests-1.2-req.scm")
+     ;; missing 1.1, 1.3, 1.5
+     ;; b/c large numbers overflow due to double tagging
+     (test-all)
+     'Ok)
+   => "#\\~\nOk\n Ok.\nPassed all 255 tests.\nOk\n"]
+
+  [(let ()
+     (flush-output-port)
+     (load "self.scm")
+     (load "reader.scm")
+     (load "compiler.scm")
+     (load "tests-2.9-req.scm")
+     (load "tests-2.8-req.scm")
+     (load "tests-2.6-req.scm")
+     (load "tests-2.4-req.scm")
+     (load "tests-2.3-req.scm")
+     (load "tests-2.2-req.scm")
+     (load "tests-2.1-req.scm")
+     (test-all)
+     'Ok)
+   => "120\nOk\n Ok.\nPassed all 169 tests.\nOk\n"]
+
+  [(let ()
+     (flush-output-port)
+     (load "self.scm")
+     (load "reader.scm")
+     (load "compiler.scm")
+     (load "tests-3.4-req.scm")
+     (load "tests-3.3-req.scm")
+     (load "tests-3.2-req.scm")
+     (load "tests-3.1-req.scm")
+     (test-all)
+     'Ok)
+     => "#(1 2 3 4 5 6)\nOk\n Ok.\nPassed all 138 tests.\nOk\n"]
+
+  [(let ()
+     (flush-output-port)
+     (load "self.scm")
+     (load "reader.scm")
+     (load "compiler.scm")
+     (load "tests-4.2-req.scm")
+     (load "tests-4.1.2-req.scm")
+     (load "tests-4.1.1-req.scm")
+     ;; missing 4.1.3 b/c large numbers overflow
+     (test-all)
+     'Ok)
+   => "-8\nOk\n Ok.\nPassed all 35 tests.\nOk\n"]
+
+    [(let ()
+     (flush-output-port)
+     (load "self.scm")
+     (load "reader.scm")
+     (load "compiler.scm")
+     (load "tests-5.2-req.scm")
+     (test-all)
+     'Ok)
+     => "100\nOk\n Ok.\nPassed all 2 tests.\nOk\n"]
+    )

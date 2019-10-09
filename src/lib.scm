@@ -62,6 +62,12 @@
 (define-lib-primitive (log msg)
   (foreign-call "ik_log" msg))
 
+(define-lib-primitive (s_bitwise_ior x y)
+  (foreign-call "s_bitwise_ior" x y))
+
+(define-lib-primitive (s_ash x y)
+  (foreign-call "s_ash" x y))
+
 (define-lib-primitive (string-set! s i c)
   (cond
    [(not (string? s)) (error)]
@@ -132,6 +138,12 @@
 (define-lib-primitive (current-output-port)
   stdout)
 
+(define-lib-primitive stdin
+  (make-input-port "" 0))
+
+(define-lib-primitive (current-input-port)
+  stdin)
+
 (define-lib-primitive BUFFER_SIZE 4096)
 
 (define-lib-primitive (open-output-file fname . args)
@@ -185,6 +197,9 @@
   (flush-output-port port)
   (unless (string=? "" (output-port-fname port))
 	  (foreign-call "s_close" (output-port-fd port))))
+
+(define-lib-primitive (system cmd)
+  (foreign-call "s_system" cmd))
 
 (define-lib-primitive (write x (port (current-output-port)))
   (flush-output-port port)

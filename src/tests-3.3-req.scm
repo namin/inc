@@ -144,8 +144,6 @@
   => ""]
 )
 
-#!eof  
- 
 (add-tests-with-string-output "string errors"
   [(let ([f (lambda (a b c) (string a b c))])
      (f #\a #\b #\c)) => "\"abc\"\n"]

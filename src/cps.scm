@@ -16,19 +16,19 @@
     (let ([expr (first (begin-seq expr))]
 	  [exprs (rest (begin-seq expr))])
       (if (null? exprs)
-	  (T-k expr k)
-	  (T-k expr (lambda (_)
-		      (T-k `(begin ,@exprs) k)))))]
+	        (T-k expr k)
+	        (T-k expr (lambda (_)
+		                  (T-k (cons 'begin exprs) k)))))]
    [(if? expr)
     (let* ([exprc (if-test expr)]
 	   [exprt (if-conseq expr)]
 	   [exprf (if-altern expr)]
 	   [$rv (unique-name '$rv)]
-	   [cont `(lambda (,$rv) ,(k $rv))])
+	   [cont (list 'lambda (list $rv) (k $rv))])
       (T-k exprc (lambda (aexp)
-		   `(if ,aexp
-			,(T-c exprt cont)
-			,(T-c exprf cont)))))]
+		               (list 'if aexp
+			                   (T-c exprt cont)
+			                   (T-c exprf cont)))))]
    [(let? expr)
     (let ([vars (map lhs (let-bindings expr))]
 	  [vals (map rhs (let-bindings expr))])
@@ -39,7 +39,7 @@
 		    (T-k (let-body expr) k)))))]
    [(app? expr)
     (let* ([$rv (unique-name '$rv)]
-	   [cont `(lambda (,$rv) ,(k $rv))])
+	   [cont (list 'lambda (list $rv) (k $rv))])
       (T-c expr cont))]
    [else (error 'T-k (format "~s is not an expression" expr))]))
 
@@ -47,25 +47,25 @@
 (define (T-c expr c)
   (cond
    [(aexpr? expr)
-    `(,c ,(M expr))]
+    (list c (M expr))]
    [(begin? expr)
     (let ([expr (first (begin-seq expr))]
-	  [exprs (rest (begin-seq expr))])
+	        [exprs (rest (begin-seq expr))])
       (if (null? exprs)
-	  (T-c expr c)
-	  (T-k expr (lambda (_)
-		      (T-c `(begin ,@exprs) c)))))]
+	        (T-c expr c)
+	        (T-k expr (lambda (_)
+		                  (T-c (cons 'begin exprs) c)))))]
    [(if? expr)
     (let ([exprc (if-test expr)]
-	  [exprt (if-conseq expr)]
-	  [exprf (if-altern expr)]
-	  [$k (unique-name '$k)])
-      `((lambda (,$k)
-	  ,(T-k exprc (lambda (aexp)
-			`(if ,aexp
-			     ,(T-c exprt $k)
-			     ,(T-c exprf $k)))))
-	,c))]
+	        [exprt (if-conseq expr)]
+	        [exprf (if-altern expr)]
+	        [$k (unique-name '$k)])
+      (list (list 'lambda (list $k)
+	                (T-k exprc (lambda (aexp)
+			                         (list 'if aexp
+			                               (T-c exprt $k)
+			                               (T-c exprf $k)))))
+	          c))]
    [(let? expr)
     (let ([vars (map lhs (let-bindings expr))]
 	  [vals (map rhs (let-bindings expr))])
@@ -79,10 +79,10 @@
 	  [es (call-args expr)])
       (T-k f (lambda ($f)
 	       (T*-k es (lambda ($es)
-			  (let ([app `(,$f ,c ,@$es)])
-			    (if (call-apply? expr)
-				(cons 'apply app)
-				app)))))))]
+			              (let ([app (cons $f (cons c $es))])
+			                (if (call-apply? expr)
+				                  (cons 'apply app)
+				                  app)))))))]
    [else (error 'T-c (format "~s is not an expression" expr))]))
 
 (define (T*-k exprs k)
@@ -98,8 +98,15 @@
   (cond
    [(lambda? aexpr)
     (let ([$k (unique-name '$k)])
-      `(lambda ,(cons $k (lambda-formals aexpr))
-	 ,(T-c (lambda-body aexpr) $k)))]
+      (list 'lambda (cons $k (lambda-formals aexpr))
+	          (T-c (lambda-body aexpr) $k)))]
    [(eq? 'call/cc aexpr)
     '(lambda (cc f) (f cc (lambda (_ x) (cc x))))]
    [else aexpr]))
+
+(set! cps-conversion
+      (lambda (expr)
+        (make-let
+         'labels
+         (let-bindings expr)
+         (cps-top (let-body expr)))))
